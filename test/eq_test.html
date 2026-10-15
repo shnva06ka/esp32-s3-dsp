@@ -1,0 +1,2365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>ESP32-S3-DSP</title>
+<style>
+/* ── Nord Light Theme Palette (High-Contrast Flat & Mono) ──────────────── */
+:root {
+  --nord0: #2E3440; /* darkest slate */
+  --nord1: #3B4252;
+  --nord2: #434C5E;
+  --nord3: #4C566A; /* muted slate */
+  --nord4: #D8DEE9; /* light border */
+  --nord5: #E5E9F0; /* subtle surface */
+  --nord6: #ECEFF4; /* app background */
+  --nord7: #8FBCBB; /* teal frost */
+  --nord8: #88C0D0; /* cyan frost */
+  --nord9: #81A1C1; /* soft frost blue */
+  --nord10: #5E81AC; /* deep frost blue */
+  --nord11: #BF616A; /* aurora red */
+  --nord12: #D08770; /* aurora orange */
+  --nord13: #EBCB8B; /* aurora yellow */
+  --nord14: #438728; /* high-contrast green */
+  --nord15: #B48EAD; /* aurora purple */
+
+  --bg: #EDF1F7;
+  --card-bg: #FFFFFF;
+  --card-header: #E5E9F0;
+  --border: #CBD5E1;
+  --border-strong: #4C566A;
+  --text: #2E3440;
+  --muted: #4C566A;
+  --accent: #5E81AC;
+  --active: #3D7820;
+  --danger: #BF616A;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html, body, button, input, select, textarea {
+  font-family: var(--mono);
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-x: hidden;
+}
+
+/* ── App Header ─────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: var(--card-bg);
+  border-bottom: 2px solid var(--border-strong);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brand h1 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.brand .badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--nord5);
+  color: var(--nord0);
+  padding: 2px 8px;
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+}
+
+#ws-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord0);
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 4px 10px;
+}
+#ws-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 1px solid var(--nord0);
+}
+#ws-dot.ok  { background: var(--active); }
+#ws-dot.err { background: var(--danger); }
+
+/* ── Header Controls (Input Selector & Status Badge) ────── */
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.input-source-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.header-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+}
+.segmented-control {
+  display: inline-flex;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--nord5);
+}
+.btn-segment {
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-strong);
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nord0);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  font-family: var(--mono);
+}
+.btn-segment:last-child {
+  border-right: none;
+}
+.btn-segment:hover {
+  background: #DAE0EA;
+}
+.btn-segment.active {
+  background: var(--nord10);
+  color: #FFFFFF;
+}
+.active-source-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--nord0);
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 4px 8px;
+  letter-spacing: 0.03em;
+}
+.active-source-badge .badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--active);
+  border: 1px solid var(--nord0);
+}
+
+/* ── Container Layout ───────────────────────────────────── */
+main {
+  max-width: 1400px;
+  margin: 16px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Module Cards / Boxes (High Contrast Flat) ──────────── */
+.module-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.module-box.bypassed {
+  border-color: var(--border);
+}
+.module-box.bypassed .module-header {
+  background: #E2E8F0;
+}
+.module-box.bypassed .module-title {
+  color: var(--nord3);
+}
+.module-box.bypassed .module-body {
+  filter: grayscale(1);
+  opacity: 0.60;
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--card-header);
+  border-bottom: 1px solid var(--border-strong);
+  cursor: pointer;
+  user-select: none;
+}
+.module-header:hover {
+  background: #DAE0EA;
+}
+.module-box.collapsed .module-header {
+  border-bottom: none;
+}
+.module-box.collapsed .module-body {
+  display: none;
+}
+.module-title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.collapse-icon {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+  user-select: none;
+}
+.module-box.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+.module-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* ── Simple On/Off Toggle Switch (High Contrast) ────────── */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--nord4);
+  border-radius: 2px;
+  border: 1px solid var(--border-strong);
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #FFFFFF;
+  border-radius: 2px;
+  border: 1px solid var(--nord0);
+}
+.switch input:checked + .slider {
+  background-color: var(--active);
+  border-color: var(--nord0);
+}
+.switch input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.module-body {
+  padding: 14px 16px;
+}
+
+/* ── EQ Frequency Response Canvas ───────────────────────── */
+#canvas-wrap {
+  position: relative;
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+#freq-canvas {
+  width: 100%;
+  height: 220px;
+  display: block;
+}
+
+/* ── EQ Toolbar (Presets + Band Controls) ───────────────── */
+.eq-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+.preset-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.preset-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.btn-preset {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  background: #FFFFFF;
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.btn-preset:hover {
+  background: #DAE0EA;
+}
+.btn-preset.active {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--nord0);
+}
+.btn-preset-action {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  background: var(--nord5);
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.btn-preset-action:hover {
+  background: #CBD5E1;
+  border-color: var(--nord0);
+}
+
+.eq-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.band-count-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #FFFFFF;
+  border: 1px solid var(--nord0);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+}
+.btn-primary:hover {
+  background: #4C6F98;
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── EQ Main Layout: Preamp on Left, Auto-Fill Bands on Right */
+.eq-body-layout {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+}
+
+.preamp-col {
+  flex: 0 0 76px;
+  width: 76px;
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  user-select: none;
+}
+.preamp-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.preamp-slider-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 180px;
+  padding: 4px 0;
+}
+.preamp-slider {
+  -webkit-appearance: slider-vertical;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 18px;
+  height: 160px;
+  cursor: ns-resize;
+  accent-color: var(--accent);
+}
+.preamp-ticks {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 160px;
+  font-size: 8px;
+  font-weight: 800;
+  color: var(--muted);
+  line-height: 1;
+  pointer-events: none;
+}
+.preamp-ticks .tick-zero {
+  color: var(--nord0);
+  font-weight: 900;
+}
+.preamp-input {
+  width: 58px;
+  text-align: center;
+}
+.preamp-unit {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+/* ── Dynamic Band Cards (Auto Fill Width) ───────────────── */
+#bands-container {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  overflow-x: auto;
+}
+.band-card {
+  flex: 1 1 0;
+  min-width: 78px;
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.band-card:hover {
+  border-color: var(--nord0);
+}
+.band-card-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.band-id {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+}
+.band-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.btn-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+  padding: 2px;
+  line-height: 1;
+}
+.btn-icon:hover { color: var(--danger); }
+.band-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: #FFFFFF;
+}
+.band-dot.on {
+  background: var(--active);
+  border-color: var(--nord0);
+}
+
+/* Band Type Selector */
+.band-type-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 1px 0 2px;
+}
+.band-type-select {
+  width: 100%;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--nord0);
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 2px 2px;
+  outline: none;
+  cursor: pointer;
+  text-align: center;
+}
+.band-type-select:focus {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+.band-order-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 0 0 2px;
+}
+.band-order-select {
+  width: 100%;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--nord0);
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 2px 1px;
+  outline: none;
+  cursor: pointer;
+  text-align: center;
+}
+.band-order-select:focus {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+
+/* ── Parameter Row (Knob + Text Box) ────────────────────── */
+.param-unit-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+.param-unit-col.disabled-param {
+  opacity: 0.30;
+  pointer-events: none;
+}
+.param-unit-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: var(--nord0);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+canvas.knob {
+  display: block;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+/* Remove up/down spinner arrows from all number inputs */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  font-weight: 400;
+}
+
+.param-input-box {
+  width: 58px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400; /* Standard text, not bold */
+  color: var(--text);
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 2px 3px;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.param-input-box:focus {
+  border-color: var(--accent);
+  outline: 1px solid var(--accent);
+}
+
+/* ── Compander & Limiter Controls Grid ───────────────────── */
+.module-grid-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  align-items: center;
+  justify-items: center;
+}
+.control-pod {
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  max-width: 160px;
+}
+.control-pod-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--nord0);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.control-pod-val-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.control-pod-val-row span {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ── Footer ─────────────────────────────────────────────── */
+footer {
+  text-align: center;
+  padding: 16px 0 24px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1>ESP32-S3-DSP</h1>
+    <span class="badge">YD-ESP32-S3 · 48kHz Stereo</span>
+  </div>
+
+  <div class="header-controls">
+    <div class="input-source-group">
+      <span class="header-label">INPUT:</span>
+      <div class="segmented-control" id="input-source-selector">
+        <button class="btn-segment active" id="btn-src-0" onclick="setInputSource(0)" title="Auto-detect: Plays Aux by default; auto-switches to Bluetooth when non-silent audio is detected">AUTO</button>
+        <button class="btn-segment" id="btn-src-1" onclick="setInputSource(1)" title="PCM1808 ADC Aux Input">AUX</button>
+        <button class="btn-segment" id="btn-src-2" onclick="setInputSource(2)" title="External Bluetooth Input (from ESP32-WROOM)">BT</button>
+        <button class="btn-segment" id="btn-src-3" onclick="setInputSource(3)" title="Wi-Fi Stream (Ring Buffer Stub)">WIFI</button>
+      </div>
+    </div>
+
+    <div class="active-source-badge" id="active-source-badge" title="Current audible active stream">
+      <span class="badge-dot"></span>
+      <span id="active-source-lbl">ACTIVE: AUX</span>
+    </div>
+
+    <div id="ws-pill">
+      <div id="ws-dot"></div>
+      <span id="ws-lbl">Connecting…</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- MODULE 1: PARAMETRIC EQUALIZER                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section class="module-box" id="mod-eq">
+    <div class="module-header" onclick="toggleModuleCollapse('eq')">
+      <div class="module-title-area">
+        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+          <input type="checkbox" id="switch-eq" checked onchange="toggleEQModule(this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="module-title">Parametric Equalizer</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <!-- Frequency response curve -->
+      <div id="canvas-wrap">
+        <canvas id="freq-canvas"></canvas>
+      </div>
+
+      <!-- Action bar with Presets -->
+      <div class="eq-toolbar">
+        <div class="preset-group">
+          <span class="preset-label">Preset:</span>
+          <button class="btn-preset active" id="btn-pre-flat" onclick="applyPreset('flat')">Flat</button>
+          <button class="btn-preset" id="btn-pre-low" onclick="applyPreset('low_boost')">Low Boost</button>
+          <button class="btn-preset" id="btn-pre-high" onclick="applyPreset('high_boost')">High Boost</button>
+          <span id="custom-presets-list" style="display:inline-flex;gap:6px;"></span>
+          <button class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
+          <button class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
+          <input type="file" id="preset-file-input" accept=".json" style="display:none" onchange="importPresetFile(event)">
+        </div>
+        <div class="eq-toolbar-right">
+          <span class="band-count-badge" id="band-count-lbl">5 / 10 Bands</span>
+          <button class="btn-primary" id="btn-add-band" onclick="addBand()">+ Add Band</button>
+        </div>
+      </div>
+
+      <!-- Main EQ Layout: Always present preamp slider on leftmost + Auto-filling bands -->
+      <div class="eq-body-layout">
+        <!-- Always Present Preamp Slider Column -->
+        <div class="preamp-col" id="eq-preamp-col">
+          <span class="preamp-title">PREAMP</span>
+          <div class="preamp-slider-wrap">
+            <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
+            <div class="preamp-ticks">
+              <span>+18</span>
+              <span>+12</span>
+              <span>+6</span>
+              <span class="tick-zero">0</span>
+              <span>-6</span>
+              <span>-12</span>
+              <span>-18</span>
+            </div>
+          </div>
+          <input type="number" id="preamp-num" class="param-input-box preamp-input" min="-18" max="18" step="0.1" value="0.0">
+          <span class="preamp-unit">dB</span>
+        </div>
+
+        <!-- Dynamic EQ Bands Container (Stretches across remaining width) -->
+        <div id="bands-container"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- MODULE 2: COMPRESSOR                                    -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section class="module-box" id="mod-compander">
+    <div class="module-header" onclick="toggleModuleCollapse('comp')">
+      <div class="module-title-area">
+        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+          <input type="checkbox" id="switch-comp" checked onchange="toggleCompanderModule(this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="module-title">Compressor</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div class="module-grid-controls">
+        <!-- Threshold -->
+        <div class="control-pod">
+          <span class="control-pod-title">Threshold</span>
+          <canvas id="knob-comp-thresh" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-comp-thresh" class="param-input-box" min="-60" max="0" step="0.5" value="-18">
+            <span>dBFS</span>
+          </div>
+        </div>
+        <!-- Ratio -->
+        <div class="control-pod">
+          <span class="control-pod-title">Ratio</span>
+          <canvas id="knob-comp-ratio" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-comp-ratio" class="param-input-box" min="1" max="20" step="0.1" value="4">
+            <span>:1</span>
+          </div>
+        </div>
+        <!-- Attack -->
+        <div class="control-pod">
+          <span class="control-pod-title">Attack</span>
+          <canvas id="knob-comp-att" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-comp-att" class="param-input-box" min="0.1" max="200" step="0.5" value="5">
+            <span>ms</span>
+          </div>
+        </div>
+        <!-- Release -->
+        <div class="control-pod">
+          <span class="control-pod-title">Release</span>
+          <canvas id="knob-comp-rel" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-comp-rel" class="param-input-box" min="10" max="2000" step="5" value="150">
+            <span>ms</span>
+          </div>
+        </div>
+        <!-- Makeup Gain -->
+        <div class="control-pod">
+          <span class="control-pod-title">Makeup Gain</span>
+          <canvas id="knob-comp-gain" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-comp-gain" class="param-input-box" min="-12" max="24" step="0.5" value="0">
+            <span>dB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- MODULE 3: LIMITER                                       -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <section class="module-box" id="mod-limiter">
+    <div class="module-header" onclick="toggleModuleCollapse('lim')">
+      <div class="module-title-area">
+        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+          <input type="checkbox" id="switch-lim" checked onchange="toggleLimiterModule(this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="module-title">Limiter</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div class="module-grid-controls">
+        <!-- Ceiling -->
+        <div class="control-pod">
+          <span class="control-pod-title">Ceiling</span>
+          <canvas id="knob-lim-ceil" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-lim-ceil" class="param-input-box" min="-6" max="0" step="0.1" value="-0.5">
+            <span>dBFS</span>
+          </div>
+        </div>
+        <!-- Knee Width -->
+        <div class="control-pod">
+          <span class="control-pod-title">Knee Width</span>
+          <canvas id="knob-lim-knee" class="knob" width="60" height="60"></canvas>
+          <div class="control-pod-val-row">
+            <input type="number" id="num-lim-knee" class="param-input-box" min="0" max="6" step="0.1" value="3">
+            <span>dB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  ESP32-S3-DSP · FreeRTOS Modular Audio Pipeline · Core 1 RT DSP · Core 0 Async WebServer
+</footer>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Constants & Color Map (Nord Palette)
+// ═══════════════════════════════════════════════════════════
+const FS = 48000;
+const MAX_BANDS = 10;
+const BAND_COLORS = [
+  '#5E81AC', '#88C0D0', '#81A1C1', '#8FBCBB',
+  '#B48EAD', '#D08770', '#EBCB8B', '#A3BE8C',
+  '#BF616A', '#4C566A'
+];
+
+// Initial default: 5 bands (Low Shelf, 3 Peakings, High Shelf)
+let eqEnabled = true;
+let eqPreamp  = 0.0;
+let currentPreset = 'flat';
+
+let bands = [
+  { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true }, // Low Shelf
+  { band: 1, freq: 500.0,   gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true }, // Peaking
+  { band: 2, freq: 1000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true }, // Peaking
+  { band: 3, freq: 4000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true }, // Peaking
+  { band: 4, freq: 10000.0, gain: 0.0, q: 0.707, type: 2, order: 2, enabled: true }  // High Shelf
+];
+
+const PRESETS = {
+  flat: [
+    { freq: 100.0,   gain: 0.0,  q: 0.707, type: 1, order: 2, enabled: true },
+    { freq: 500.0,   gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 10000.0, gain: 0.0,  q: 0.707, type: 2, order: 2, enabled: true }
+  ],
+  low_boost: [
+    { freq: 100.0,   gain: 6.0,  q: 0.707, type: 1, order: 2, enabled: true },
+    { freq: 500.0,   gain: 2.5,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: -1.0, q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 10000.0, gain: -2.0, q: 0.707, type: 2, order: 2, enabled: true }
+  ],
+  high_boost: [
+    { freq: 100.0,   gain: -2.0, q: 0.707, type: 1, order: 2, enabled: true },
+    { freq: 500.0,   gain: -1.0, q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: 3.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 10000.0, gain: 6.0,  q: 0.707, type: 2, order: 2, enabled: true }
+  ]
+};
+
+function applyPreset(name) {
+  if (!PRESETS[name]) return;
+  currentPreset = name;
+  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`btn-pre-${name === 'low_boost' ? 'low' : (name === 'high_boost' ? 'high' : 'flat')}`);
+  if (btn) btn.classList.add('active');
+
+  bands = PRESETS[name].map((p, idx) => ({
+    band: idx,
+    freq: p.freq,
+    gain: p.gain,
+    q:    p.q,
+    type: p.type,
+    order: p.order || 2,
+    enabled: p.enabled
+  }));
+
+  rebuildBandsUI();
+  drawResponse();
+
+  wsTx({ t: 'eq_preset', name: name });
+  bands.forEach((_, i) => sendBand(i));
+}
+
+function saveCurrentPreset() {
+  const defaultName = `Preset ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+  const name = prompt("Enter preset name:", defaultName);
+  if (!name || !name.trim()) return;
+
+  const presetData = {
+    name: name.trim(),
+    preamp: eqPreamp,
+    bands: bands.map(b => ({
+      freq: b.freq,
+      gain: b.gain,
+      q: b.q,
+      type: b.type !== undefined ? b.type : 0,
+      order: b.order !== undefined ? b.order : 2,
+      enabled: b.enabled !== undefined ? b.enabled : true
+    }))
+  };
+
+  // 1. Save to localStorage custom presets
+  let customPresets = [];
+  try {
+    customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
+  } catch (_) { customPresets = []; }
+
+  const existingIdx = customPresets.findIndex(p => p.name.toLowerCase() === name.trim().toLowerCase());
+  if (existingIdx >= 0) {
+    customPresets[existingIdx] = presetData;
+  } else {
+    customPresets.push(presetData);
+  }
+  localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+  renderCustomPresets();
+
+  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelector(`[data-custom-preset="${CSS.escape(name.trim())}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // 2. Download JSON file
+  const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name.trim().replace(/[^a-zA-Z0-9_-]/g, '_')}_preset.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importPresetFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !Array.isArray(data.bands) || data.bands.length === 0) {
+        alert("Invalid preset file: missing bands data.");
+        return;
+      }
+
+      // Load preamp if provided
+      if (typeof data.preamp === 'number') {
+        eqPreamp = Math.max(-18, Math.min(18, data.preamp));
+        updatePreampUI();
+        wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+      }
+
+      bands = data.bands.slice(0, MAX_BANDS).map((b, idx) => {
+        let t = parseInt(b.type) || 0;
+        let ord = parseInt(b.order) || 2;
+        if (t === 5) { t = 3; ord = 4; }
+        else if (t === 6) { t = 4; ord = 4; }
+        return {
+          band: idx,
+          freq: parseFloat(b.freq) || 1000,
+          gain: parseFloat(b.gain) || 0,
+          q:    parseFloat(b.q) || 0.707,
+          type: t,
+          order: ord,
+          enabled: b.enabled !== undefined ? b.enabled : true
+        };
+      });
+
+      document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+
+      const presetName = data.name || file.name.replace(/\.[^/.]+$/, "");
+      let customPresets = [];
+      try {
+        customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
+      } catch (_) { customPresets = []; }
+
+      const existingIdx = customPresets.findIndex(p => p.name.toLowerCase() === presetName.toLowerCase());
+      const customEntry = { name: presetName, preamp: eqPreamp, bands: bands };
+      if (existingIdx >= 0) {
+        customPresets[existingIdx] = customEntry;
+      } else {
+        customPresets.push(customEntry);
+      }
+      localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+      renderCustomPresets();
+
+      const importedBtn = document.querySelector(`[data-custom-preset="${CSS.escape(presetName)}"]`);
+      if (importedBtn) importedBtn.classList.add('active');
+
+      rebuildBandsUI();
+      drawResponse();
+
+      // Transmit to ESP32
+      bands.forEach((_, i) => sendBand(i));
+
+      event.target.value = '';
+    } catch (err) {
+      alert("Error reading preset file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderCustomPresets() {
+  const container = document.getElementById('custom-presets-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let customPresets = [];
+  try {
+    customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
+  } catch (_) { customPresets = []; }
+
+  customPresets.forEach((p, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-preset';
+    btn.setAttribute('data-custom-preset', p.name);
+    btn.textContent = p.name;
+    btn.title = `Apply "${p.name}" (Right-click to delete)`;
+    btn.onclick = () => {
+      document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (typeof p.preamp === 'number') {
+        eqPreamp = p.preamp;
+        updatePreampUI();
+        wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+      }
+      bands = p.bands.map((b, i) => {
+        let t = b.type || 0;
+        let ord = b.order || 2;
+        if (t === 5) { t = 3; ord = 4; }
+        else if (t === 6) { t = 4; ord = 4; }
+        return {
+          band: i,
+          freq: b.freq,
+          gain: b.gain,
+          q: b.q,
+          type: t,
+          order: ord,
+          enabled: b.enabled !== undefined ? b.enabled : true
+        };
+      });
+      rebuildBandsUI();
+      drawResponse();
+      bands.forEach((_, i) => sendBand(i));
+    };
+
+    btn.oncontextmenu = (e) => {
+      e.preventDefault();
+      if (confirm(`Delete preset "${p.name}"?`)) {
+        customPresets.splice(idx, 1);
+        localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+        renderCustomPresets();
+      }
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+function initPreamp() {
+  const slider = document.getElementById('preamp-slider');
+  const input  = document.getElementById('preamp-num');
+  if (!slider || !input) return;
+
+  const onPreampChange = (v) => {
+    v = Math.max(-18, Math.min(18, parseFloat(v) || 0));
+    eqPreamp = v;
+    slider.value = v;
+    input.value  = v.toFixed(1);
+    drawResponse();
+    wsTx({ t: 'eq_preamp', preamp: Math.round(v * 100) / 100 });
+  };
+
+  slider.addEventListener('input', e => onPreampChange(e.target.value));
+  slider.addEventListener('dblclick', () => onPreampChange(0.0));
+
+  input.addEventListener('change', e => onPreampChange(e.target.value));
+  input.addEventListener('dblclick', () => onPreampChange(0.0));
+}
+
+function updatePreampUI() {
+  const slider = document.getElementById('preamp-slider');
+  const input  = document.getElementById('preamp-num');
+  if (slider) slider.value = eqPreamp;
+  if (input)  input.value  = eqPreamp.toFixed(1);
+}
+
+let compParams = {
+  enabled: true, threshold: -18.0, ratio: 4.0,
+  attackMs: 5.0, releaseMs: 150.0, makeup: 0.0
+};
+
+let limParams = {
+  enabled: true, ceiling: -0.5, knee: 3.0
+};
+
+// References to UI Knob instances
+let bandKnobs = []; // Array of { freqKnob, gainKnob, qKnob }
+let compKnobs = {};
+let limKnobs  = {};
+
+// ═══════════════════════════════════════════════════════════
+// WebSocket Client
+// ═══════════════════════════════════════════════════════════
+let ws = null, wsRetry = null;
+
+function wsConnect() {
+  clearTimeout(wsRetry);
+
+  if (location.protocol === 'file:') {
+    setDot('ok', 'Offline Demo');
+    return;
+  }
+
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  try {
+    ws = new WebSocket(proto + '//' + location.host + '/ws');
+    ws.onopen = () => {
+      setDot('ok', 'Connected');
+      wsTx({ t: 'getState' });
+    };
+    ws.onclose = () => {
+      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting…');
+      ws = null;
+      wsRetry = setTimeout(wsConnect, 3000);
+    };
+    ws.onerror = () => {
+      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Error');
+    };
+    ws.onmessage = e => {
+      try { handleMsg(JSON.parse(e.data)); } catch (_) {}
+    };
+  } catch (e) {
+    setDot('err', 'Offline Demo');
+  }
+}
+
+function wsTx(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function setDot(cls, txt) {
+  document.getElementById('ws-dot').className = cls;
+  document.getElementById('ws-lbl').textContent = txt;
+}
+
+function handleMsg(d) {
+  if (d.t !== 'state') return;
+
+  // 1. EQ State
+  if (d.eq) {
+    eqEnabled = d.eq.enabled !== undefined ? d.eq.enabled : true;
+    updateBypassUI('eq', eqEnabled);
+
+    if (d.eq.preamp !== undefined) {
+      eqPreamp = parseFloat(d.eq.preamp) || 0.0;
+      updatePreampUI();
+    }
+
+    if (Array.isArray(d.eq.bands)) {
+      bands = d.eq.bands.map(b => {
+        let t = parseInt(b.type) || 0;
+        let ord = parseInt(b.order) || 2;
+        if (t === 5) { t = 3; ord = 4; }
+        else if (t === 6) { t = 4; ord = 4; }
+        return {
+          band: b.band,
+          freq: parseFloat(b.freq) || 1000,
+          gain: parseFloat(b.gain) || 0,
+          q:    parseFloat(b.q) || 0.707,
+          type: t,
+          order: ord,
+          enabled: b.enabled !== undefined ? b.enabled : true
+        };
+      });
+      rebuildBandsUI();
+    }
+  }
+
+  // 2. Compander State
+  if (d.compander) {
+    Object.assign(compParams, d.compander);
+    updateBypassUI('comp', compParams.enabled);
+    syncCompanderUI();
+  }
+
+  // 3. Limiter State
+  if (d.limiter) {
+    Object.assign(limParams, d.limiter);
+    updateBypassUI('lim', limParams.enabled);
+    syncLimiterUI();
+  }
+
+  // 4. Input Source State
+  if (d.input) {
+    if (d.input.source !== undefined) {
+      selectedInputSource = parseInt(d.input.source) || 0;
+    }
+    if (d.input.active !== undefined) {
+      activeInputSource = parseInt(d.input.active) || 1;
+    }
+    updateInputSourceUI();
+  }
+
+  drawResponse();
+}
+
+// ── Input Source Functions ──────────────────────────────────
+let selectedInputSource = 0; // 0: AUTO, 1: AUX, 2: BT, 3: WIFI
+let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
+
+function setInputSource(src) {
+  selectedInputSource = src;
+  updateInputSourceUI();
+  wsTx({ t: 'input_source', source: src });
+}
+
+function updateInputSourceUI() {
+  for (let i = 0; i <= 3; ++i) {
+    const btn = document.getElementById(`btn-src-${i}`);
+    if (btn) {
+      if (i === selectedInputSource) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  }
+  const badgeLbl = document.getElementById('active-source-lbl');
+  if (badgeLbl) {
+    const names = { 1: 'AUX', 2: 'BT', 3: 'WIFI' };
+    const actName = names[activeInputSource] || 'AUX';
+    badgeLbl.textContent = selectedInputSource === 0 ? `ACTIVE: ${actName} (AUTO)` : `ACTIVE: ${actName}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Rotary Knob Component (Nord Light Style)
+// ═══════════════════════════════════════════════════════════
+class Knob {
+  constructor(canvas, opts) {
+    this.cv  = canvas;
+    this.ctx = canvas.getContext('2d');
+    Object.assign(this, {
+      min: 0,
+      max: 100,
+      value: 0,
+      defaultVal: undefined,
+      unit: '',
+      color: '#5E81AC',
+      decimals: 1,
+      centerZero: false,
+      logScale: false,
+      onChange: null
+    }, opts);
+
+    // If defaultVal is not supplied, use centerZero or min
+    if (this.defaultVal === undefined) {
+      this.defaultVal = this.centerZero ? 0 : this.min;
+    }
+
+    this._drag = false;
+    this._y0   = 0;
+    this._v0   = 0;
+
+    canvas.addEventListener('mousedown',  e => this._md(e.clientY));
+    canvas.addEventListener('dblclick',   () => {
+      // RESET TO defaultVal (e.g. Q resets to 0.707!)
+      this.set(this.defaultVal, true);
+    });
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      if (this.logScale) {
+        // Less sensitive, proportional step (~2.5% per notch)
+        const factor = Math.pow(1.025, -Math.sign(e.deltaY));
+        this.set(this.value * factor, true);
+      } else {
+        const step = (this.max - this.min) / 100;
+        this.set(this.value - Math.sign(e.deltaY) * step, true);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      this._md(e.touches[0].clientY);
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      this._mm(e.touches[0].clientY, false);
+    }, { passive: false });
+    canvas.addEventListener('touchend', () => { this._drag = false; });
+
+    window.addEventListener('mousemove', e => this._mm(e.clientY, e.shiftKey));
+    window.addEventListener('mouseup',   () => { this._drag = false; });
+
+    this.draw();
+  }
+
+  _md(y) {
+    this._drag = true;
+    this._y0 = y;
+    this._v0 = this.value;
+  }
+
+  _mm(y, fineTune = false) {
+    if (!this._drag) return;
+    const dy = this._y0 - y;
+    if (this.logScale) {
+      // Logarithmic scaling for frequency: significantly less sensitive (500px travel; 1500px with shift)
+      const sens = fineTune ? 1500 : 500;
+      const range = Math.log(this.max / this.min);
+      const curT  = Math.log(this._v0 / this.min) / range;
+      const newT  = Math.max(0, Math.min(1, curT + dy / sens));
+      this.set(this.min * Math.exp(newT * range), true);
+    } else {
+      const sens = fineTune ? 500 : 180;
+      const range = this.max - this.min;
+      this.set(this._v0 + dy * range / sens, true);
+    }
+  }
+
+  set(v, fire = false) {
+    const clamped = Math.max(this.min, Math.min(this.max, v));
+    this.value = +clamped.toFixed(this.decimals + 1);
+    this.draw();
+    if (fire && this.onChange) this.onChange(this.value);
+    return this;
+  }
+
+  setQuiet(v) {
+    if (this._drag) return this;
+    return this.set(v, false);
+  }
+
+  draw() {
+    const cv = this.cv;
+    const c  = this.ctx;
+    const W  = cv.width, H = cv.height;
+    const cx = W / 2, cy = H / 2;
+    const R  = Math.min(W, H) / 2 - 3;
+
+    // 270 degree sweep
+    const SA  = Math.PI * 0.75;
+    const SWP = Math.PI * 1.5;
+
+    let t = 0;
+    if (this.logScale) {
+      t = Math.log(this.value / this.min) / Math.log(this.max / this.min);
+    } else {
+      t = (this.value - this.min) / (this.max - this.min);
+    }
+    t = Math.max(0, Math.min(1, t));
+
+    const vA   = SA + t * SWP;
+    const midA = SA + 0.5 * SWP;
+
+    c.clearRect(0, 0, W, H);
+
+    // Knob outer body
+    c.beginPath();
+    c.arc(cx, cy, R, 0, Math.PI * 2);
+    c.fillStyle = '#E5E9F0'; // Nord 5
+    c.fill();
+    c.strokeStyle = '#D8DEE9'; // Nord 4
+    c.lineWidth = 1;
+    c.stroke();
+
+    // Background track arc
+    c.beginPath();
+    c.arc(cx, cy, R - 4, SA, SA + SWP);
+    c.strokeStyle = '#D8DEE9';
+    c.lineWidth = 4;
+    c.lineCap = 'round';
+    c.stroke();
+
+    // Value active arc
+    const arc0 = this.centerZero ? midA : SA;
+    const arc1 = vA;
+    if (Math.abs(arc1 - arc0) > 0.01) {
+      c.beginPath();
+      if (arc1 >= arc0) c.arc(cx, cy, R - 4, arc0, arc1);
+      else              c.arc(cx, cy, R - 4, arc1, arc0);
+      c.strokeStyle = (this.centerZero && this.value < 0) ? '#D08770' : this.color;
+      c.lineWidth = 4;
+      c.lineCap = 'round';
+      c.stroke();
+    }
+
+    // Indicator needle dot
+    c.beginPath();
+    c.arc(cx + (R - 4) * Math.cos(vA), cy + (R - 4) * Math.sin(vA), 2.5, 0, Math.PI * 2);
+    c.fillStyle = '#2E3440';
+    c.fill();
+
+    // Center disc
+    c.beginPath();
+    c.arc(cx, cy, R - 10, 0, Math.PI * 2);
+    c.fillStyle = '#FFFFFF';
+    c.fill();
+    c.strokeStyle = '#D8DEE9';
+    c.lineWidth = 1;
+    c.stroke();
+
+    // Display value inside knob
+    const fs = Math.max(7, Math.floor(W * 0.17));
+    c.font = `600 ${fs}px ui-monospace, SFMono-Regular, monospace`;
+    c.fillStyle = '#2E3440';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+
+    let displayVal = this.value;
+    if (this.logScale && displayVal >= 1000) {
+      displayVal = (displayVal / 1000).toFixed(1) + 'k';
+    } else {
+      displayVal = displayVal.toFixed(this.decimals);
+    }
+    c.fillText(displayVal, cx, cy - 1);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Frequency Response Canvas (Nord Light)
+// ═══════════════════════════════════════════════════════════
+const fCanvas = document.getElementById('freq-canvas');
+const fCtx    = fCanvas.getContext('2d');
+const DB_MAX  = 18;
+const F0 = 20, F1 = 20000;
+const NPTS = 500;
+
+function f2x(f, W) {
+  return Math.log10(f / F0) / Math.log10(F1 / F0) * W;
+}
+function db2y(db, H) {
+  return H * (0.5 - db / (2 * DB_MAX));
+}
+
+// Exact biquad magnitude for all filter types
+function singleBiquadMag(type, freq, gain, q, f) {
+  const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
+  const safeQ = Math.max(0.05, q);
+  const w0 = 2 * Math.PI * safeFreq / FS;
+  const cw0 = Math.cos(w0), sw0 = Math.sin(w0);
+  const al = sw0 / (2 * safeQ);
+
+  let b0 = 1, b1 = 0, b2 = 0;
+  let a0 = 1, a1 = 0, a2 = 0;
+
+  switch (type) {
+    case 1: { // Low Shelf
+      const A = Math.pow(10, gain / 40);
+      const twoSqrtAAlpha = 2 * Math.sqrt(A) * al;
+      b0 =    A * ((A + 1) - (A - 1) * cw0 + twoSqrtAAlpha);
+      b1 =  2*A * ((A - 1) - (A + 1) * cw0);
+      b2 =    A * ((A + 1) - (A - 1) * cw0 - twoSqrtAAlpha);
+      a0 =         (A + 1) + (A - 1) * cw0 + twoSqrtAAlpha;
+      a1 =   -2 * ((A - 1) + (A + 1) * cw0);
+      a2 =         (A + 1) + (A - 1) * cw0 - twoSqrtAAlpha;
+      break;
+    }
+    case 2: { // High Shelf
+      const A = Math.pow(10, gain / 40);
+      const twoSqrtAAlpha = 2 * Math.sqrt(A) * al;
+      b0 =    A * ((A + 1) + (A - 1) * cw0 + twoSqrtAAlpha);
+      b1 = -2*A * ((A - 1) + (A + 1) * cw0);
+      b2 =    A * ((A + 1) + (A - 1) * cw0 - twoSqrtAAlpha);
+      a0 =         (A + 1) - (A - 1) * cw0 + twoSqrtAAlpha;
+      a1 =    2 * ((A - 1) - (A + 1) * cw0);
+      a2 =         (A + 1) - (A - 1) * cw0 - twoSqrtAAlpha;
+      break;
+    }
+    case 3: { // Low Pass
+      b0 = (1 - cw0) * 0.5;
+      b1 =  1 - cw0;
+      b2 = (1 - cw0) * 0.5;
+      a0 =  1 + al;
+      a1 = -2 * cw0;
+      a2 =  1 - al;
+      break;
+    }
+    case 4: { // High Pass
+      b0 =  (1 + cw0) * 0.5;
+      b1 = -(1 + cw0);
+      b2 =  (1 + cw0) * 0.5;
+      a0 =  1 + al;
+      a1 = -2 * cw0;
+      a2 =  1 - al;
+      break;
+    }
+    case 0: // Peaking
+    default: {
+      const A = Math.pow(10, gain / 40);
+      b0 =  1 + al * A;
+      b1 = -2 * cw0;
+      b2 =  1 - al * A;
+      a0 =  1 + al / A;
+      a1 = -2 * cw0;
+      a2 =  1 - al / A;
+      break;
+    }
+  }
+
+  const invA0 = Math.abs(a0) > 1e-12 ? 1 / a0 : 1;
+  const B0 = b0 * invA0, B1 = b1 * invA0, B2 = b2 * invA0;
+  const A1 = a1 * invA0, A2 = a2 * invA0;
+
+  const w  = 2 * Math.PI * f / FS;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const c2 = Math.cos(2 * w), s2 = Math.sin(2 * w);
+
+  const nRe = B0 + B1 * c1 + B2 * c2,  nIm = -B1 * s1 - B2 * s2;
+  const dRe = 1  + A1 * c1 + A2 * c2,  dIm = -A1 * s1 - A2 * s2;
+  const dM2 = dRe * dRe + dIm * dIm;
+  if (dM2 < 1e-20) return -120;
+  return 10 * Math.log10((nRe * nRe + nIm * nIm) / dM2 + 1e-12);
+}
+
+function eval1stOrderLP(freq, f) {
+  const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
+  const w0 = 2 * Math.PI * safeFreq / FS;
+  const K = Math.tan(w0 * 0.5);
+  const b0 = K / (1 + K);
+  const a1 = (K - 1) / (1 + K);
+  const w = 2 * Math.PI * f / FS;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const nRe = b0 + b0 * c1, nIm = -b0 * s1;
+  const dRe = 1 + a1 * c1,  dIm = -a1 * s1;
+  const dM2 = dRe * dRe + dIm * dIm;
+  if (dM2 < 1e-20) return -120;
+  return 10 * Math.log10((nRe * nRe + nIm * nIm) / dM2 + 1e-12);
+}
+
+function eval1stOrderHP(freq, f) {
+  const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
+  const w0 = 2 * Math.PI * safeFreq / FS;
+  const K = Math.tan(w0 * 0.5);
+  const b0 = 1 / (1 + K);
+  const a1 = (K - 1) / (1 + K);
+  const w = 2 * Math.PI * f / FS;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const nRe = b0 - b0 * c1, nIm = b0 * s1;
+  const dRe = 1 + a1 * c1,  dIm = -a1 * s1;
+  const dM2 = dRe * dRe + dIm * dIm;
+  if (dM2 < 1e-20) return -120;
+  return 10 * Math.log10((nRe * nRe + nIm * nIm) / dM2 + 1e-12);
+}
+
+function bandMagAt(b, f) {
+  if (!b.enabled) return 0;
+  let type  = b.type || 0;
+  let order = b.order || 2;
+  // Backwards compatibility for legacy flat types
+  if (type === 5) { type = 3; order = 4; }
+  else if (type === 6) { type = 4; order = 4; }
+
+  if ((type === 0 || type === 1 || type === 2) && Math.abs(b.gain) < 0.001) return 0;
+
+  if (type === 3) { // Low Pass
+    if (order === 1) {
+      return Math.max(-60, Math.min(30, eval1stOrderLP(b.freq, f)));
+    }
+    if (order === 3) {
+      const m = eval1stOrderLP(b.freq, f) + singleBiquadMag(3, b.freq, 0, 1.0, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    if (order === 4) {
+      const m = singleBiquadMag(3, b.freq, 0, 1.30656296, f) + singleBiquadMag(3, b.freq, 0, 0.5411961, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    const m = singleBiquadMag(3, b.freq, 0, b.q, f);
+    return Math.max(-60, Math.min(30, m));
+  }
+
+  if (type === 4) { // High Pass
+    if (order === 1) {
+      return Math.max(-60, Math.min(30, eval1stOrderHP(b.freq, f)));
+    }
+    if (order === 3) {
+      const m = eval1stOrderHP(b.freq, f) + singleBiquadMag(4, b.freq, 0, 1.0, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    if (order === 4) {
+      const m = singleBiquadMag(4, b.freq, 0, 1.30656296, f) + singleBiquadMag(4, b.freq, 0, 0.5411961, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    const m = singleBiquadMag(4, b.freq, 0, b.q, f);
+    return Math.max(-60, Math.min(30, m));
+  }
+
+  const m = singleBiquadMag(type, b.freq, b.gain, b.q, f);
+  return Math.max(-60, Math.min(30, m));
+}
+
+function totalMagAt(f) {
+  return eqPreamp + bands.reduce((s, b) => s + bandMagAt(b, f), 0);
+}
+
+function drawResponse() {
+  const rect = fCanvas.getBoundingClientRect();
+  const DPR  = window.devicePixelRatio || 1;
+  const W    = fCanvas.width  = Math.round(rect.width * DPR);
+  const H    = fCanvas.height = Math.round(rect.height * DPR);
+  const c    = fCtx;
+
+  c.clearRect(0, 0, W, H);
+
+  // Background
+  c.fillStyle = '#FFFFFF';
+  c.fillRect(0, 0, W, H);
+
+  // dB horizontal grid
+  [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
+    const y = db2y(db, H);
+    c.beginPath();
+    c.moveTo(0, y);
+    c.lineTo(W, y);
+    c.strokeStyle = db === 0 ? '#4C566A' : '#E5E9F0';
+    c.lineWidth   = db === 0 ? 1.5 * DPR : 1 * DPR;
+    c.stroke();
+
+    if (db !== -18 && db !== 18) {
+      c.font = `700 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
+      c.fillStyle = db === 0 ? '#2E3440' : '#718096';
+      c.textAlign = 'left';
+      c.textBaseline = 'middle';
+      c.fillText((db > 0 ? '+' : '') + db + ' dB', 6 * DPR, y - 1);
+    }
+  });
+
+  // Frequency vertical grid
+  [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(f => {
+    const x = f2x(f, W);
+    c.beginPath();
+    c.moveTo(x, 0);
+    c.lineTo(x, H);
+    c.strokeStyle = '#E5E9F0';
+    c.lineWidth   = 1 * DPR;
+    c.stroke();
+
+    const lbl = f >= 1000 ? (f / 1000) + 'k' : String(f);
+    c.font = `600 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
+    c.fillStyle = '#718096';
+    c.textAlign = 'center';
+    c.textBaseline = 'bottom';
+    c.fillText(lbl, x, H - 4 * DPR);
+  });
+
+  // Individual band curves (crisp, subtle)
+  bands.forEach((b, i) => {
+    if (!b.enabled) return;
+    const isShelfOrPeak = (b.type === 0 || b.type === 1 || b.type === 2 || b.type === undefined);
+    if (isShelfOrPeak && Math.abs(b.gain) < 0.1) return;
+    c.beginPath();
+    for (let k = 0; k <= NPTS; k++) {
+      const f = F0 * Math.pow(F1 / F0, k / NPTS);
+      const x = f2x(f, W), y = db2y(eqPreamp + bandMagAt(b, f), H);
+      k === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
+    }
+    c.strokeStyle = eqEnabled ? (BAND_COLORS[i % BAND_COLORS.length] + '88') : '#CBD5E1';
+    c.lineWidth   = 1.5 * DPR;
+    c.stroke();
+  });
+
+  // Combined curve points
+  const pts = [];
+  for (let k = 0; k <= NPTS; k++) {
+    const f = F0 * Math.pow(F1 / F0, k / NPTS);
+    pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
+  }
+
+  // High-contrast flat subtle tint (no blurry glow)
+  const zY = db2y(0, H);
+  c.beginPath();
+  c.moveTo(pts[0].x, zY);
+  pts.forEach(p => c.lineTo(p.x, p.y));
+  c.lineTo(pts[pts.length - 1].x, zY);
+  c.closePath();
+  c.fillStyle = eqEnabled ? 'rgba(94, 129, 172, 0.10)' : 'rgba(76, 86, 106, 0.06)';
+  c.fill();
+
+  // Primary curve line (solid high contrast)
+  c.beginPath();
+  pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
+  c.strokeStyle = eqEnabled ? '#5E81AC' : '#718096';
+  c.lineWidth   = 2.4 * DPR;
+  c.lineJoin    = 'round';
+  c.stroke();
+
+  // Band center dot markers (solid crisp dots with sharp border)
+  bands.forEach((b, i) => {
+    const x = f2x(b.freq, W);
+    const y = db2y(totalMagAt(b.freq), H);
+    c.beginPath();
+    c.arc(x, y, 4.5 * DPR, 0, Math.PI * 2);
+    if (eqEnabled) {
+      c.fillStyle   = b.enabled ? BAND_COLORS[i % BAND_COLORS.length] : '#A0AEC0';
+      c.strokeStyle = '#2E3440';
+    } else {
+      c.fillStyle   = b.enabled ? '#718096' : '#CBD5E1';
+      c.strokeStyle = '#4C566A';
+    }
+    c.lineWidth   = 1.5 * DPR;
+    c.fill();
+    c.stroke();
+  });
+}
+
+new ResizeObserver(drawResponse).observe(fCanvas);
+
+// ═══════════════════════════════════════════════════════════
+// Dynamic EQ Bands UI Builder
+// ═══════════════════════════════════════════════════════════
+function rebuildBandsUI() {
+  const root = document.getElementById('bands-container');
+  root.innerHTML = '';
+  bandKnobs = [];
+
+  document.getElementById('band-count-lbl').textContent = `${bands.length} / ${MAX_BANDS} Bands`;
+  document.getElementById('btn-add-band').disabled = bands.length >= MAX_BANDS;
+
+  bands.forEach((b, i) => {
+    b.band = i;
+    if (b.type === undefined) b.type = 0;
+    if (b.order === undefined) b.order = 2;
+    if (b.type === 5) { b.type = 3; b.order = 4; }
+    else if (b.type === 6) { b.type = 4; b.order = 4; }
+    const card = document.createElement('div');
+    card.className = 'band-card';
+    card.id = `band-card-${i}`;
+
+    // Header: Band # + Toggle dot + Remove btn
+    const hdr = document.createElement('div');
+    hdr.className = 'band-card-header';
+    hdr.innerHTML = `
+      <span class="band-id" style="color:${BAND_COLORS[i % BAND_COLORS.length]}">Band ${i + 1}</span>
+      <div class="band-actions">
+        <div class="band-dot ${b.enabled ? 'on' : ''}" id="band-dot-${i}" title="Toggle Band"></div>
+        ${bands.length > 1 ? `<button class="btn-icon" title="Remove Band" onclick="removeBand(${i})">✕</button>` : ''}
+      </div>
+    `;
+    card.appendChild(hdr);
+
+    // Toggle band dot event
+    hdr.querySelector(`#band-dot-${i}`).addEventListener('click', () => {
+      b.enabled = !b.enabled;
+      document.getElementById(`band-dot-${i}`).className = 'band-dot ' + (b.enabled ? 'on' : '');
+      sendBand(i);
+      drawResponse();
+    });
+
+    // Filter Type Dropdown
+    const typeRow = document.createElement('div');
+    typeRow.className = 'band-type-row';
+    typeRow.innerHTML = `
+      <select id="sel-type-${i}" class="band-type-select">
+        <option value="0" ${b.type === 0 ? 'selected' : ''}>Peaking</option>
+        <option value="1" ${b.type === 1 ? 'selected' : ''}>Low Shelf</option>
+        <option value="2" ${b.type === 2 ? 'selected' : ''}>High Shelf</option>
+        <option value="3" ${b.type === 3 ? 'selected' : ''}>Low Pass</option>
+        <option value="4" ${b.type === 4 ? 'selected' : ''}>High Pass</option>
+      </select>
+    `;
+    card.appendChild(typeRow);
+
+    // Filter Order Dropdown (shown for Low Pass and High Pass)
+    const orderRow = document.createElement('div');
+    orderRow.className = 'band-order-row';
+    orderRow.id = `order-row-${i}`;
+    orderRow.style.display = (b.type === 3 || b.type === 4) ? 'flex' : 'none';
+    orderRow.innerHTML = `
+      <select id="sel-order-${i}" class="band-order-select">
+        <option value="1" ${b.order === 1 ? 'selected' : ''}>1st (6 dB/oct)</option>
+        <option value="2" ${(b.order === 2 || !b.order) ? 'selected' : ''}>2nd (12 dB/oct)</option>
+        <option value="3" ${b.order === 3 ? 'selected' : ''}>3rd (18 dB/oct)</option>
+        <option value="4" ${b.order === 4 ? 'selected' : ''}>4th (24 dB/oct)</option>
+      </select>
+    `;
+    card.appendChild(orderRow);
+
+    // 1. Frequency Control
+    const colF = document.createElement('div');
+    colF.className = 'param-unit-col';
+    colF.innerHTML = `
+      <span class="param-unit-label">Freq (Hz)</span>
+      <canvas id="knob-f-${i}" class="knob" width="56" height="56"></canvas>
+      <input type="number" id="num-f-${i}" class="param-input-box" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
+    `;
+    card.appendChild(colF);
+
+    // 2. Gain Control
+    const colG = document.createElement('div');
+    colG.className = 'param-unit-col';
+    colG.id = `gain-col-${i}`;
+    colG.innerHTML = `
+      <span class="param-unit-label">Gain (dB)</span>
+      <canvas id="knob-g-${i}" class="knob" width="56" height="56"></canvas>
+      <input type="number" id="num-g-${i}" class="param-input-box" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}">
+    `;
+    card.appendChild(colG);
+
+    // 3. Q Control
+    const colQ = document.createElement('div');
+    colQ.className = 'param-unit-col';
+    colQ.id = `q-col-${i}`;
+    colQ.innerHTML = `
+      <span class="param-unit-label">Q Factor</span>
+      <canvas id="knob-q-${i}" class="knob" width="56" height="56"></canvas>
+      <input type="number" id="num-q-${i}" class="param-input-box" min="0.1" max="8" step="0.01" value="${b.q.toFixed(3)}">
+    `;
+    card.appendChild(colQ);
+
+    root.appendChild(card);
+
+    // Instantiate Frequency Knob
+    const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
+      min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
+      logScale: true, color: BAND_COLORS[i % BAND_COLORS.length],
+      decimals: 0,
+      onChange: v => {
+        b.freq = v;
+        card.querySelector(`#num-f-${i}`).value = Math.round(v);
+        sendBand(i);
+        drawResponse();
+      }
+    });
+
+    // Frequency Text Input Box Link
+    card.querySelector(`#num-f-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.freq;
+      v = Math.max(20, Math.min(20000, v));
+      e.target.value = Math.round(v);
+      b.freq = v;
+      fKnob.set(v, false);
+      sendBand(i);
+      drawResponse();
+    });
+
+    // Instantiate Gain Knob (resets to 0.0)
+    const gKnob = new Knob(card.querySelector(`#knob-g-${i}`), {
+      min: -18, max: 18, value: b.gain, defaultVal: 0.0,
+      centerZero: true, color: BAND_COLORS[i % BAND_COLORS.length],
+      decimals: 1,
+      onChange: v => {
+        b.gain = v;
+        card.querySelector(`#num-g-${i}`).value = v.toFixed(1);
+        sendBand(i);
+        drawResponse();
+      }
+    });
+
+    // Helper to dim/disable gain knob & Q knob for Pass and Flat filter types
+    const updateBandParamStates = () => {
+      const isPassFilter = (b.type === 3 || b.type === 4);
+      const oRow = card.querySelector(`#order-row-${i}`);
+      if (oRow) {
+        oRow.style.display = isPassFilter ? 'flex' : 'none';
+      }
+
+      if (isPassFilter) {
+        colG.classList.add('disabled-param');
+        card.querySelector(`#num-g-${i}`).disabled = true;
+        b.gain = 0;
+        card.querySelector(`#num-g-${i}`).value = "0.0";
+        gKnob.set(0, false);
+
+        // For orders 1, 3, 4: Q is fixed flat (Butterworth). For order 2: Q can be adjusted
+        if (b.order === 2) {
+          colQ.classList.remove('disabled-param');
+          card.querySelector(`#num-q-${i}`).disabled = false;
+        } else {
+          colQ.classList.add('disabled-param');
+          card.querySelector(`#num-q-${i}`).disabled = true;
+        }
+      } else {
+        colG.classList.remove('disabled-param');
+        card.querySelector(`#num-g-${i}`).disabled = false;
+        colQ.classList.remove('disabled-param');
+        card.querySelector(`#num-q-${i}`).disabled = false;
+      }
+    };
+
+    // Filter Type Change Event
+    card.querySelector(`#sel-type-${i}`).addEventListener('change', e => {
+      b.type = parseInt(e.target.value) || 0;
+      updateBandParamStates();
+      sendBand(i);
+      drawResponse();
+    });
+
+    // Filter Order Change Event
+    card.querySelector(`#sel-order-${i}`).addEventListener('change', e => {
+      b.order = parseInt(e.target.value) || 2;
+      updateBandParamStates();
+      sendBand(i);
+      drawResponse();
+    });
+
+    // Initialize Gain & Q states based on current type & order
+    updateBandParamStates();
+
+    // Gain Text Input Box Link
+    card.querySelector(`#num-g-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.gain;
+      v = Math.max(-18, Math.min(18, v));
+      e.target.value = v.toFixed(1);
+      b.gain = v;
+      gKnob.set(v, false);
+      sendBand(i);
+      drawResponse();
+    });
+
+    // Instantiate Q Knob (resets to 0.707 on double click!)
+    const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
+      min: 0.1, max: 8.0, value: b.q, defaultVal: 0.707,
+      color: '#81A1C1',
+      decimals: 3,
+      onChange: v => {
+        b.q = v;
+        card.querySelector(`#num-q-${i}`).value = v.toFixed(3);
+        sendBand(i);
+        drawResponse();
+      }
+    });
+
+    // Q Text Input Box Link
+    card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.q;
+      v = Math.max(0.1, Math.min(8.0, v));
+      e.target.value = v.toFixed(3);
+      b.q = v;
+      qKnob.set(v, false);
+      sendBand(i);
+      drawResponse();
+    });
+
+    bandKnobs.push({ fKnob, gKnob, qKnob });
+  });
+
+  drawResponse();
+}
+
+function sendBand(i) {
+  const b = bands[i];
+  if (!b) return;
+  wsTx({
+    t: 'eq_band',
+    band: i,
+    freq: Math.round(b.freq * 10) / 10,
+    gain: Math.round(b.gain * 100) / 100,
+    q:    Math.round(b.q * 1000) / 1000,
+    type: b.type || 0,
+    order: b.order || 2,
+    enabled: b.enabled
+  });
+}
+
+function addBand() {
+  if (bands.length >= MAX_BANDS) return;
+
+  // Pick a musical frequency between 50 Hz and 15000 Hz
+  const candidateFreqs = [250, 500, 2000, 4000, 8000, 16000, 63, 125, 315];
+  let nextFreq = 1000;
+  for (let f of candidateFreqs) {
+    if (!bands.some(b => Math.abs(b.freq - f) < f * 0.25)) {
+      nextFreq = f;
+      break;
+    }
+  }
+
+  const newBand = {
+    band: bands.length,
+    freq: nextFreq,
+    gain: 0.0,
+    q: 0.707,
+    type: 0,
+    order: 2,
+    enabled: true
+  };
+  bands.push(newBand);
+  rebuildBandsUI();
+
+  wsTx({
+    t: 'add_band',
+    freq: newBand.freq,
+    gain: newBand.gain,
+    q: newBand.q,
+    type: newBand.type,
+    order: newBand.order
+  });
+}
+
+function removeBand(index) {
+  if (bands.length <= 1) return;
+  bands.splice(index, 1);
+  rebuildBandsUI();
+  wsTx({ t: 'remove_band', band: index });
+}
+
+// ═══════════════════════════════════════════════════════════
+// Module Bypass Controls
+// ═══════════════════════════════════════════════════════════
+function updateBypassUI(mod, enabled) {
+  const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'comp' ? 'compander' : 'limiter')}`;
+  const box = document.getElementById(boxId);
+  const sw = document.getElementById(`switch-${mod}`);
+
+  if (sw) sw.checked = !!enabled;
+
+  if (box) {
+    if (enabled) {
+      box.classList.remove('bypassed');
+    } else {
+      box.classList.add('bypassed');
+    }
+  }
+}
+
+function toggleModuleCollapse(mod) {
+  const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'comp' ? 'compander' : 'limiter')}`;
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  box.classList.toggle('collapsed');
+  if (mod === 'eq' && !box.classList.contains('collapsed')) {
+    setTimeout(drawResponse, 60);
+  }
+}
+
+function toggleEQModule(checked) {
+  if (typeof checked === 'boolean') {
+    eqEnabled = checked;
+  } else {
+    eqEnabled = !eqEnabled;
+  }
+  updateBypassUI('eq', eqEnabled);
+  drawResponse();
+  wsTx({ t: 'eq_module', enabled: eqEnabled });
+}
+
+function toggleCompanderModule(checked) {
+  if (typeof checked === 'boolean') {
+    compParams.enabled = checked;
+  } else {
+    compParams.enabled = !compParams.enabled;
+  }
+  updateBypassUI('comp', compParams.enabled);
+  sendCompander();
+}
+
+function toggleLimiterModule(checked) {
+  if (typeof checked === 'boolean') {
+    limParams.enabled = checked;
+  } else {
+    limParams.enabled = !limParams.enabled;
+  }
+  updateBypassUI('lim', limParams.enabled);
+  sendLimiter();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Compander & Limiter UI Binding
+// ═══════════════════════════════════════════════════════════
+function initCompanderKnobs() {
+  // Threshold (-60 to 0)
+  compKnobs.thresh = new Knob(document.getElementById('knob-comp-thresh'), {
+    min: -60, max: 0, value: compParams.threshold, defaultVal: -18,
+    color: '#81A1C1', decimals: 1,
+    onChange: v => {
+      compParams.threshold = v;
+      document.getElementById('num-comp-thresh').value = v.toFixed(1);
+      sendCompander();
+    }
+  });
+  document.getElementById('num-comp-thresh').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-60, Math.min(0, v));
+      compParams.threshold = v;
+      compKnobs.thresh.set(v, false);
+      sendCompander();
+    }
+  });
+
+  // Ratio (1 to 20)
+  compKnobs.ratio = new Knob(document.getElementById('knob-comp-ratio'), {
+    min: 1, max: 20, value: compParams.ratio, defaultVal: 4,
+    color: '#88C0D0', decimals: 1,
+    onChange: v => {
+      compParams.ratio = v;
+      document.getElementById('num-comp-ratio').value = v.toFixed(1);
+      sendCompander();
+    }
+  });
+  document.getElementById('num-comp-ratio').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(1, Math.min(20, v));
+      compParams.ratio = v;
+      compKnobs.ratio.set(v, false);
+      sendCompander();
+    }
+  });
+
+  // Attack (0.1 to 200 ms)
+  compKnobs.att = new Knob(document.getElementById('knob-comp-att'), {
+    min: 0.1, max: 200, value: compParams.attackMs, defaultVal: 5,
+    color: '#A3BE8C', decimals: 1,
+    onChange: v => {
+      compParams.attackMs = v;
+      document.getElementById('num-comp-att').value = v.toFixed(1);
+      sendCompander();
+    }
+  });
+  document.getElementById('num-comp-att').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(0.1, Math.min(200, v));
+      compParams.attackMs = v;
+      compKnobs.att.set(v, false);
+      sendCompander();
+    }
+  });
+
+  // Release (10 to 2000 ms)
+  compKnobs.rel = new Knob(document.getElementById('knob-comp-rel'), {
+    min: 10, max: 2000, value: compParams.releaseMs, defaultVal: 150,
+    color: '#D08770', decimals: 0,
+    onChange: v => {
+      compParams.releaseMs = v;
+      document.getElementById('num-comp-rel').value = Math.round(v);
+      sendCompander();
+    }
+  });
+  document.getElementById('num-comp-rel').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(10, Math.min(2000, v));
+      compParams.releaseMs = v;
+      compKnobs.rel.set(v, false);
+      sendCompander();
+    }
+  });
+
+  // Makeup Gain (-12 to +24 dB)
+  compKnobs.gain = new Knob(document.getElementById('knob-comp-gain'), {
+    min: -12, max: 24, value: compParams.makeup, defaultVal: 0,
+    centerZero: true, color: '#B48EAD', decimals: 1,
+    onChange: v => {
+      compParams.makeup = v;
+      document.getElementById('num-comp-gain').value = v.toFixed(1);
+      sendCompander();
+    }
+  });
+  document.getElementById('num-comp-gain').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-12, Math.min(24, v));
+      compParams.makeup = v;
+      compKnobs.gain.set(v, false);
+      sendCompander();
+    }
+  });
+}
+
+function syncCompanderUI() {
+  if (compKnobs.thresh) {
+    compKnobs.thresh.setQuiet(compParams.threshold);
+    document.getElementById('num-comp-thresh').value = compParams.threshold.toFixed(1);
+    compKnobs.ratio.setQuiet(compParams.ratio);
+    document.getElementById('num-comp-ratio').value = compParams.ratio.toFixed(1);
+    compKnobs.att.setQuiet(compParams.attackMs);
+    document.getElementById('num-comp-att').value = compParams.attackMs.toFixed(1);
+    compKnobs.rel.setQuiet(compParams.releaseMs);
+    document.getElementById('num-comp-rel').value = Math.round(compParams.releaseMs);
+    compKnobs.gain.setQuiet(compParams.makeup);
+    document.getElementById('num-comp-gain').value = compParams.makeup.toFixed(1);
+  }
+}
+
+function sendCompander() {
+  wsTx({
+    t: 'compander',
+    threshold: compParams.threshold,
+    ratio: compParams.ratio,
+    attackMs: compParams.attackMs,
+    releaseMs: compParams.releaseMs,
+    makeup: compParams.makeup,
+    enabled: compParams.enabled
+  });
+}
+
+function initLimiterKnobs() {
+  // Ceiling (-6 to 0 dBFS)
+  limKnobs.ceil = new Knob(document.getElementById('knob-lim-ceil'), {
+    min: -6, max: 0, value: limParams.ceiling, defaultVal: -0.5,
+    color: '#BF616A', decimals: 1,
+    onChange: v => {
+      limParams.ceiling = v;
+      document.getElementById('num-lim-ceil').value = v.toFixed(1);
+      sendLimiter();
+    }
+  });
+  document.getElementById('num-lim-ceil').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-6, Math.min(0, v));
+      limParams.ceiling = v;
+      limKnobs.ceil.set(v, false);
+      sendLimiter();
+    }
+  });
+
+  // Knee Width (0 to 6 dB)
+  limKnobs.knee = new Knob(document.getElementById('knob-lim-knee'), {
+    min: 0, max: 6, value: limParams.knee, defaultVal: 3.0,
+    color: '#8FBCBB', decimals: 1,
+    onChange: v => {
+      limParams.knee = v;
+      document.getElementById('num-lim-knee').value = v.toFixed(1);
+      sendLimiter();
+    }
+  });
+  document.getElementById('num-lim-knee').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(0, Math.min(6, v));
+      limParams.knee = v;
+      limKnobs.knee.set(v, false);
+      sendLimiter();
+    }
+  });
+}
+
+function syncLimiterUI() {
+  if (limKnobs.ceil) {
+    limKnobs.ceil.setQuiet(limParams.ceiling);
+    document.getElementById('num-lim-ceil').value = limParams.ceiling.toFixed(1);
+    limKnobs.knee.setQuiet(limParams.knee);
+    document.getElementById('num-lim-knee').value = limParams.knee.toFixed(1);
+  }
+}
+
+function sendLimiter() {
+  wsTx({
+    t: 'limiter',
+    ceiling: limParams.ceiling,
+    knee: limParams.knee,
+    enabled: limParams.enabled
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// Initialization
+// ═══════════════════════════════════════════════════════════
+updateInputSourceUI();
+initPreamp();
+renderCustomPresets();
+rebuildBandsUI();
+initCompanderKnobs();
+initLimiterKnobs();
+wsConnect();
+</script>
+</body>
+</html>
