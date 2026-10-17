@@ -6,9 +6,9 @@
  * begins gradually below the ceiling, avoiding hard clipping artefacts.
  *
  * Transfer function (dB domain, knee width W):
- *   if  x < ceiling - W/2       → output = x          (no gain reduction)
- *   if  x > ceiling + W/2       → output = ceiling     (hard limit)
- *   else                         → soft curve           (quadratic interpolation)
+ *   if  x < ceiling - W/2       -> output = x          (no gain reduction)
+ *   if  x > ceiling + W/2       -> output = ceiling     (hard limit)
+ *   else                         -> soft curve           (quadratic interpolation)
  *
  * Look-ahead: a short fixed delay aligns the gain signal with the signal
  * peak, eliminating overshoot on fast transients.
@@ -54,10 +54,10 @@ public:
             float gainDb = 0.0f;
 
             if (peakDb >= _upperDb) {
-                // Above knee — hard ceiling
+                // Above knee  -  hard ceiling
                 gainDb = _ceilingDb - peakDb;
             } else if (peakDb > _lowerDb) {
-                // Inside knee — quadratic blend
+                // Inside knee  -  quadratic blend
                 const float t = (peakDb - _lowerDb) / _kneeDb;  // 0..1
                 gainDb = -0.5f * _kneeDb * t * t;
             }

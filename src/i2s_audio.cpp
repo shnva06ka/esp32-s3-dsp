@@ -15,12 +15,12 @@ I2SAudio::I2SAudio(ParamStore& params)
 {
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 bool I2SAudio::begin()
 {
     _allocBuffers();
 
-    // ── 1. I2S_NUM_0: Full-Duplex Master (PCM1808 ADC + PCM5102A DAC) ──
+    // -- 1. I2S_NUM_0: Full-Duplex Master (PCM1808 ADC + PCM5102A DAC) --
     const i2s_config_t cfg_master = {
         .mode                 = static_cast<i2s_mode_t>(
                                     I2S_MODE_MASTER |
@@ -56,7 +56,7 @@ bool I2SAudio::begin()
     }
     i2s_zero_dma_buffer(kI2SPortMaster);
 
-    // ── 2. I2S_NUM_1: Slave Receiver (External ESP32-WROOM Bluetooth A2DP) ──
+    // -- 2. I2S_NUM_1: Slave Receiver (External ESP32-WROOM Bluetooth A2DP) --
     const i2s_config_t cfg_slave = {
         .mode                 = static_cast<i2s_mode_t>(
                                     I2S_MODE_SLAVE |
@@ -97,14 +97,14 @@ bool I2SAudio::begin()
     return true;
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 void I2SAudio::process(const AudioCallback& cb)
 {
     if (!_running) return;
 
     const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
 
-    // ── 1. Read AUX from I2S_NUM_0 (Master ADC) ──────────────
+    // -- 1. Read AUX from I2S_NUM_0 (Master ADC) --------------
     size_t bytesReadAux = 0;
     esp_err_t errAux = i2s_read(kI2SPortMaster, _rxBufAux, byteCount, &bytesReadAux, pdMS_TO_TICKS(20));
     if (errAux != ESP_OK || bytesReadAux == 0) {
@@ -119,7 +119,7 @@ void I2SAudio::process(const AudioCallback& cb)
     _rmsAuxL = _calcRMS(_leftAux,  kBufferFrames);
     _rmsAuxR = _calcRMS(_rightAux, kBufferFrames);
 
-    // ── 2. Read Bluetooth from I2S_NUM_1 (Slave RX) ───────────
+    // -- 2. Read Bluetooth from I2S_NUM_1 (Slave RX) -----------
     // Non-blocking read (timeout = 0) so lack of external clock never stalls Core 1
     size_t bytesReadBt = 0;
     i2s_read(kI2SPortSlave, _rxBufBt, byteCount, &bytesReadBt, 0);
@@ -158,10 +158,10 @@ void I2SAudio::process(const AudioCallback& cb)
     _rmsBtR = (framesReadBt > 0) ? _calcRMS(_rightBt, framesReadBt) : 0.0f;
     const float btMaxRms = (_rmsBtL > _rmsBtR) ? _rmsBtL : _rmsBtR;
 
-    // ── 3. Read Wi-Fi Stream stub from Ring Buffer ────────────
+    // -- 3. Read Wi-Fi Stream stub from Ring Buffer ------------
     _wifiRingBuffer.read(_leftWifi, _rightWifi, kBufferFrames);
 
-    // ── 4. Manual Input Selector Crossfade Logic ──────────────
+    // -- 4. Manual Input Selector Crossfade Logic --------------
     const InputSourceMode targetSource = _params.getInputMode();
 
     const float targetGainAux  = (targetSource == INPUT_MODE_AUX)  ? 1.0f : 0.0f;
@@ -195,13 +195,13 @@ void I2SAudio::process(const AudioCallback& cb)
         Serial.printf("[AUDIO] Active input switched to: %s\n", name);
     }
 
-    // ── 5. Run DSP Pipeline Callback ──────────────────────────
+    // -- 5. Run DSP Pipeline Callback --------------------------
     cb(_leftMix, _rightMix, kBufferFrames);
 
     _rmsOutL = _calcRMS(_leftMix,  kBufferFrames);
     _rmsOutR = _calcRMS(_rightMix, kBufferFrames);
 
-    // ── 6. Interleave float → int32 and write to DAC ─────────
+    // -- 6. Interleave float -> int32 and write to DAC ---------
     auto toI32 = [](float s) -> int32_t {
         if (s > 1.0f) s = 1.0f;
         else if (s < -1.0f) s = -1.0f;
@@ -218,7 +218,7 @@ void I2SAudio::process(const AudioCallback& cb)
     i2s_write(kI2SPortMaster, _txBuf, byteCount, &bytesWritten, pdMS_TO_TICKS(20));
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 void I2SAudio::end()
 {
     if (_running) {
@@ -229,7 +229,7 @@ void I2SAudio::end()
     _freeBuffers();
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 void I2SAudio::_allocBuffers()
 {
     const size_t intBufBytes   = kBufferFrames * kChannels * sizeof(int32_t); // 2048 bytes

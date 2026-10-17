@@ -1,16 +1,16 @@
 /**
  * @file web_ui.h
- * @brief Async Web UI server (Core 0) — PROGMEM page + WebSocket control.
+ * @brief Async Web UI server (Core 0) - PROGMEM page + WebSocket control.
  *
  * Architecture
- * ────────────
+ * ------------
  *  ESPAsyncWebServer (port 80)
- *  ├── GET /            → send EQ_HTML from PROGMEM (no SPIFFS needed)
- *  ├── GET /api/params  → JSON snapshot of all params (REST fallback)
- *  └── WS  /ws          → bidirectional real-time channel
+ *  |-- GET /            -> send EQ_HTML from PROGMEM (no SPIFFS needed)
+ *  |-- GET /api/params  -> JSON snapshot of all params (REST fallback)
+ *  \-- WS  /ws          -> bidirectional real-time channel
  *
  * Thread safety
- * ─────────────
+ * -------------
  *  All param reads/writes go through ParamStore's mutex.
  */
 #pragma once
@@ -20,8 +20,9 @@
 #include <ArduinoJson.h>
 #include "eq_html.h"        // PROGMEM EQ_HTML[]
 #include "param_store.h"
+#include "sys_monitor.h"
 
-// ── Wi-Fi credentials (reads private wifi_credentials.h if present) ─
+// -- Wi-Fi credentials (reads private wifi_credentials.h if present) -
 #if __has_include("wifi_credentials.h")
 #  include "wifi_credentials.h"
 #endif
@@ -48,7 +49,7 @@ public:
           _ws("/ws")
     {}
 
-    // ── Public API ──────────────────────────────────────────
+    // -- Public API ------------------------------------------
     void begin() {
         Serial1.begin(115200, SERIAL_8N1, BT_UART_RX_PIN, BT_UART_TX_PIN);
         Serial.printf("[WEB] Inter-board Bluetooth metadata UART listener on RX GPIO %d\n", BT_UART_RX_PIN);
@@ -94,6 +95,12 @@ public:
             _ws.textAll(_buildBtMetaJson(bt));
         }
 
+        // 3b. Broadcast Wi-Fi streaming metadata updates
+        WiFiStreamMetadata wifiMeta;
+        if (_params.getWiFiStreamMetadataIfChanged(wifiMeta, _lastWifiMetaVersion)) {
+            _ws.textAll(_buildWiFiMetaJson(wifiMeta));
+        }
+
         // 4. Print IP address every 5 seconds during operation
         unsigned long now = millis();
         if (now - _lastIpPrint >= 5000) {
@@ -103,6 +110,21 @@ public:
                              : WiFi.softAPIP().toString();
             Serial.printf("[NET] Web UI accessible at: http://%s\n", ipStr.c_str());
         }
+
+        // 5. Automatic debounced flash persistence
+        if (_params.isDirty()) {
+            if (now - _params.getLastDirtyTime() >= 1000) {
+                _params.save();
+            }
+        }
+
+        // 6. Broadcast real-time system stats (CPU, Flash, RAM) to connected WebSockets
+        if (now - _lastSysBroadcast >= 1000) {
+            _lastSysBroadcast = now;
+            if (_ws.count() > 0) {
+                _ws.textAll(_buildSysJson());
+            }
+        }
     }
 
 private:
@@ -110,11 +132,13 @@ private:
     AsyncWebServer _server;
     AsyncWebSocket _ws;
     unsigned long  _lastIpPrint{0};
+    unsigned long  _lastSysBroadcast{0};
     uint32_t       _lastInputVersion{1};
     uint32_t       _lastBtMetaVersion{1};
+    uint32_t       _lastWifiMetaVersion{1};
     String         _uartLine{""};
 
-    // ── Wi-Fi / AP setup ────────────────────────────────────
+    // -- Wi-Fi / AP setup ------------------------------------
     void _startWiFi() {
         bool hasCredentials = (strlen(WIFI_SSID) > 0 && strcmp(WIFI_SSID, "YourSSID") != 0);
 
@@ -142,89 +166,68 @@ private:
         Serial.printf("[NET] Web UI accessible at: http://%s\n", WiFi.softAPIP().toString().c_str());
     }
 
-    // ── HTTP routes ─────────────────────────────────────────
+    // -- Route setup -----------------------------------------
     void _setupRoutes() {
-        // Serve the EQ UI from PROGMEM (gzipped)
+        _ws.onEvent([this](AsyncWebSocket* s, AsyncWebSocketClient* c,
+                           AwsEventType type, void* arg, uint8_t* data, size_t len) {
+            _onWsEvent(s, c, type, arg, data, len);
+        });
+
         _server.on("/", HTTP_GET, [](AsyncWebServerRequest* req) {
-            AsyncWebServerResponse* res = req->beginResponse_P(200, "text/html", PAGE_INDEX_HTML_GZ, PAGE_INDEX_HTML_GZ_LEN);
+            AsyncWebServerResponse* res = req->beginResponse(200, "text/html", PAGE_INDEX_HTML_GZ, PAGE_INDEX_HTML_GZ_LEN);
             res->addHeader("Content-Encoding", "gzip");
+            res->addHeader("Cache-Control", "no-cache");
             req->send(res);
         });
 
-        // REST fallback — returns the same JSON the WS broadcasts
-        _server.on("/api/params", HTTP_GET,
-            [this](AsyncWebServerRequest* req) {
-                req->send(200, "application/json", _buildStateJson());
-            });
+        _server.on("/api/params", HTTP_GET, [this](AsyncWebServerRequest* req) {
+            req->send(200, "application/json", _buildStateJson());
+        });
 
-        // 404
         _server.onNotFound([](AsyncWebServerRequest* req) {
             req->send(404, "text/plain", "Not found");
         });
-
-        // WebSocket event handler
-        _ws.onEvent(
-            [this](AsyncWebSocket* /*srv*/, AsyncWebSocketClient* client,
-                   AwsEventType type, void* arg, uint8_t* data, size_t len) {
-                _onWsEvent(client, type, arg, data, len);
-            });
     }
 
-    // ── WebSocket dispatcher ────────────────────────────────
-    void _onWsEvent(AsyncWebSocketClient* client,
-                    AwsEventType           type,
-                    void*                  arg,
-                    uint8_t*               data,
-                    size_t                 len)
-    {
+    // -- WebSocket event handler ------------------------------
+    void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
+                    AwsEventType type, void* arg, uint8_t* data, size_t len) {
         switch (type) {
             case WS_EVT_CONNECT:
-                Serial.printf("[WS] Client #%u connected\n", client->id());
+                Serial.printf("[WS] Client #%u connected from %s\n",
+                              client->id(), client->remoteIP().toString().c_str());
                 client->text(_buildStateJson());
+                client->text(_buildSysJson());
+                client->text(_buildBtMetaJson(_params.getBluetoothMetadata()));
                 break;
-
             case WS_EVT_DISCONNECT:
                 Serial.printf("[WS] Client #%u disconnected\n", client->id());
                 break;
-
             case WS_EVT_DATA: {
                 auto* info = static_cast<AwsFrameInfo*>(arg);
-                if (info->opcode == WS_TEXT &&
-                    info->final  &&
-                    info->index == 0)
-                {
-                    _handleWsData(client, data, len);
+                if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
+                    data[len] = 0;
+                    _handleWsMessage(client, reinterpret_cast<char*>(data));
                 }
                 break;
             }
-
-            case WS_EVT_ERROR:
-                Serial.printf("[WS] Error on client #%u\n", client->id());
-                break;
-
             default:
                 break;
         }
     }
 
-    // ── Message parser ───────────────────────────────────────
-    void _handleWsData(AsyncWebSocketClient* client,
-                       uint8_t* data, size_t len)
-    {
+    // -- Inbound WS message dispatcher ------------------------
+    void _handleWsMessage(AsyncWebSocketClient* client, const char* json) {
         StaticJsonDocument<384> doc;
-        if (deserializeJson(doc, data, len) != DeserializationError::Ok) {
-            client->text("{\"err\":\"bad json\"}");
-            return;
-        }
+        if (deserializeJson(doc, json) != DeserializationError::Ok) return;
 
-        const char* t = doc["t"];
-        if (!t) return;
+        const char* t = doc["t"] | "";
 
-        if (strcmp(t, "eq") == 0 || strcmp(t, "eq_band") == 0) {
+        if (strcmp(t, "eq") == 0) {
             _handleEQMsg(doc);
             _ws.textAll(_buildStateJson());
         }
-        else if (strcmp(t, "eq_module") == 0) {
+        else if (strcmp(t, "eq_toggle") == 0) {
             if (doc.containsKey("enabled")) {
                 _params.setEQEnabled(doc["enabled"].as<bool>());
             }
@@ -246,12 +249,17 @@ private:
             float g = doc["gain"] | 0.0f;
             float q = doc["q"]    | 0.707f;
             uint8_t type = doc["type"] | 0;
-            _params.addEQBand(f, g, q, type);
+            uint8_t order = doc["order"] | 2;
+            _params.addEQBand(f, g, q, type, order);
             _ws.textAll(_buildStateJson());
         }
         else if (strcmp(t, "remove_band") == 0) {
             int b = doc["band"] | -1;
             _params.removeEQBand(b);
+            _ws.textAll(_buildStateJson());
+        }
+        else if (strcmp(t, "subsonic") == 0) {
+            _handleSubsonicMsg(doc);
             _ws.textAll(_buildStateJson());
         }
         else if (strcmp(t, "compander") == 0) {
@@ -288,12 +296,22 @@ private:
             _params.setBluetoothMetadata(meta);
             _ws.textAll(_buildBtMetaJson(meta));
         }
+        else if (strcmp(t, "boot_defaults") == 0) {
+            bool custom   = doc["custom"]   | false;
+            bool eq       = doc["eq"]       | false;
+            bool subsonic = doc["subsonic"] | false;
+            bool comp     = doc["comp"]     | false;
+            bool lim      = doc["lim"]      | false;
+            _params.setBootDefaults(custom, eq, comp, lim, subsonic);
+            _params.save();
+            _ws.textAll(_buildStateJson());
+        }
         else if (strcmp(t, "getState") == 0) {
             client->text(_buildStateJson());
         }
     }
 
-    // ── EQ message handler ───────────────────────────────────
+    // -- EQ message handler -----------------------------------
     void _handleEQMsg(const StaticJsonDocument<384>& doc) {
         const int band = doc["band"] | -1;
         if (band < 0 || band >= kEQBands) return;
@@ -323,7 +341,30 @@ private:
         _params.setEQBand(band, p);
     }
 
-    // ── Compander message handler ─────────────────────────────
+    // -- Speakers correction (Subsonic + Channel correction) message handler --
+    void _handleSubsonicMsg(const StaticJsonDocument<384>& doc) {
+        SubsonicParams p = _params.getSubsonic();
+        if (doc.containsKey("freq"))    p.freq     = doc["freq"].as<float>();
+        if (doc.containsKey("order"))   p.order    = doc["order"].as<uint8_t>();
+        if (doc.containsKey("enabled")) p.enabled  = doc["enabled"].as<bool>();
+        if (doc.containsKey("balance")) p.balance  = doc["balance"].as<float>();
+        if (doc.containsKey("delayL"))  p.delayMsL = doc["delayL"].as<float>();
+        if (doc.containsKey("delayR"))  p.delayMsR = doc["delayR"].as<float>();
+        if (doc.containsKey("phaseL"))  p.phaseL   = doc["phaseL"].as<int16_t>();
+        if (doc.containsKey("phaseR"))  p.phaseR   = doc["phaseR"].as<int16_t>();
+
+        p.freq = _clamp(p.freq, 20.0f, 100.0f);
+        if (p.order < 1 || p.order > 4) p.order = 2;
+        p.balance  = _clamp(p.balance, -100.0f, 100.0f);
+        p.delayMsL = _clamp(p.delayMsL, 0.0f, 20.0f);
+        p.delayMsR = _clamp(p.delayMsR, 0.0f, 20.0f);
+        if (p.phaseL < 0 || p.phaseL > 180) p.phaseL = 0;
+        if (p.phaseR < 0 || p.phaseR > 180) p.phaseR = 0;
+
+        _params.setSubsonic(p);
+    }
+
+    // -- Compander message handler ----------------------------
     void _handleCompanderMsg(const StaticJsonDocument<384>& doc) {
         CompanderParams p = _params.getCompander();
         if (doc.containsKey("threshold")) p.threshold  = doc["threshold"].as<float>();
@@ -335,7 +376,7 @@ private:
         _params.setCompander(p);
     }
 
-    // ── Limiter message handler ───────────────────────────────
+    // -- Limiter message handler ------------------------------
     void _handleLimiterMsg(const StaticJsonDocument<384>& doc) {
         LimiterParams p = _params.getLimiter();
         if (doc.containsKey("ceiling")) p.ceilingDb = doc["ceiling"].as<float>();
@@ -344,9 +385,9 @@ private:
         _params.setLimiter(p);
     }
 
-    // ── JSON builder ─────────────────────────────────────────
+    // -- JSON builder -----------------------------------------
     String _buildStateJson() {
-        DynamicJsonDocument doc(2304);
+        DynamicJsonDocument doc(3072);
         doc["t"] = "state";
 
         // Input Source Module
@@ -373,6 +414,18 @@ private:
             o["enabled"] = p.enabled;
         }
 
+        // Speakers Correction Module
+        auto sub = _params.getSubsonic();
+        JsonObject subObj = doc.createNestedObject("subsonic");
+        subObj["enabled"] = sub.enabled;
+        subObj["freq"]    = roundf(sub.freq * 10.0f) / 10.0f;
+        subObj["order"]   = sub.order;
+        subObj["balance"] = roundf(sub.balance * 10.0f) / 10.0f;
+        subObj["delayL"]  = roundf(sub.delayMsL * 10.0f) / 10.0f;
+        subObj["delayR"]  = roundf(sub.delayMsR * 10.0f) / 10.0f;
+        subObj["phaseL"]  = sub.phaseL;
+        subObj["phaseR"]  = sub.phaseR;
+
         // Compander Module
         auto comp = _params.getCompander();
         JsonObject cObj = doc.createNestedObject("compander");
@@ -390,6 +443,16 @@ private:
         lObj["ceiling"] = roundf(lim.ceilingDb * 10.0f) / 10.0f;
         lObj["knee"]    = roundf(lim.kneeDb * 10.0f) / 10.0f;
 
+        // Boot Defaults Configuration
+        bool bCustom, bEQ, bComp, bLim, bSub;
+        _params.getBootDefaults(bCustom, bEQ, bComp, bLim, bSub);
+        JsonObject bootObj = doc.createNestedObject("boot_defaults");
+        bootObj["custom"]   = bCustom;
+        bootObj["eq"]       = bEQ;
+        bootObj["subsonic"] = bSub;
+        bootObj["comp"]     = bComp;
+        bootObj["lim"]      = bLim;
+
         // Bluetooth Metadata Module
         auto bt = _params.getBluetoothMetadata();
         JsonObject btObj = doc.createNestedObject("bt");
@@ -400,6 +463,51 @@ private:
         btObj["playing"]   = bt.playing;
         btObj["duration"]  = bt.duration;
         btObj["pos"]       = bt.pos;
+
+        // Wi-Fi Stream Metadata Module (LMS / Roon)
+        auto wf = _params.getWiFiStreamMetadata();
+        JsonObject wfObj = doc.createNestedObject("wifi_stream");
+        wfObj["server"]    = wf.serverName;
+        wfObj["server_ip"] = wf.serverIp;
+        wfObj["title"]     = wf.trackTitle;
+        wfObj["artist"]    = wf.trackArtist;
+        wfObj["album"]     = wf.trackAlbum;
+        wfObj["format"]    = wf.formatInfo;
+        wfObj["connected"] = wf.connected;
+        wfObj["streaming"] = wf.streaming;
+        wfObj["paused"]    = wf.paused;
+        wfObj["rate"]      = wf.sampleRate;
+        wfObj["bits"]      = wf.bitDepth;
+
+        // System Telemetry (CPU 0/1, RAM, Flash)
+        auto s = SystemMonitor::getStats();
+        JsonObject sysObj = doc.createNestedObject("sys");
+        sysObj["cpu0"]    = roundf(s.cpu0 * 10.0f) / 10.0f;
+        sysObj["cpu1"]    = roundf(s.cpu1 * 10.0f) / 10.0f;
+        sysObj["heap_u"]  = s.heapUsed;
+        sysObj["heap_t"]  = s.heapTotal;
+        sysObj["psram_u"] = s.psramUsed;
+        sysObj["psram_t"] = s.psramTotal;
+        sysObj["flash_u"] = s.flashUsed;
+        sysObj["flash_t"] = s.flashTotal;
+
+        String out;
+        serializeJson(doc, out);
+        return out;
+    }
+
+    String _buildSysJson() {
+        auto s = SystemMonitor::getStats();
+        StaticJsonDocument<256> doc;
+        doc["t"]       = "sys";
+        doc["cpu0"]    = roundf(s.cpu0 * 10.0f) / 10.0f;
+        doc["cpu1"]    = roundf(s.cpu1 * 10.0f) / 10.0f;
+        doc["heap_u"]  = s.heapUsed;
+        doc["heap_t"]  = s.heapTotal;
+        doc["psram_u"] = s.psramUsed;
+        doc["psram_t"] = s.psramTotal;
+        doc["flash_u"] = s.flashUsed;
+        doc["flash_t"] = s.flashTotal;
 
         String out;
         serializeJson(doc, out);
@@ -416,6 +524,25 @@ private:
         doc["playing"]   = bt.playing;
         doc["duration"]  = bt.duration;
         doc["pos"]       = bt.pos;
+        String out;
+        serializeJson(doc, out);
+        return out;
+    }
+
+    String _buildWiFiMetaJson(const WiFiStreamMetadata& wf) {
+        StaticJsonDocument<384> doc;
+        doc["t"]         = "wifi_meta";
+        doc["server"]    = wf.serverName;
+        doc["server_ip"] = wf.serverIp;
+        doc["title"]     = wf.trackTitle;
+        doc["artist"]    = wf.trackArtist;
+        doc["album"]     = wf.trackAlbum;
+        doc["format"]    = wf.formatInfo;
+        doc["connected"] = wf.connected;
+        doc["streaming"] = wf.streaming;
+        doc["paused"]    = wf.paused;
+        doc["rate"]      = wf.sampleRate;
+        doc["bits"]      = wf.bitDepth;
         String out;
         serializeJson(doc, out);
         return out;
@@ -444,7 +571,7 @@ private:
 
                 // Broadcast directly to connected WebSockets
                 _ws.textAll(line);
-                Serial.printf("[WEB] BT Track: %s — %s (%s)\n", meta.title, meta.artist, meta.album);
+                Serial.printf("[WEB] BT Track: %s - %s (%s)\n", meta.title, meta.artist, meta.album);
             }
         }
     }

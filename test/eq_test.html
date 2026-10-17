@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ESP32-S3-DSP</title>
 <style>
-/* ── Nord Light Theme Palette (High-Contrast Flat & Mono) ──────────────── */
+/* -- Nord Light Theme Palette (High-Contrast Flat & Mono) ---------------- */
 :root {
   --nord0: #2E3440; /* darkest slate */
   --nord1: #3B4252;
@@ -58,7 +58,7 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ── App Header ─────────────────────────────────────────── */
+/* -- App Header ------------------------------------------- */
 header {
   display: flex;
   align-items: center;
@@ -111,7 +111,7 @@ header {
 #ws-dot.ok  { background: var(--active); }
 #ws-dot.err { background: var(--danger); }
 
-/* ── Header Controls (Input Selector & Status Badge) ────── */
+/* -- Header Controls (Input Selector & Status Badge) ------ */
 .header-controls {
   display: flex;
   align-items: center;
@@ -179,7 +179,7 @@ header {
   border: 1px solid var(--nord0);
 }
 
-/* ── Container Layout ───────────────────────────────────── */
+/* -- Container Layout ------------------------------------- */
 main {
   max-width: 1400px;
   margin: 16px auto;
@@ -189,7 +189,7 @@ main {
   gap: 16px;
 }
 
-/* ── Module Cards / Boxes (High Contrast Flat) ──────────── */
+/* -- Module Cards / Boxes (High Contrast Flat) ------------ */
 .module-box {
   background: var(--card-bg);
   border: 1px solid var(--border-strong);
@@ -252,7 +252,7 @@ main {
   text-transform: uppercase;
 }
 
-/* ── Simple On/Off Toggle Switch (High Contrast) ────────── */
+/* -- Simple On/Off Toggle Switch (High Contrast) ---------- */
 .switch {
   position: relative;
   display: inline-block;
@@ -298,7 +298,7 @@ main {
   padding: 14px 16px;
 }
 
-/* ── EQ Frequency Response Canvas ───────────────────────── */
+/* -- EQ Frequency Response Canvas ------------------------- */
 #canvas-wrap {
   position: relative;
   width: 100%;
@@ -314,7 +314,7 @@ main {
   display: block;
 }
 
-/* ── EQ Toolbar (Presets + Band Controls) ───────────────── */
+/* -- EQ Toolbar (Presets + Band Controls) ----------------- */
 .eq-toolbar {
   display: flex;
   align-items: center;
@@ -411,7 +411,7 @@ main {
   cursor: not-allowed;
 }
 
-/* ── EQ Main Layout: Preamp on Left, Auto-Fill Bands on Right */
+/* -- EQ Main Layout: Preamp on Left, Auto-Fill Bands on Right */
 .eq-body-layout {
   display: flex;
   align-items: stretch;
@@ -482,7 +482,7 @@ main {
   color: var(--muted);
 }
 
-/* ── Dynamic Band Cards (Auto Fill Width) ───────────────── */
+/* -- Dynamic Band Cards (Auto Fill Width) ----------------- */
 #bands-container {
   flex: 1 1 0;
   min-width: 0;
@@ -598,7 +598,7 @@ main {
   outline: 1px solid var(--accent);
 }
 
-/* ── Parameter Row (Knob + Text Box) ────────────────────── */
+/* -- Parameter Row (Knob + Text Box) ---------------------- */
 .param-unit-col {
   display: flex;
   flex-direction: column;
@@ -655,7 +655,7 @@ input[type=number] {
   outline: 1px solid var(--accent);
 }
 
-/* ── Compander & Limiter Controls Grid ───────────────────── */
+/* -- Compander & Limiter Controls Grid --------------------- */
 .module-grid-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -693,7 +693,7 @@ input[type=number] {
   color: var(--muted);
 }
 
-/* ── Footer ─────────────────────────────────────────────── */
+/* -- Footer ----------------------------------------------- */
 footer {
   text-align: center;
   padding: 16px 0 24px;
@@ -708,7 +708,7 @@ footer {
 <header>
   <div class="brand">
     <h1>ESP32-S3-DSP</h1>
-    <span class="badge">YD-ESP32-S3 · 48kHz Stereo</span>
+    <span class="badge">YD-ESP32-S3 * 48kHz Stereo</span>
   </div>
 
   <div class="header-controls">
@@ -729,15 +729,15 @@ footer {
 
     <div id="ws-pill">
       <div id="ws-dot"></div>
-      <span id="ws-lbl">Connecting…</span>
+      <span id="ws-lbl">Connecting...</span>
     </div>
   </div>
 </header>
 
 <main>
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 1: PARAMETRIC EQUALIZER                          -->
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <section class="module-box" id="mod-eq">
     <div class="module-header" onclick="toggleModuleCollapse('eq')">
       <div class="module-title-area">
@@ -747,7 +747,7 @@ footer {
         </label>
         <span class="module-title">Parametric Equalizer</span>
       </div>
-      <span class="collapse-icon">▼</span>
+      <span class="collapse-icon">v</span>
     </div>
     <div class="module-body">
       <!-- Frequency response curve -->
@@ -800,9 +800,9 @@ footer {
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 2: COMPRESSOR                                    -->
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <section class="module-box" id="mod-compander">
     <div class="module-header" onclick="toggleModuleCollapse('comp')">
       <div class="module-title-area">
@@ -812,7 +812,7 @@ footer {
         </label>
         <span class="module-title">Compressor</span>
       </div>
-      <span class="collapse-icon">▼</span>
+      <span class="collapse-icon">v</span>
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
@@ -865,9 +865,9 @@ footer {
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 3: LIMITER                                       -->
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <section class="module-box" id="mod-limiter">
     <div class="module-header" onclick="toggleModuleCollapse('lim')">
       <div class="module-title-area">
@@ -877,7 +877,7 @@ footer {
         </label>
         <span class="module-title">Limiter</span>
       </div>
-      <span class="collapse-icon">▼</span>
+      <span class="collapse-icon">v</span>
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
@@ -905,13 +905,13 @@ footer {
 </main>
 
 <footer>
-  ESP32-S3-DSP · FreeRTOS Modular Audio Pipeline · Core 1 RT DSP · Core 0 Async WebServer
+  ESP32-S3-DSP * FreeRTOS Modular Audio Pipeline * Core 1 RT DSP * Core 0 Async WebServer
 </footer>
 
 <script>
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Constants & Color Map (Nord Palette)
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 const FS = 48000;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
@@ -1200,9 +1200,9 @@ let bandKnobs = []; // Array of { freqKnob, gainKnob, qKnob }
 let compKnobs = {};
 let limKnobs  = {};
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // WebSocket Client
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 let ws = null, wsRetry = null;
 
 function wsConnect() {
@@ -1221,7 +1221,7 @@ function wsConnect() {
       wsTx({ t: 'getState' });
     };
     ws.onclose = () => {
-      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting…');
+      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting...');
       ws = null;
       wsRetry = setTimeout(wsConnect, 3000);
     };
@@ -1308,7 +1308,7 @@ function handleMsg(d) {
   drawResponse();
 }
 
-// ── Input Source Functions ──────────────────────────────────
+// -- Input Source Functions ----------------------------------
 let selectedInputSource = 0; // 0: AUTO, 1: AUX, 2: BT, 3: WIFI
 let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
 
@@ -1334,9 +1334,9 @@ function updateInputSourceUI() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Rotary Knob Component (Nord Light Style)
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 class Knob {
   constructor(canvas, opts) {
     this.cv  = canvas;
@@ -1518,9 +1518,9 @@ class Knob {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Frequency Response Canvas (Nord Light)
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 const fCanvas = document.getElementById('freq-canvas');
 const fCtx    = fCanvas.getContext('2d');
 const DB_MAX  = 18;
@@ -1806,9 +1806,9 @@ function drawResponse() {
 
 new ResizeObserver(drawResponse).observe(fCanvas);
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Dynamic EQ Bands UI Builder
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 function rebuildBandsUI() {
   const root = document.getElementById('bands-container');
   root.innerHTML = '';
@@ -2098,9 +2098,9 @@ function removeBand(index) {
   wsTx({ t: 'remove_band', band: index });
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Module Bypass Controls
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 function updateBypassUI(mod, enabled) {
   const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'comp' ? 'compander' : 'limiter')}`;
   const box = document.getElementById(boxId);
@@ -2158,9 +2158,9 @@ function toggleLimiterModule(checked) {
   sendLimiter();
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Compander & Limiter UI Binding
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 function initCompanderKnobs() {
   // Threshold (-60 to 0)
   compKnobs.thresh = new Knob(document.getElementById('knob-comp-thresh'), {
@@ -2350,9 +2350,9 @@ function sendLimiter() {
   });
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Initialization
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 updateInputSourceUI();
 initPreamp();
 renderCustomPresets();

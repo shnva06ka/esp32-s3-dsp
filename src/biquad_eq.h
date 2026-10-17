@@ -8,7 +8,7 @@
  * optimised dsps_biquad_f32() SIMD function.
  *
  * Coefficient reference: Audio EQ Cookbook (R. Bristow-Johnson)
- *   H(z) peaking = (b0 + b1·z⁻¹ + b2·z⁻²) / (1 + a1·z⁻¹ + a2·z⁻²)
+ *   H(z) peaking = (b0 + b1*z^-1 + b2*z^-^2) / (1 + a1*z^-1 + a2*z^-^2)
  */
 #pragma once
 

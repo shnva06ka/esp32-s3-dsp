@@ -52,7 +52,7 @@ public:
     /** @brief Tear down I2S peripherals and free buffers. */
     void end();
 
-    // ── Level meters (updated every process() call) ──────────
+    // -- Level meters (updated every process() call) ----------
     float rmsInL()  const { return _rmsAuxL; } // Alias for backward compatibility
     float rmsInR()  const { return _rmsAuxR; }
     float rmsAuxL() const { return _rmsAuxL; }
@@ -62,8 +62,8 @@ public:
     float rmsOutL() const { return _rmsOutL; }
     float rmsOutR() const { return _rmsOutR; }
 
-    // ── Wi-Fi Ring Buffer Access (stub for future Wi-Fi stream tasks) ──
-    AudioRingBuffer<2048>& getWiFiRingBuffer() { return _wifiRingBuffer; }
+    // -- Wi-Fi Ring Buffer Access (LMS / Roon streaming) -----
+    AudioRingBuffer<16384>& getWiFiRingBuffer() { return _wifiRingBuffer; }
 
 private:
     ParamStore& _params;
@@ -84,8 +84,8 @@ private:
     float* _leftMix{nullptr};
     float* _rightMix{nullptr};
 
-    // Wi-Fi Stream ring buffer placeholder
-    AudioRingBuffer<2048> _wifiRingBuffer;
+    // Wi-Fi Stream ring buffer (16384 frames = ~341 ms buffer at 48kHz)
+    AudioRingBuffer<16384> _wifiRingBuffer;
 
     // Crossfade gain states (0.0 to 1.0)
     float _gainAux{1.0f};

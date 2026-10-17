@@ -1,8 +1,8 @@
 /**
  * @file dsp_pipeline.h
- * @brief Modular DSP pipeline: EQ → Compressor → Limiter
+ * @brief Modular DSP pipeline: EQ -> Subsonic -> Compressor -> Limiter
  *
- * Runs on Core 1.  Reads parameters from the shared ParamStore on
+ * Runs on Core 1. Reads parameters from the shared ParamStore on
  * every buffer boundary (cheap mutex + struct copy), so updates from
  * the web UI are picked up with at most one buffer's latency
  * (~5.3 ms at 48 kHz / 256 frames).
@@ -13,6 +13,7 @@
 #include "biquad_eq.h"
 #include "compander.h"
 #include "limiter.h"
+#include "speaker_correction.h"
 
 class DSPPipeline {
 public:
@@ -31,7 +32,7 @@ public:
     void process(float* left, float* right, size_t frames) {
         _syncParams();
 
-        // ── Stage 1: Parametric EQ Module ───────────────────
+        // -- Stage 1: Parametric EQ Module -------------------
         if (_localEqEnabled) {
             if (fabsf(_localPreampGain - 1.0f) > 0.001f) {
                 for (size_t i = 0; i < frames; ++i) {
@@ -42,28 +43,33 @@ public:
             _eq.process(left, right, frames, _localEqCount);
         }
 
-        // ── Stage 2: Compressor Module ──────────────────────
+        // -- Stage 2: Compressor Module ----------------------
         _comp.process(left, right, frames);
 
-        // ── Stage 3: Soft Limiter Module ──────────────────────
+        // -- Stage 3: Soft Limiter Module --------------------
         _limiter.process(left, right, frames);
+
+        // -- Stage 4: Speakers Correction Module (Final Step) -
+        _speakers.process(left, right, frames);
     }
 
 private:
-    ParamStore& _params;
-    BiquadEQ    _eq;
-    Compander   _comp;
-    SoftLimiter _limiter;
+    ParamStore&       _params;
+    BiquadEQ          _eq;
+    Compander         _comp;
+    SoftLimiter       _limiter;
+    SpeakerCorrection _speakers;
 
     uint32_t _syncCounter{0};
     uint32_t _localEqVersion{0};
+    uint32_t _localSubVersion{0};
     uint32_t _localCompVersion{0};
     uint32_t _localLimVersion{0};
     int      _localEqCount{5};
     bool     _localEqEnabled{true};
     float    _localPreampDb{0.0f};
     float    _localPreampGain{1.0f};
-    static constexpr uint32_t kSyncInterval = 4;   // check every 4 buffers (~21 ms)
+    static constexpr uint32_t kSyncInterval = 4; // check every 4 buffers (~21 ms)
 
     /** @brief Pull fresh parameters only when changed. */
     void _syncParams() {
@@ -79,6 +85,12 @@ private:
             }
         }
 
+        // Speakers Correction (Subsonic Filter + Channel Correction)
+        SubsonicParams sub;
+        if (_params.getSubsonicIfChanged(sub, _localSubVersion)) {
+            _speakers.setParams(sub);
+        }
+
         // Compander
         CompanderParams comp;
         if (_params.getCompanderIfChanged(comp, _localCompVersion)) {
@@ -92,4 +104,3 @@ private:
         }
     }
 };
-

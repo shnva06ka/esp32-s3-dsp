@@ -6,3 +6,9 @@
 __pycache__/
 *.pyc
 src/wifi_credentials.h
+.DS_Store
+Thumbs.db
+*.swp
+*.bak
+*.tmp
+*.log

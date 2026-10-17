@@ -1,245 +1,121 @@
 # ESP32-S3-DSP
 
-Real-time stereo digital audio processor running on dual ESP32 microcontrollers. The system combines an ESP32-S3 audio workstation with a dedicated ESP32-WROOM Bluetooth co-processor, high-fidelity ADC and DAC converters, and a modern responsive web dashboard.
+Real-time stereo digital audio processor on dual ESP32 microcontrollers. Combines an ESP32-S3 audio engine with an ESP32-WROOM Bluetooth co-processor, PCM1808 ADC, PCM5102A DAC, and responsive WebUI.
 
 ---
 
-## System Architecture
-
-The architecture separates heavy DSP processing and networking on the primary ESP32-S3 from the Bluetooth A2DP audio sink on a dedicated ESP32-WROOM co-processor.
+## Architecture
 
 ```
                     ESP32-WROOM (Co-Processor)
-                 ┌───────────────────────────────┐
-                 │  Bluetooth A2DP Audio Sink    │
-Phone / PC ─────▶│  AVRCP Metadata & Transport   │
- (Bluetooth)     └──────────────┬────────────────┘
-                                │
-                 I2S (Audio)    │  UART (Metadata & Controls)
-                 GPIO 22/21/23  │  GPIO 19/18
-                                ▼
-                    ESP32-S3 (Audio Processor)
-                 ┌───────────────────────────────┐
-AUX Line In ────▶│  Dual-I2S Input Multiplexer   │
- (PCM1808 ADC)   ├───────────────────────────────┤
-                 │  Core 1: DSP Pipeline         │
-                 │   - 10-Band Parametric EQ     │
-                 │   - Stereo RMS Compander      │
-                 │   - Soft-Knee Peak Limiter    │
-                 ├───────────────────────────────┤
-                 │  Core 0: Network & Web Server │
-                 │   - Embedded Web App (PROGMEM)│
-                 │   - Bidirectional WebSocket   │
-                 └──────────────┬────────────────┘
-                                │ I2S Audio
-                                ▼
-                       PCM5102A Stereo DAC
-                                │
-                                ▼
-                        Analog Audio Out
+                 +-------------------------------+
+                 |  Bluetooth A2DP Audio Sink    |
+Phone / PC ----->|  AVRCP Metadata and Transport |
+ (Bluetooth)     +---------------+---------------+
+                                 |
+                 I2S (Audio)     |  UART (Metadata and Controls)
+                 GPIO 22/21/23   |  GPIO 19/18
+                                 v
+                     ESP32-S3 (Audio Processor)
+                 +-------------------------------+
+AUX Line In ---->|  Input Selector:              |
+ (PCM1808 ADC)   |   1. AUX Line In (PCM1808)    |
+Wi-Fi Stream --->|   2. Bluetooth A2DP           |
+(LMS / Roon)     |   3. Wi-Fi Lossless (SlimProto|
+                 +-------------------------------+
+                 |  Core 1: DSP Pipeline         |
+                 |   - Preamp Gain Stage         |
+                 |   - Parametric Biquad EQ      |
+                 |   - Subsonic High-Pass Filter |
+                 |   - Stereo RMS Compressor     |
+                 |   - Soft-Knee Peak Limiter    |
+                 +-------------------------------+
+                 |  Core 0: Network and WebUI    |
+                 |   - AsyncWebServer (PROGMEM)  |
+                 |   - Bidirectional WebSocket   |
+                 |   - Squeezelite SlimProto     |
+                 +---------------+---------------+
+                                 | I2S Audio
+                                 v
+                        PCM5102A Stereo DAC
+                                 |
+                                 v
+                         Analog Audio Out
 ```
 
 ### Core Allocation (ESP32-S3)
 
-- **Core 1 (Real-Time Audio Engine)**:
-  - Highest FreeRTOS task priority (priority 24)
-  - Non-blocking DMA transfers at 48 kHz stereo 32-bit resolution
-  - Zero-latency DSP pipeline processing audio frames in place
-
-- **Core 0 (Networking and Control)**:
-  - AsyncWebServer on port 80 serving the compressed Web UI from flash
-  - Bidirectional WebSocket server at `/ws` for parameter synchronization
-  - Full-duplex UART bridge interfacing with the ESP32-WROOM co-processor
-  - Wi-Fi Station client with automatic fallback to SoftAP (`ESP32-DSP`)
+- **Core 1 (Audio Engine)**: FreeRTOS priority 24, DMA transfers at 48 kHz stereo 32-bit, zero-latency DSP in-place processing.
+- **Core 0 (Network and Control)**: AsyncWebServer on port 80, WebSocket `/ws`, UART bridge to ESP32-WROOM, Wi-Fi Station and SoftAP fallback.
 
 ---
 
 ## Inter-Board Wiring (ESP32-S3 to ESP32-WROOM)
 
-The two microcontrollers communicate through a dedicated 6-wire bus covering I2S digital audio, full-duplex UART for metadata and transport control, and common ground.
-
-| Signal | ESP32-WROOM (DevKit V1) | ESP32-S3 (YD-ESP32-S3) | Description |
-|--------|-------------------------|------------------------|-------------|
-| GND    | GND                     | GND                    | Common reference ground |
-| BCK    | GPIO 22 (Out)           | GPIO 16 (In)           | I2S1 Bit Clock |
-| WS     | GPIO 21 (Out)           | GPIO 17 (In)           | I2S1 Word Select / LRCK |
-| DIN    | GPIO 23 (Out)           | GPIO 18 (In)           | I2S1 Serial Audio Data |
-| TX     | GPIO 19 (Out)           | GPIO 44 (In)           | UART Metadata pass-through (WROOM to S3) |
-| RX     | GPIO 18 (In)            | GPIO 43 (Out)          | UART Transport commands (S3 to WROOM) |
+| Signal | ESP32-WROOM | ESP32-S3 | Description |
+|--------|-------------|----------|-------------|
+| GND    | GND         | GND      | Common reference ground |
+| BCK    | GPIO 22     | GPIO 16  | I2S1 Bit Clock |
+| WS     | GPIO 21     | GPIO 17  | I2S1 Word Select / LRCK |
+| DIN    | GPIO 23     | GPIO 18  | I2S1 Audio Data |
+| TX     | GPIO 19     | GPIO 44  | UART Metadata (WROOM to S3) |
+| RX     | GPIO 18     | GPIO 43  | UART Commands (S3 to WROOM) |
 
 ---
 
 ## Audio Hardware Wiring
 
-The primary ESP32-S3 interfaces with external audio converters using I2S0 in master mode.
+ESP32-S3 interfaces with external audio converters via I2S0 master mode.
 
-| Signal | ESP32-S3 GPIO | Connected Hardware | Function |
-|--------|---------------|--------------------|----------|
-| MCLK   | GPIO 4        | PCM1808 ADC        | 12.288 MHz Master Clock (256 x Fs) |
-| BCK    | GPIO 5        | PCM1808 & PCM5102A | I2S0 Bit Clock |
-| WS     | GPIO 6        | PCM1808 & PCM5102A | I2S0 Word Select / Frame Sync |
-| DIN    | GPIO 15       | PCM1808 ADC DOUT   | ADC Line-In capture into ESP32-S3 |
-| DOUT   | GPIO 7        | PCM5102A DAC DIN   | Processed audio stream to DAC output |
+| Signal | ESP32-S3 | Connected Hardware | Function |
+|--------|----------|--------------------|----------|
+| MCLK   | GPIO 4   | PCM1808 ADC        | 12.288 MHz Master Clock (256 * Fs) |
+| BCK    | GPIO 5   | PCM1808 and PCM5102A | I2S0 Bit Clock |
+| WS     | GPIO 6   | PCM1808 and PCM5102A | I2S0 Frame Sync |
+| DIN    | GPIO 15  | PCM1808 DOUT       | ADC Line-In capture |
+| DOUT   | GPIO 7   | PCM5102A DIN       | Processed audio stream to DAC |
 
-### Converter Configuration Notes
-
-- **PCM1808 ADC**:
-  - Operating format: 24-bit I2S standard
-  - Mode pins MD0 and MD1 set for Slave mode
-  - Requires external MCLK generated by ESP32-S3 GPIO 4
-
-- **PCM5102A DAC**:
-  - Operating format: 32-bit I2S standard
-  - SCK pin tied to GND to enable internal PLL clock generation
-  - Does not require a separate MCLK connection
+- **PCM1808 ADC**: Set MD0/MD1 for Slave mode. Requires MCLK on GPIO 4.
+- **PCM5102A DAC**: Tie SCK to GND to enable internal PLL.
 
 ---
 
-## DSP Audio Pipeline
+## DSP Pipeline
 
-Audio processing executes on Core 1 at a 48 kHz sampling rate with 256 samples per buffer.
+Audio executes on Core 1 at 48 kHz (256 samples/buffer):
 
 ```
-Input Frame (AUX or Bluetooth)
-            │
-            ▼
-┌───────────────────────┐
-│  10-Band Biquad EQ    │  Direct Form II biquad filters across standard ISO bands
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Stereo RMS Compander  │  Smooth attack and release envelope follower with makeup gain
-└───────────┬───────────┘
-            ▼
-┌───────────────────────┐
-│ Soft-Knee Peak Limiter│  Transparent saturation curve preventing digital clipping
-└───────────┬───────────┘
-            │
-            ▼
-Output Frame to PCM5102A DAC
+Input (AUX / BT / Wi-Fi) -> Preamp -> Parametric EQ -> Subsonic Filter -> Compressor -> Limiter -> Output
 ```
 
-### Equalizer Default Bands (ISO 266)
-
-| Band | Frequency | Default Gain | Default Q | Filter Type |
-|------|-----------|--------------|-----------|-------------|
-| 0    | 31.5 Hz   | 0 dB         | 0.707     | Peaking EQ  |
-| 1    | 63 Hz     | 0 dB         | 0.707     | Peaking EQ  |
-| 2    | 125 Hz    | 0 dB         | 0.707     | Peaking EQ  |
-| 3    | 250 Hz    | 0 dB         | 0.707     | Peaking EQ  |
-| 4    | 500 Hz    | 0 dB         | 0.707     | Peaking EQ  |
-| 5    | 1 kHz     | 0 dB         | 0.707     | Peaking EQ  |
-| 6    | 2 kHz     | 0 dB         | 0.707     | Peaking EQ  |
-| 7    | 4 kHz     | 0 dB         | 0.707     | Peaking EQ  |
-| 8    | 8 kHz     | 0 dB         | 0.707     | Peaking EQ  |
-| 9    | 16 kHz    | 0 dB         | 0.707     | Peaking EQ  |
-
-### Compander Defaults
-
-| Parameter   | Value     | Description |
-|-------------|-----------|-------------|
-| Threshold   | -18 dBFS  | Signal level above which compression begins |
-| Ratio       | 4.0:1     | Input to output level ratio above threshold |
-| Attack      | 5 ms      | Envelope reaction time on rising signal |
-| Release     | 150 ms    | Envelope recovery time on falling signal |
-| Makeup Gain | 0 dB      | Post-compression level compensation |
-
-### Limiter Defaults
-
-| Parameter   | Value     | Description |
-|-------------|-----------|-------------|
-| Ceiling     | -0.5 dBFS | Hard peak ceiling output level |
-| Knee Width  | 3.0 dB    | Transition range around ceiling for smooth saturation |
+- **Preamp**: -18 dB to +18 dB gain.
+- **Parametric EQ**: Up to 10 biquad filters (Peaking, Low/High Shelf, Low/High Pass).
+- **Subsonic Filter**: High-pass biquad (20 to 100 Hz, 1st to 4th order: 6, 12, 18, 24 dB/oct slopes) to protect subwoofer drivers.
+- **Compressor**: RMS dynamic range compander with threshold, ratio, attack, release, and makeup gain.
+- **Limiter**: Soft-knee peak ceiling limiter to prevent digital clipping.
 
 ---
 
-## Web Interface and Features
+## Build and Flash
 
-The web interface is compiled into PROGMEM as compressed bytecode and served directly by ESPAsyncWebServer without requiring SPIFFS partition flashing.
-
-### Key Capabilities
-
-- **Now Playing Card**:
-  - Displays track title, artist name, and album received from Bluetooth AVRCP.
-  - Automatically queries the iTunes Search API to fetch high-resolution album artwork.
-  - Displays dynamic playback progress bar with elapsed and remaining timestamps.
-  - Includes media control buttons for Previous, Play / Pause toggle, and Next.
-  - Button presses provide immediate optimistic UI state updates for a responsive feel.
-
-- **Audio Controls**:
-  - Input selector toggle between Line In (PCM1808) and Bluetooth (ESP32-WROOM).
-  - Real-time 10-band slider interface with fine frequency and Q adjustments.
-  - Full compander configuration with visual feedback.
-  - Peak limiter threshold adjustment.
-  - Real-time peak and RMS stereo level meters streamed over WebSocket.
-
-- **Network Connectivity**:
-  - Connects to existing Wi-Fi networks using credentials in `src/wifi_credentials.h`.
-  - Automatically launches an access point named `ESP32-DSP` if network connection fails.
-
----
-
-## Project Structure
-
-```
-ESP32_DSP/
-├── platformio.ini              Configuration for both ESP32-S3 and ESP32-WROOM
-├── partitions_16MB.csv         16 MB Flash partition table (OTA + storage)
-├── huge_app.csv                3 MB App partition table for ESP32-WROOM
-├── wroom_bt_bridge/
-│   └── wroom_bt_bridge.cpp     Standalone Bluetooth A2DP and AVRCP bridge firmware
-└── src/
-    ├── main.cpp                FreeRTOS tasks and system initialization
-    ├── audio_config.h          Pin definitions, sample rate, and audio constants
-    ├── param_store.h           Thread-safe parameter store protected by FreeRTOS mutex
-    ├── i2s_audio.h/.cpp        Dual-I2S driver (I2S0 Master + I2S1 Slave)
-    ├── biquad_eq.h             10-band parametric equalizer using esp-dsp biquads
-    ├── compander.h             Stereo RMS dynamic range compressor
-    ├── limiter.h               Soft-knee peak limiter
-    ├── dsp_pipeline.h          Serial processing pipeline (EQ -> Compander -> Limiter)
-    ├── web_ui.h                AsyncWebServer, WebSocket protocol, and UART parser
-    └── eq_html.h               Self-contained web application stored in PROGMEM
-```
-
----
-
-## Build and Installation
-
-The project uses PlatformIO with separate environments for each microcontroller.
-
-### 1. Flash the ESP32-S3 Audio Processor
-
-Connect the ESP32-S3 board to your computer via USB:
+The project builds via PlatformIO:
 
 ```bash
+# Flash ESP32-S3
 pio run -e yd_esp32s3_n16r8 -t upload
-```
 
-To monitor debug output from the ESP32-S3:
-
-```bash
-pio device monitor -e yd_esp32s3_n16r8
-```
-
-### 2. Flash the ESP32-WROOM Bluetooth Co-Processor
-
-Connect the ESP32-WROOM board to your computer via USB:
-
-```bash
+# Flash ESP32-WROOM Bluetooth bridge
 pio run -e wroom_bt -t upload
-```
 
-To monitor debug output from the ESP32-WROOM:
-
-```bash
-pio device monitor -e wroom_bt
+# Monitor serial debug
+pio device monitor -e yd_esp32s3_n16r8
 ```
 
 ---
 
 ## Wi-Fi Configuration
 
-Create an optional file at `src/wifi_credentials.h` to define your network credentials:
+Configure Wi-Fi credentials in `src/wifi_credentials.h`:
 
 ```cpp
 #pragma once
@@ -247,7 +123,7 @@ Create an optional file at `src/wifi_credentials.h` to define your network crede
 #define WIFI_PASS "YourNetworkPassword"
 ```
 
-If this file is omitted or connection fails, connect your device to the fallback Wi-Fi network:
+If unconnected, the board starts a fallback SoftAP:
 - **SSID**: `ESP32-DSP`
 - **Password**: `dspcontrol`
 - **URL**: `http://192.168.4.1`

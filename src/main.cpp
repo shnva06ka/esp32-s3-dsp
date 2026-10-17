@@ -1,10 +1,10 @@
 /**
  * @file main.cpp
- * @brief ESP32-S3-DSP — Entry Point & Task Scheduler
+ * @brief ESP32-S3-DSP  -  Entry Point & Task Scheduler
  *
  * Architecture:
- *   Core 0 — Wi-Fi / Fallback AP + Async Web UI & WebSockets
- *   Core 1 — Real-time Dual-I2S audio engine + DSP pipeline
+ *   Core 0  -  Wi-Fi / Fallback AP + Async Web UI & WebSockets
+ *   Core 1  -  Real-time Dual-I2S audio engine + DSP pipeline
  */
 
 #include <Arduino.h>
@@ -12,15 +12,18 @@
 #include "i2s_audio.h"
 #include "dsp_pipeline.h"
 #include "web_ui.h"
+#include "sys_monitor.h"
+#include "slimproto_client.h"
 
-// ── Forward declarations ─────────────────────────────────────
+// -- Forward declarations -------------------------------------
 static void audioTask(void* pvParameters);
 static void webTask(void* pvParameters);
 
-// ── Shared parameter store (thread-safe via FreeRTOS mutex) ───
+// -- Shared parameter store & audio driver --------------------
 ParamStore g_params;
+I2SAudio   g_audio(g_params);
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 void setup()
 {
     Serial.begin(115200);
@@ -29,7 +32,7 @@ void setup()
     delay(1200);
 
     Serial.println("\n========================================================");
-    Serial.println("  ESP32-S3-DSP — Real-Time DSP Audio Processor");
+    Serial.println("  ESP32-S3-DSP  -  Real-Time DSP Audio Processor");
     Serial.println("========================================================");
     Serial.printf("[BOOT] Chip: ESP32-S3 (Rev %d, %d Cores @ %d MHz)\n",
                   ESP.getChipRevision(), ESP.getChipCores(), ESP.getCpuFreqMHz());
@@ -44,10 +47,13 @@ void setup()
     }
     Serial.printf("[BOOT] Free Internal DRAM: %u bytes\n", ESP.getFreeHeap());
 
+    // Initialise system monitor idle hooks for CPU core monitoring
+    SystemMonitor::begin();
+
     // Initialise parameter store (loads defaults / NVS)
     g_params.begin();
 
-    // ── Core 1: Real-time Audio Task (Highest Priority) ──────
+    // -- Core 1: Real-time Audio Task (Highest Priority) ------
     xTaskCreatePinnedToCore(
         audioTask,
         "AudioTask",
@@ -58,7 +64,7 @@ void setup()
         1              // Core 1
     );
 
-    // ── Core 0: Web UI & Networking Task ─────────────────────
+    // -- Core 0: Web UI & Networking Task ---------------------
     xTaskCreatePinnedToCore(
         webTask,
         "WebTask",
@@ -76,12 +82,11 @@ void loop()
     vTaskDelay(portMAX_DELAY);
 }
 
-// ─────────────────────────────────────────────────────────────
+// -------------------------------------------------------------
 static void audioTask(void* /*pvParameters*/)
 {
     Serial.println("[AUDIO] Initialising Dual-I2S Audio Driver...");
-    static I2SAudio audio(g_params);
-    if (!audio.begin()) {
+    if (!g_audio.begin()) {
         Serial.println("[AUDIO] FATAL: I2S peripheral initialisation failed");
         vTaskDelete(nullptr);
     }
@@ -92,7 +97,7 @@ static void audioTask(void* /*pvParameters*/)
     Serial.println("[AUDIO] DSP Pipeline active on Core 1");
 
     for (;;) {
-        audio.process([&](float* left, float* right, size_t frames) {
+        g_audio.process([&](float* left, float* right, size_t frames) {
             dsp.process(left, right, frames);
         });
     }
@@ -103,6 +108,10 @@ static void webTask(void* /*pvParameters*/)
     Serial.println("[WEB] Initialising Web UI on Core 0...");
     static WebUI ui(g_params);
     ui.begin();
+
+    Serial.println("[NET] Starting Squeezelite / SlimProto Wi-Fi streaming client on Core 0...");
+    static SlimprotoClient slimproto(g_params, g_audio.getWiFiRingBuffer());
+    slimproto.begin();
 
     for (;;) {
         ui.loop();

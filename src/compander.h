@@ -3,13 +3,13 @@
  * @brief Stereo RMS Feed-Forward Compander.
  *
  * Architecture:
- *  ┌──────────┐    ┌──────────┐    ┌──────────┐
- *  │  Level   │───▶│  Gain    │───▶│  Gain    │
- *  │ Detector │    │ Computer │    │  Apply   │
- *  └──────────┘    └──────────┘    └──────────┘
+ *  +----------+    +----------+    +----------+
+ *  |  Level   |--->|  Gain    |--->|  Gain    |
+ *  | Detector |    | Computer |    |  Apply   |
+ *  +----------+    +----------+    +----------+
  *      RMS             dB                linear
  *
- * The RMS level is computed per-buffer (√(mean(x²))),
+ * The RMS level is computed per-buffer (sqrt(mean(x^2))),
  * then smoothed with independent attack/release IIR envelopes.
  * Gain reduction is computed in dB using the standard compressor
  * transfer function, then converted to linear and applied sample-by-sample.
@@ -35,7 +35,7 @@ public:
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
-        // ── RMS detection ─────────────────────────────────────
+        // -- RMS detection -------------------------------------
         float sumL = 0, sumR = 0;
         for (size_t i = 0; i < frames; ++i) {
             sumL += left[i]  * left[i];
@@ -45,11 +45,11 @@ public:
         const float rmsR = sqrtf(sumR / frames);
         const float rms  = (rmsL > rmsR) ? rmsL : rmsR;   // stereo-linked
 
-        // ── Envelope smoothing ────────────────────────────────
+        // -- Envelope smoothing --------------------------------
         const float coeff = (rms > _envRMS) ? _attackCoeff : _releaseCoeff;
         _envRMS = _envRMS * coeff + rms * (1.0f - coeff);
 
-        // ── Gain computer (dB) ────────────────────────────────
+        // -- Gain computer (dB) --------------------------------
         const float levelDb = 20.0f * log10f(_envRMS + 1e-9f);
         float gainDb = 0.0f;
         if (levelDb > _thresholdDb) {
@@ -57,7 +57,7 @@ public:
         }
         gainDb += _makeupGainDb;
 
-        // ── Apply smoothed linear gain ─────────────────────────
+        // -- Apply smoothed linear gain -------------------------
         const float targetGain = powf(10.0f, gainDb / 20.0f);
         const float gainStep   = (targetGain - _currentGain) / static_cast<float>(frames);
         for (size_t i = 0; i < frames; ++i) {

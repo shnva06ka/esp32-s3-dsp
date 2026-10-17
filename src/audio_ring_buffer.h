@@ -8,21 +8,33 @@
 #include <cstring>
 #include <atomic>
 #include <new>
+#include <esp_heap_caps.h>
+#include <Arduino.h>
 
 template <size_t CapacityFrames>
 class AudioRingBuffer {
 public:
     AudioRingBuffer() : _readIdx(0), _writeIdx(0) {
-        _left  = new (std::nothrow) float[CapacityFrames]();
-        _right = new (std::nothrow) float[CapacityFrames]();
+#if defined(BOARD_HAS_PSRAM)
+        if (psramFound()) {
+            _left  = static_cast<float*>(heap_caps_malloc(CapacityFrames * sizeof(float), MALLOC_CAP_SPIRAM));
+            _right = static_cast<float*>(heap_caps_malloc(CapacityFrames * sizeof(float), MALLOC_CAP_SPIRAM));
+        }
+#endif
+        if (!_left)  _left  = static_cast<float*>(malloc(CapacityFrames * sizeof(float)));
+        if (!_right) _right = static_cast<float*>(malloc(CapacityFrames * sizeof(float)));
+        clear();
     }
 
     ~AudioRingBuffer() {
-        delete[] _left;
-        delete[] _right;
+        if (_left)  free(_left);
+        if (_right) free(_right);
         _left = nullptr;
         _right = nullptr;
     }
+
+    /** @brief Buffer capacity in stereo frames. */
+    size_t capacity() const { return CapacityFrames; }
 
     /** @brief Number of stereo frames available to read. */
     size_t available() const {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ESP32-S3-DSP</title>
 <style>
-/* ── Nord Light Theme Palette (High-Contrast Flat & Mono) ──────────────── */
+/* -- Nord Light Theme Palette (High-Contrast Flat & Mono) ---------------- */
 :root {
   --nord0: #2E3440; /* darkest slate */
   --nord1: #3B4252;
@@ -58,74 +58,80 @@ html, body {
   overflow-x: hidden;
 }
 
-/* ── App Header ─────────────────────────────────────────── */
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 20px;
-  background: var(--card-bg);
-  border-bottom: 2px solid var(--border-strong);
+/* -- Global Dropdown Selects (No Arrows Anywhere) ---------- */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none !important;
+  text-align-last: center;
 }
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.brand h1 {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--nord0);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.brand .badge {
-  font-size: 10px;
-  font-weight: 700;
-  background: var(--nord5);
-  color: var(--nord0);
-  padding: 2px 8px;
-  border-radius: 2px;
-  border: 1px solid var(--border-strong);
+select::-ms-expand {
+  display: none;
 }
 
-#ws-pill {
+/* -- Disconnected / Reconnecting Overlay ------------------- */
+.conn-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 34, 42, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 999999;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--nord0);
-  background: var(--nord5);
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 4px 10px;
+  justify-content: center;
 }
-#ws-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--muted);
-  border: 1px solid var(--nord0);
-}
-#ws-dot.ok  { background: var(--active); }
-#ws-dot.err { background: var(--danger); }
-
-/* ── Header Controls (Input Selector & Status Badge) ────── */
-.header-controls {
+.conn-card {
+  background: #FFFFFF;
+  border: 2px solid var(--nord11);
+  border-radius: 8px;
+  padding: 26px 36px;
+  text-align: center;
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.conn-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3.5px solid var(--nord4);
+  border-top-color: var(--nord11);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.conn-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--nord11);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.conn-desc {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
-/* ── Module Ordering Layout ─────────────────────────────── */
-#mod-input   { order: 1; }
-#mod-bt-meta { order: 2; }
-#mod-eq      { order: 3; }
+/* -- Module Ordering Layout ------------------------------- */
+#mod-input     { order: 1; }
+#mod-bt-meta   { order: 2; }
+#mod-wifi-meta { order: 2; }
+#mod-eq        { order: 3; }
 #mod-compander { order: 4; }
 #mod-limiter   { order: 5; }
+#mod-subsonic  { order: 6; }
+#mod-boot-cfg  { order: 7; }
 
-/* ── Module 0: Input Selector ───────────────────────────── */
+/* -- Module 0: Input Selector ----------------------------- */
 .input-selector-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -135,9 +141,9 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 12px 16px;
   background: var(--card-bg);
-  border: 1.5px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
@@ -147,7 +153,7 @@ header {
 }
 .input-card:hover {
   background: var(--nord5);
-  border-color: var(--nord10);
+  border-color: var(--nord9);
 }
 .input-card:active {
   transform: scale(0.99);
@@ -155,19 +161,24 @@ header {
 .input-card.active {
   background: #E8F0FE;
   border-color: var(--nord10);
-  border-width: 2px;
+  border-width: 1.5px;
 }
 .input-card-main {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+}
+.input-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .input-card-icon {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 4px;
   background: var(--nord5);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,28 +194,74 @@ header {
   font-size: 13px;
   font-weight: 800;
   color: var(--nord0);
-  letter-spacing: 0.04em;
-}
-.input-card-desc {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-  margin-top: 2px;
-}
-.input-card-badge {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 8px;
-  border-radius: 2px;
-  border: 1px solid var(--border-strong);
-  background: var(--nord5);
-  color: var(--muted);
   letter-spacing: 0.03em;
 }
+.input-card-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--nord5);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
 .input-card.active .input-card-badge {
-  background: var(--active);
+  background: var(--nord10);
   color: #FFFFFF;
-  border-color: var(--nord0);
+  border-color: var(--nord10);
+}
+
+/* -- Hardware Telemetry (ESP32-S3-DSP) -- */
+.sys-stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.sys-stat-card {
+  background: var(--nord6);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sys-stat-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--mono);
+}
+.sys-stat-name {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sys-stat-val {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+}
+.sys-stat-bar-track {
+  width: 100%;
+  height: 5px;
+  background: var(--nord4);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.sys-stat-bar-fill {
+  height: 100%;
+  background: var(--nord10);
+  border-radius: 2px;
+  transition: width 0.35s ease, background 0.35s ease;
 }
 
 .active-source-pill {
@@ -215,7 +272,7 @@ header {
   font-weight: 800;
   color: var(--nord0);
   background: var(--nord5);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: 2px;
   padding: 4px 10px;
 }
@@ -223,11 +280,11 @@ header {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--active);
-  border: 1px solid var(--nord0);
+  background: var(--muted);
+  border: 1px solid var(--muted);
 }
 
-/* ── Module 1: Bluetooth Now Playing Card ───────────────── */
+/* -- Module 1: Bluetooth Now Playing Card ----------------- */
 #mod-bt-meta {
   border-color: var(--nord10);
 }
@@ -402,7 +459,44 @@ header {
   transform: scale(0.96);
 }
 
-/* ── Container Layout ───────────────────────────────────── */
+/* -- Module 1B: Wi-Fi Streaming Card ----------------------- */
+#mod-wifi-meta {
+  border-color: var(--border);
+}
+.wifi-stream-card {
+  padding: 2px 0;
+}
+.wifi-stream-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.wifi-info-item {
+  background: var(--nord6);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wifi-info-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--mono);
+}
+.wifi-info-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nord0);
+  font-family: var(--mono);
+  word-break: break-word;
+}
+
+/* -- Container Layout ------------------------------------- */
 main {
   max-width: 1400px;
   margin: 16px auto;
@@ -412,7 +506,7 @@ main {
   gap: 16px;
 }
 
-/* ── Module Cards / Boxes (High Contrast Flat) ──────────── */
+/* -- Module Cards / Boxes (High Contrast Flat) ------------ */
 .module-box {
   background: var(--card-bg);
   border: 1px solid var(--border-strong);
@@ -430,7 +524,38 @@ main {
 }
 .module-box.bypassed .module-body {
   filter: grayscale(1);
-  opacity: 0.60;
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+}
+.module-box.bypassed .module-body::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(237, 241, 247, 0.45);
+  z-index: 100;
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+
+.submodule-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 2px 0 8px 2px;
+  font-family: var(--mono);
+}
+.submodule-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0 12px;
+  width: 100%;
 }
 
 .module-header {
@@ -455,9 +580,6 @@ main {
 .module-box.collapsed .module-header {
   border-bottom: none;
 }
-.module-box.collapsed .module-body {
-  display: none;
-}
 .module-title-area {
   display: flex;
   align-items: center;
@@ -481,12 +603,12 @@ main {
   text-transform: uppercase;
 }
 
-/* ── Simple On/Off Toggle Switch (High Contrast) ────────── */
+/* -- Simple On/Off Toggle Switch (High Contrast & Perfectly Circular) -- */
 .switch {
   position: relative;
   display: inline-block;
-  width: 34px;
-  height: 18px;
+  width: 38px;
+  height: 22px;
   flex-shrink: 0;
   cursor: pointer;
 }
@@ -501,19 +623,22 @@ main {
   cursor: pointer;
   top: 0; left: 0; right: 0; bottom: 0;
   background-color: var(--nord4);
-  border-radius: 2px;
+  border-radius: 12px;
   border: 1px solid var(--border-strong);
+  box-sizing: border-box;
 }
 .slider:before {
   position: absolute;
   content: "";
-  height: 12px;
-  width: 12px;
+  height: 16px;
+  width: 16px;
   left: 2px;
-  bottom: 2px;
+  top: 2px;
   background-color: #FFFFFF;
-  border-radius: 2px;
+  border-radius: 50%;
   border: 1px solid var(--nord0);
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .switch input:checked + .slider {
   background-color: var(--active);
@@ -526,8 +651,11 @@ main {
 .module-body {
   padding: 14px 16px;
 }
+.module-box.collapsed .module-body {
+  display: none;
+}
 
-/* ── EQ Frequency Response Canvas ───────────────────────── */
+/* -- EQ Frequency Response Canvas ------------------------- */
 #canvas-wrap {
   position: relative;
   width: 100%;
@@ -543,23 +671,25 @@ main {
   display: block;
 }
 
-/* ── EQ Toolbar (Presets + Band Controls) ───────────────── */
-.eq-toolbar {
+/* -- EQ Toolbar (Presets + Band Controls in 2 Separate Boxes) -- */
+.eq-toolbar-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
+  width: 100%;
   margin-bottom: 12px;
-  padding: 6px 10px;
-  background: var(--nord5);
-  border: 1px solid var(--border);
-  border-radius: 2px;
 }
-.preset-group {
+.eq-preset-box {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  flex: 1;
 }
 .preset-label {
   font-size: 10px;
@@ -604,10 +734,16 @@ main {
   border-color: var(--nord0);
 }
 
-.eq-toolbar-right {
+.eq-bands-box {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  flex-shrink: 0;
 }
 .band-count-badge {
   font-size: 11px;
@@ -640,322 +776,701 @@ main {
   cursor: not-allowed;
 }
 
-/* ── EQ Main Layout: Preamp on Left, Auto-Fill Bands on Right */
+/* -- EQ Main Layout: Preamp on Left, Horizontally Scrolling Bands on Right */
 .eq-body-layout {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 8px;
   width: 100%;
 }
 
 .preamp-col {
-  flex: 0 0 76px;
-  width: 76px;
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
+  flex: 0 0 54px;
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  box-sizing: border-box;
   background: var(--nord5);
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 8px 4px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 3px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
   user-select: none;
+  transition: border-color 0.15s ease;
 }
-.preamp-title {
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--nord0);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+.preamp-col:hover {
+  border-color: var(--nord3);
+}
+.preamp-col .card-val-badge {
+  max-width: 48px;
+  padding: 3px 2px;
 }
 .preamp-slider-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  height: 180px;
-  padding: 4px 0;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 6px 0;
 }
 .preamp-slider {
   -webkit-appearance: slider-vertical;
   writing-mode: vertical-lr;
   direction: rtl;
   width: 18px;
-  height: 160px;
+  height: 100%;
+  max-height: 200px;
   cursor: ns-resize;
-  accent-color: var(--accent);
-}
-.preamp-ticks {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 160px;
-  font-size: 8px;
-  font-weight: 800;
-  color: var(--muted);
-  line-height: 1;
-  pointer-events: none;
-}
-.preamp-ticks .tick-zero {
-  color: var(--nord0);
-  font-weight: 900;
-}
-.preamp-input {
-  width: 58px;
-  text-align: center;
-}
-.preamp-unit {
-  font-size: 9px;
-  font-weight: 800;
-  color: var(--muted);
+  accent-color: #2E3440;
+  background: transparent;
+  border: none;
+  outline: none;
 }
 
-/* ── Dynamic Band Cards (Auto Fill Width) ───────────────── */
+/* -- Dynamic Band Cards (Static Width & Horizontal Scroll) -- */
 #bands-container {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   flex-direction: row;
-  align-items: stretch;
-  gap: 8px;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 12px;
   width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  scroll-behavior: smooth;
 }
 .band-card {
-  flex: 1 1 0;
-  min-width: 78px;
+  width: 175px;
+  min-width: 175px;
+  max-width: 175px;
+  flex: 0 0 175px;
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  box-sizing: border-box;
   background: var(--nord5);
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 8px 4px;
+  border: 3px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  transition: border-color 0.15s, opacity 0.15s, background 0.15s;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+}
+.band-card:hover,
+.band-card:focus-within {
+  border-color: var(--nord0);
+  z-index: 50;
+}
+.band-card.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.band-card.drag-over {
+  border-color: var(--nord10);
+  background: #E8F0FE;
+}
+.band-card.band-bypassed {
+  opacity: 0.45;
+}
+
+
+/* Draggable Title Bar (Full width, no background, no border) */
+.band-dragger-titlebar {
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: grab;
+  user-select: none;
+}
+.band-dragger-titlebar:active {
+  cursor: grabbing;
+}
+.drag-grip {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--nord0);
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+.band-dragger-titlebar:hover .drag-grip {
+  opacity: 0.9;
+}
+.band-select-checkbox {
+  display: none;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--nord11);
+}
+#bands-container.select-mode .band-select-checkbox {
+  display: block;
+}
+#bands-container.select-mode .drag-grip {
+  display: none;
+}
+#bands-container.select-mode .band-card {
+  cursor: pointer;
+}
+#bands-container.select-mode .band-card.selected {
+  border-color: var(--nord11) !important;
+  box-shadow: 0 0 0 2px var(--nord11);
+}
+
+/* Appended Action Card for Add Band & Select */
+.eq-actions-card {
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+  flex: 0 0 90px;
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  user-select: none;
+}
+.btn-card-action {
+  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-}
-.band-card:hover {
-  border-color: var(--nord0);
-}
-.band-card-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 4px;
-  border-bottom: 1px solid var(--border);
-}
-.band-id {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--nord0);
-}
-.band-actions {
-  display: flex;
-  align-items: center;
+  justify-content: center;
   gap: 4px;
-}
-.btn-icon {
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 800;
+  background: var(--nord5);
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
   color: var(--nord0);
-  padding: 2px;
-  line-height: 1;
-}
-.btn-icon:hover { color: var(--danger); }
-.band-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
   cursor: pointer;
-  border: 1px solid var(--border-strong);
-  background: #FFFFFF;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  padding: 12px 6px;
+  text-align: center;
+  letter-spacing: 0.02em;
 }
-.band-dot.on {
-  background: var(--active);
-  border-color: var(--nord0);
+.btn-card-action:hover {
+  background: #E5E9F0;
+  border-color: var(--nord3);
+  color: var(--nord0);
+  border-style: dashed;
+}
+.btn-card-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+.btn-card-action.btn-danger {
+  color: #BF616A;
+  border-color: #BF616A;
+}
+.btn-card-action.btn-danger:hover {
+  background: #BF616A;
+  color: #FFFFFF;
 }
 
-/* Band Type Selector */
+/* Card Top: Type Pill Centered */
 .band-type-row {
   width: 100%;
   display: flex;
+  align-items: center;
   justify-content: center;
-  padding: 1px 0 2px;
 }
-.band-type-select {
-  width: 100%;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--nord0);
-  background: #FFFFFF;
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 2px 2px;
-  outline: none;
-  cursor: pointer;
-  text-align: center;
-}
-.band-type-select:focus {
-  border-color: var(--accent);
-  outline: 1px solid var(--accent);
-}
-.band-order-row {
+/* Filter Type Dropdown Menu (Clean 1-Level, No Arrow) */
+.band-type-menu-wrap {
+  position: relative;
   width: 100%;
   display: flex;
   justify-content: center;
-  padding: 0 0 2px;
 }
-.band-order-select {
+.band-type-menu-btn {
   width: 100%;
-  font-size: 9px;
+  max-width: 135px;
+  font-size: 10.5px;
   font-weight: 700;
-  color: var(--nord0);
-  background: #FFFFFF;
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 2px 1px;
-  outline: none;
+  color: #FFFFFF;
+  background: var(--nord0);
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
   cursor: pointer;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  outline: none;
+  transition: background 0.15s ease;
+  font-family: var(--mono);
 }
-.band-order-select:focus {
-  border-color: var(--accent);
-  outline: 1px solid var(--accent);
+.band-type-menu-btn:hover {
+  background: var(--nord1);
+}
+.type-btn-caret {
+  display: none;
 }
 
-/* ── Parameter Row (Knob + Text Box) ────────────────────── */
-.param-unit-col {
+/* 1st Level Filter Dropdown */
+.band-type-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 130px;
+  background: #2E3440;
+  border: 1px solid #434C5E;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  z-index: 120;
+  padding: 4px 0;
+  font-family: var(--mono);
+}
+.band-type-menu-wrap:hover .band-type-dropdown,
+.band-type-menu-wrap.open .band-type-dropdown {
+  display: block;
+}
+
+.band-menu-opt {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ECEFF4;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.band-menu-opt:hover {
+  background: var(--nord10);
+  color: #FFFFFF;
+}
+.band-menu-opt.selected {
+  color: #88C0D0;
+  font-weight: 800;
+}
+
+/* Card Bottom: Bypass + Delete Buttons (Transparent & Column-Aligned) */
+.band-card-bottom-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding-top: 4px;
+}
+.band-card-bottom-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.band-bottom-gain {
+  width: 62px;
+  flex-shrink: 0;
+}
+.band-bottom-knobs {
+  flex: 1; /* Matches .band-knobs-col flex: 1 for exact horizontal centering */
+}
+.band-bypass-btn {
+  width: 24px;
+  height: 24px;
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+  transition: transform 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+.band-bypass-btn:hover {
+  transform: scale(1.18);
+}
+.band-bypass-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.band-delete-btn {
+  width: 24px;
+  height: 24px;
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.band-delete-btn:hover {
+  color: var(--nord11);
+  transform: scale(1.18);
+}
+.band-delete-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Main Grid Inside Card: Left Fader, Right Knobs */
+.band-card-main-grid {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.band-gain-col {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
+  width: 62px;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.band-slider-wrap {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0;
+}
+.band-vslider {
+  -webkit-appearance: slider-vertical;
+  writing-mode: bt-lr;
+  width: 22px;
+  height: 122px;
+  cursor: pointer;
+  accent-color: #2E3440;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+/* Slider Bar (Thinner 6px, Rounder with subtle drop shadow) */
+.preamp-slider::-webkit-slider-runnable-track,
+.band-vslider::-webkit-slider-runnable-track {
+  width: 6px;
+  background: #FFFFFF;
+  border: 1px solid rgba(76, 86, 106, 0.22);
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.preamp-slider::-moz-range-track,
+.band-vslider::-moz-range-track {
+  width: 6px;
+  background: #FFFFFF;
+  border: 1px solid rgba(76, 86, 106, 0.22);
+  border-radius: 9999px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.preamp-slider::-moz-range-progress,
+.band-vslider::-moz-range-progress {
+  background: transparent;
+}
+/* Circle knob matching the rotary knob disc (#2E3440 with #434C5E border) */
+.preamp-slider::-webkit-slider-thumb,
+.band-vslider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2E3440 !important;
+  border: 1.5px solid #434C5E !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+.preamp-slider::-webkit-slider-thumb:hover,
+.band-vslider::-webkit-slider-thumb:hover {
+  background: #3B4252 !important;
+  border-color: #5E81AC !important;
+}
+.preamp-slider::-moz-range-thumb,
+.band-vslider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2E3440 !important;
+  border: 1.5px solid #434C5E !important;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+}
+.preamp-slider::-moz-range-thumb:hover,
+.band-vslider::-moz-range-thumb:hover {
+  background: #3B4252 !important;
+  border-color: #5E81AC !important;
+}
+/* Rotary Knob Subtle Drop Shadow */
+.knob {
+  cursor: pointer;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.14));
+  transition: filter 0.15s ease;
+}
+.knob:hover {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.22));
+}
+.band-knobs-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  gap: 8px;
+}
+.band-knob-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+/* -- Reference-Image Dark Rounded Badge Box ---------------- */
+.card-val-badge {
+  background: #2E3440;
+  color: #ECEFF4;
+  border-radius: 6px;
+  padding: 3px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 66px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+  user-select: none;
+}
+.card-val-badge * {
+  cursor: pointer;
+}
+.card-val-badge .badge-lbl {
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #D8DEE9;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+.badge-input-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
   gap: 2px;
   width: 100%;
 }
-.param-unit-col.disabled-param {
-  opacity: 0.30;
-  pointer-events: none;
-}
-.param-unit-label {
-  font-size: 9px;
-  font-weight: 800;
-  color: var(--nord0);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-canvas.knob {
-  display: block;
-  cursor: ns-resize;
-  touch-action: none;
-  user-select: none;
-}
-/* Remove up/down spinner arrows from all number inputs */
-input[type=number]::-webkit-outer-spin-button,
-input[type=number]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-input[type=number] {
-  -moz-appearance: textfield;
-  appearance: textfield;
-  font-weight: 400;
-}
-
-.param-input-box {
-  width: 58px;
+.card-val-badge input.badge-val-input {
+  background: transparent;
+  border: none;
+  color: #ECEFF4;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 400; /* Standard text, not bold */
-  color: var(--text);
-  background: #FFFFFF;
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 2px 3px;
+  font-weight: 700;
   text-align: center;
+  width: 100%;
   outline: none;
+  padding: 0;
+  line-height: 1.2;
   -moz-appearance: textfield;
   appearance: textfield;
+  cursor: pointer;
 }
-.param-input-box:focus {
-  border-color: var(--accent);
-  outline: 1px solid var(--accent);
+.badge-unit {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #88C0D0;
 }
 
-/* ── Compander & Limiter Controls Grid ───────────────────── */
+/* -- Compander & Limiter Controls Grid --------------------- */
 .module-grid-controls {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 12px;
-  align-items: center;
-  justify-items: center;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 4px 10px;
+  scroll-behavior: smooth;
 }
 .control-pod {
+  width: 136px;
+  min-width: 136px;
+  max-width: 136px;
+  flex: 0 0 136px;
   background: var(--nord5);
-  border: 1px solid var(--border-strong);
-  border-radius: 2px;
-  padding: 10px 8px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
-  width: 100%;
-  max-width: 160px;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.15s;
 }
-.control-pod-title {
-  font-size: 10px;
-  font-weight: 800;
-  color: var(--nord0);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+.control-pod:hover {
+  border-color: var(--nord0);
 }
-.control-pod-val-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.control-pod-val-row span {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--muted);
+.control-pod .card-val-badge {
+  max-width: 90px;
+  padding: 4px 6px;
 }
 
-/* ── Footer ─────────────────────────────────────────────── */
+
+/* -- Startup Effects Configuration Panel ------------------- */
+.boot-cfg-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 4px;
+}
+.boot-cfg-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+}
+.boot-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nord0);
+  cursor: pointer;
+}
+.boot-radio-label input[type="radio"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.boot-toggles-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  transition: opacity 0.2s ease;
+}
+.boot-toggle-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord0);
+  cursor: pointer;
+}
+.boot-toggle-item input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.boot-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.boot-saved-indicator {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--active);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.boot-saved-indicator.visible {
+  opacity: 1;
+}
+
+/* -- Footer ----------------------------------------------- */
 footer {
   text-align: center;
-  padding: 16px 0 24px;
+  max-width: 1400px;
+  margin: 24px auto 32px;
+  padding: 16px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--muted);
+  letter-spacing: 0.05em;
+  font-family: var(--mono);
+  box-sizing: border-box;
+}
+
+/* -- Mobile Layout Adjustments ----------------------------- */
+@media (max-width: 680px) {
+  .input-selector-grid {
+    grid-template-columns: 1fr;
+  }
+  .sys-stats-container {
+    grid-template-columns: 1fr;
+  }
+  .eq-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .eq-bands-box {
+    justify-content: space-between;
+    width: 100%;
+  }
 }
 </style>
 </head>
 <body>
 
-<header>
-  <div class="brand">
-    <h1>ESP32-S3-DSP</h1>
-    <span class="badge">YD-ESP32-S3 · 48kHz Stereo</span>
+<div id="conn-overlay" class="conn-overlay" style="display: none;">
+  <div class="conn-card">
+    <div class="conn-spinner"></div>
+    <div class="conn-title">Connection Lost</div>
+    <div class="conn-desc" id="conn-desc">Reconnecting to ESP32-S3...</div>
   </div>
-
-  <div class="header-controls">
-    <div id="ws-pill">
-      <div id="ws-dot"></div>
-      <span id="ws-lbl">Connecting…</span>
-    </div>
-  </div>
-</header>
+</div>
 
 <main>
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 0: INPUT SOURCE SELECTOR                         -->
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <section class="module-box" id="mod-input">
     <div class="module-header static-header">
       <div class="module-title-area">
-        <span class="module-title">Input Source Selector</span>
+        <span class="module-title">ESP32-S3-DSP</span>
       </div>
     </div>
     <div class="module-body">
@@ -964,14 +1479,11 @@ footer {
         <button class="input-card active" id="btn-src-1" onclick="setInputSource(1)" type="button">
           <div class="input-card-main">
             <div class="input-card-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12"/>
               </svg>
             </div>
-            <div>
-              <div class="input-card-title">AUX (ANALOG LINE-IN)</div>
-              <div class="input-card-desc">PCM1808 ADC · I2S Master · 48kHz Stereo</div>
-            </div>
+            <div class="input-card-title">AUX Line In</div>
           </div>
           <span class="input-card-badge" id="badge-src-1">ACTIVE</span>
         </button>
@@ -984,27 +1496,78 @@ footer {
                 <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
               </svg>
             </div>
-            <div>
-              <div class="input-card-title">BLUETOOTH AUDIO</div>
-              <div class="input-card-desc">ESP32-A2DP · I2S Slave · AVRCP Metadata</div>
-            </div>
+            <div class="input-card-title">Bluetooth Audio</div>
           </div>
           <span class="input-card-badge" id="badge-src-2">STANDBY</span>
         </button>
+
+        <!-- Wi-Fi Card -->
+        <button class="input-card" id="btn-src-3" onclick="setInputSource(3)" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                <line x1="12" y1="20" x2="12.01" y2="20"/>
+              </svg>
+            </div>
+            <div class="input-card-title">Wi-Fi Streaming</div>
+          </div>
+          <span class="input-card-badge" id="badge-src-3">STANDBY</span>
+        </button>
+      </div>
+
+      <!-- Real-Time Hardware Resource Telemetry -->
+      <div class="sys-stats-container">
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Core 0 (Sys/Net)</span>
+            <span class="sys-stat-val" id="sys-val-cpu0">0.0%</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-cpu0" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Core 1 (Audio DSP)</span>
+            <span class="sys-stat-val" id="sys-val-cpu1">0.0%</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-cpu1" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Internal RAM</span>
+            <span class="sys-stat-val" id="sys-val-ram">-- / -- KB</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-ram" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Flash Memory</span>
+            <span class="sys-stat-val" id="sys-val-flash">-- / -- MB</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-flash" style="width: 0%;"></div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 0B: BLUETOOTH NOW PLAYING / METADATA              -->
   <!-- (Ordered on top directly below Input Selector when BT)  -->
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <section class="module-box" id="mod-bt-meta" style="display: none;">
-    <div class="module-header static-header">
-      <div class="module-title-area">
-        <span class="module-title">Bluetooth Now Playing</span>
-      </div>
-    </div>
     <div class="module-body">
       <div class="bt-player-card">
         <!-- 1. Album Art (Large, Centered) -->
@@ -1023,9 +1586,9 @@ footer {
         <!-- 2. Song Name (Large, Bold, Centered) -->
         <div class="bt-track-title" id="bt-track-title">No Track Playing</div>
 
-        <!-- 3. Artist — Album (Centered Subtitle) -->
+        <!-- 3. Artist  -  Album (Centered Subtitle) -->
         <div class="bt-artist-album">
-          <span id="bt-track-artist">Unknown Artist</span> — <span id="bt-track-album" class="bt-track-album">Unknown Album</span>
+          <span id="bt-track-artist">Unknown Artist</span>  -  <span id="bt-track-album" class="bt-track-album">Unknown Album</span>
         </div>
 
         <!-- Progress Bar & Timestamps -->
@@ -1039,7 +1602,7 @@ footer {
           </div>
         </div>
 
-        <!-- 4. Transport Controls: PREV — PLAY/PAUSE — NEXT (Simple Round with Icon) -->
+        <!-- 4. Transport Controls: PREV  -  PLAY/PAUSE  -  NEXT (Simple Round with Icon) -->
         <div class="bt-actions-row">
           <!-- Previous Button -->
           <button class="btn-bt-round" onclick="sendBtCmd('prev')" title="Previous Track">
@@ -1069,14 +1632,47 @@ footer {
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
+  <!-- MODULE 0C: WI-FI STREAMING                             -->
+  <!-- ======================================================= -->
+  <section class="module-box" id="mod-wifi-meta" style="display: none;">
+    <div class="module-header static-header">
+      <div class="module-title-area">
+        <span class="module-title">Wi-Fi Stream</span>
+      </div>
+      <div class="active-source-pill" id="wifi-status-pill">
+        <span class="badge-dot" id="wifi-status-dot"></span>
+        <span id="wifi-status-text">DISCONNECTED</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="wifi-stream-card">
+        <div class="wifi-stream-meta-grid">
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Server Endpoint</span>
+            <span class="wifi-info-val" id="wifi-server-val">Searching for server...</span>
+          </div>
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Stream Format</span>
+            <span class="wifi-info-val" id="wifi-format-val">PCM 44.1 kHz / 16-bit -> 48 kHz DSP</span>
+          </div>
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Playback Status</span>
+            <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
   <!-- MODULE 1: PARAMETRIC EQUALIZER                          -->
-  <!-- ═══════════════════════════════════════════════════════ -->
-  <section class="module-box" id="mod-eq">
+  <!-- ======================================================= -->
+  <section class="module-box bypassed" id="mod-eq">
     <div class="module-header" onclick="toggleModuleCollapse('eq')">
       <div class="module-title-area">
         <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-eq" checked onchange="toggleEQModule(this.checked)">
+          <input type="checkbox" id="switch-eq" onchange="toggleEQModule(this.checked)">
           <span class="slider"></span>
         </label>
         <span class="module-title">Parametric Equalizer</span>
@@ -1090,10 +1686,11 @@ footer {
       </div>
 
       <!-- Action bar with Presets -->
-      <div class="eq-toolbar">
-        <div class="preset-group">
+      <div class="eq-toolbar-row">
+        <div class="eq-preset-box">
           <span class="preset-label">Preset:</span>
-          <button class="btn-preset active" id="btn-pre-flat" onclick="applyPreset('flat')">Flat</button>
+          <button class="btn-preset active" id="btn-pre-flat_5" onclick="applyPreset('flat_5')">Flat 5 Bands</button>
+          <button class="btn-preset" id="btn-pre-flat_10" onclick="applyPreset('flat_10')">Flat 10 Bands</button>
           <button class="btn-preset" id="btn-pre-low" onclick="applyPreset('low_boost')">Low Boost</button>
           <button class="btn-preset" id="btn-pre-high" onclick="applyPreset('high_boost')">High Boost</button>
           <span id="custom-presets-list" style="display:inline-flex;gap:6px;"></span>
@@ -1101,47 +1698,37 @@ footer {
           <button class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
           <input type="file" id="preset-file-input" accept=".json" style="display:none" onchange="importPresetFile(event)">
         </div>
-        <div class="eq-toolbar-right">
-          <span class="band-count-badge" id="band-count-lbl">5 / 10 Bands</span>
-          <button class="btn-primary" id="btn-add-band" onclick="addBand()">+ Add Band</button>
-        </div>
       </div>
 
-      <!-- Main EQ Layout: Always present preamp slider on leftmost + Auto-filling bands -->
+      <!-- Main EQ Layout: Preamp slider on leftmost + Horizontally scrolling static band cards -->
       <div class="eq-body-layout">
         <!-- Always Present Preamp Slider Column -->
         <div class="preamp-col" id="eq-preamp-col">
-          <span class="preamp-title">PREAMP</span>
           <div class="preamp-slider-wrap">
             <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
-            <div class="preamp-ticks">
-              <span>+18</span>
-              <span>+12</span>
-              <span>+6</span>
-              <span class="tick-zero">0</span>
-              <span>-6</span>
-              <span>-12</span>
-              <span>-18</span>
+          </div>
+          <div class="card-val-badge">
+            <span class="badge-lbl">PREAMP</span>
+            <div class="badge-input-row">
+              <input type="number" id="preamp-num" class="badge-val-input" min="-18" max="18" step="0.1" value="0.0">
             </div>
           </div>
-          <input type="number" id="preamp-num" class="param-input-box preamp-input" min="-18" max="18" step="0.1" value="0.0">
-          <span class="preamp-unit">dB</span>
         </div>
 
-        <!-- Dynamic EQ Bands Container (Stretches across remaining width) -->
+        <!-- Dynamic EQ Bands Container (Static Width & Horizontally Scrolling) -->
         <div id="bands-container"></div>
       </div>
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 2: COMPRESSOR                                    -->
-  <!-- ═══════════════════════════════════════════════════════ -->
-  <section class="module-box" id="mod-compander">
+  <!-- ======================================================= -->
+  <section class="module-box bypassed" id="mod-compander">
     <div class="module-header" onclick="toggleModuleCollapse('comp')">
       <div class="module-title-area">
         <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-comp" checked onchange="toggleCompanderModule(this.checked)">
+          <input type="checkbox" id="switch-comp" onchange="toggleCompanderModule(this.checked)">
           <span class="slider"></span>
         </label>
         <span class="module-title">Compressor</span>
@@ -1152,61 +1739,71 @@ footer {
       <div class="module-grid-controls">
         <!-- Threshold -->
         <div class="control-pod">
-          <span class="control-pod-title">Threshold</span>
-          <canvas id="knob-comp-thresh" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-comp-thresh" class="param-input-box" min="-60" max="0" step="0.5" value="-18">
-            <span>dBFS</span>
+          <svg id="knob-comp-thresh" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">THRESHOLD</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-thresh" class="badge-val-input" min="-60" max="0" step="0.5" value="-18">
+              <span class="badge-unit">dBFS</span>
+            </div>
           </div>
         </div>
         <!-- Ratio -->
         <div class="control-pod">
-          <span class="control-pod-title">Ratio</span>
-          <canvas id="knob-comp-ratio" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-comp-ratio" class="param-input-box" min="1" max="20" step="0.1" value="4">
-            <span>:1</span>
+          <svg id="knob-comp-ratio" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">RATIO</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-ratio" class="badge-val-input" min="1" max="20" step="0.1" value="4">
+              <span class="badge-unit">:1</span>
+            </div>
           </div>
         </div>
         <!-- Attack -->
         <div class="control-pod">
-          <span class="control-pod-title">Attack</span>
-          <canvas id="knob-comp-att" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-comp-att" class="param-input-box" min="0.1" max="200" step="0.5" value="5">
-            <span>ms</span>
+          <svg id="knob-comp-att" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">ATTACK</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-att" class="badge-val-input" min="0.1" max="200" step="0.5" value="5">
+              <span class="badge-unit">ms</span>
+            </div>
           </div>
         </div>
         <!-- Release -->
         <div class="control-pod">
-          <span class="control-pod-title">Release</span>
-          <canvas id="knob-comp-rel" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-comp-rel" class="param-input-box" min="10" max="2000" step="5" value="150">
-            <span>ms</span>
+          <svg id="knob-comp-rel" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">RELEASE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-rel" class="badge-val-input" min="10" max="2000" step="5" value="150">
+              <span class="badge-unit">ms</span>
+            </div>
           </div>
         </div>
         <!-- Makeup Gain -->
         <div class="control-pod">
-          <span class="control-pod-title">Makeup Gain</span>
-          <canvas id="knob-comp-gain" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-comp-gain" class="param-input-box" min="-12" max="24" step="0.5" value="0">
-            <span>dB</span>
+          <svg id="knob-comp-gain" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">MAKEUP</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-gain" class="badge-val-input" min="-12" max="24" step="0.5" value="0">
+              <span class="badge-unit">dB</span>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- ======================================================= -->
   <!-- MODULE 3: LIMITER                                       -->
-  <!-- ═══════════════════════════════════════════════════════ -->
-  <section class="module-box" id="mod-limiter">
+  <!-- ======================================================= -->
+  <section class="module-box bypassed" id="mod-limiter">
     <div class="module-header" onclick="toggleModuleCollapse('lim')">
       <div class="module-title-area">
         <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-lim" checked onchange="toggleLimiterModule(this.checked)">
+          <input type="checkbox" id="switch-lim" onchange="toggleLimiterModule(this.checked)">
           <span class="slider"></span>
         </label>
         <span class="module-title">Limiter</span>
@@ -1217,21 +1814,184 @@ footer {
       <div class="module-grid-controls">
         <!-- Ceiling -->
         <div class="control-pod">
-          <span class="control-pod-title">Ceiling</span>
-          <canvas id="knob-lim-ceil" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-lim-ceil" class="param-input-box" min="-6" max="0" step="0.1" value="-0.5">
-            <span>dBFS</span>
+          <svg id="knob-lim-ceil" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">CEILING</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-lim-ceil" class="badge-val-input" min="-6" max="0" step="0.1" value="-0.5">
+              <span class="badge-unit">dBFS</span>
+            </div>
           </div>
         </div>
         <!-- Knee Width -->
         <div class="control-pod">
-          <span class="control-pod-title">Knee Width</span>
-          <canvas id="knob-lim-knee" class="knob" width="60" height="60"></canvas>
-          <div class="control-pod-val-row">
-            <input type="number" id="num-lim-knee" class="param-input-box" min="0" max="6" step="0.1" value="3">
-            <span>dB</span>
+          <svg id="knob-lim-knee" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">KNEE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-lim-knee" class="badge-val-input" min="0" max="6" step="0.1" value="3">
+              <span class="badge-unit">dB</span>
+            </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- MODULE: SPEAKERS CORRECTION                             -->
+  <!-- ======================================================= -->
+  <section class="module-box bypassed" id="mod-subsonic">
+    <div class="module-header" onclick="toggleModuleCollapse('subsonic')">
+      <div class="module-title-area">
+        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+          <input type="checkbox" id="switch-subsonic" onchange="toggleSubsonicModule(this.checked)">
+          <span class="slider"></span>
+        </label>
+        <span class="module-title">Speakers correction</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <!-- Submodule 1: Subsonic filter -->
+      <div class="submodule-title">Subsonic Filter</div>
+      <div class="module-grid-controls">
+        <!-- Frequency -->
+        <div class="control-pod">
+          <svg id="knob-sub-freq" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">FREQ</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-sub-freq" class="badge-val-input" min="20" max="100" step="1" value="80">
+              <span class="badge-unit">Hz</span>
+            </div>
+          </div>
+        </div>
+        <!-- Slope (Stepped 6, 12, 18, 24 dB) -->
+        <div class="control-pod">
+          <svg id="knob-sub-order" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">SLOPE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-sub-order" class="badge-val-input" min="6" max="24" step="6" value="12">
+              <span class="badge-unit">dB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horizontal separator between submodules -->
+      <div class="submodule-separator"></div>
+
+      <!-- Submodule 2: Channel correction -->
+      <div class="submodule-title">Channel Correction</div>
+      <div class="module-grid-controls">
+        <!-- Balance: L/R knob -->
+        <div class="control-pod">
+          <svg id="knob-spk-bal" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">BALANCE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-bal" class="badge-val-input" min="-100" max="100" step="1" value="0">
+              <span class="badge-unit">%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Time Shift L (ms) -->
+        <div class="control-pod">
+          <svg id="knob-spk-delay-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">TIME L</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-delay-l" class="badge-val-input" min="-20" max="20" step="0.1" value="0.0">
+              <span class="badge-unit">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Time Shift R (ms) -->
+        <div class="control-pod">
+          <svg id="knob-spk-delay-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">TIME R</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-delay-r" class="badge-val-input" min="-20" max="20" step="0.1" value="0.0">
+              <span class="badge-unit">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase Shift L (-180 to 180 deg, step 45) -->
+        <div class="control-pod">
+          <svg id="knob-spk-phase-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">PHASE L</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-phase-l" class="badge-val-input" min="-180" max="180" step="45" value="0">
+              <span class="badge-unit">°</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase Shift R (-180 to 180 deg, step 45) -->
+        <div class="control-pod">
+          <svg id="knob-spk-phase-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">PHASE R</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-phase-r" class="badge-val-input" min="-180" max="180" step="45" value="0">
+              <span class="badge-unit">°</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- MODULE 4: STARTUP EFFECTS CONFIGURATION                 -->
+  <!-- ======================================================= -->
+  <section class="module-box" id="mod-boot-cfg">
+    <div class="module-header" onclick="toggleModuleCollapse('boot-cfg')">
+      <div class="module-title-area">
+        <span class="module-title">Startup Effects Configuration</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body" id="body-boot-cfg">
+      <div class="boot-cfg-container">
+        <div class="boot-cfg-mode-row">
+          <label class="boot-radio-label">
+            <input type="radio" name="boot_mode" value="last_state" id="boot-mode-last" checked onchange="updateBootConfigUI(); sendBootDefaults();">
+            <span>Restore Last Saved State on Boot</span>
+          </label>
+          <label class="boot-radio-label">
+            <input type="radio" name="boot_mode" value="custom" id="boot-mode-custom" onchange="updateBootConfigUI(); sendBootDefaults();">
+            <span>Use Configured Startup Defaults</span>
+          </label>
+        </div>
+        <div class="boot-toggles-row" id="boot-toggles-wrap" style="opacity: 0.4; pointer-events: none;">
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-eq" onchange="sendBootDefaults()">
+            <span>Equalizer ON</span>
+          </label>
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-sub" onchange="sendBootDefaults()">
+            <span>Speakers Correction ON</span>
+          </label>
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-comp" onchange="sendBootDefaults()">
+            <span>Compressor ON</span>
+          </label>
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-lim" onchange="sendBootDefaults()">
+            <span>Limiter ON</span>
+          </label>
+        </div>
+        <div class="boot-actions-row">
+          <button class="btn-primary" onclick="saveCurrentAsBootDefaults()">Save Current States as Boot Defaults</button>
+          <span class="boot-saved-indicator" id="boot-saved-indicator">Saved to Flash</span>
         </div>
       </div>
     </div>
@@ -1239,25 +1999,55 @@ footer {
 </main>
 
 <footer>
-  ESP32-S3-DSP · FreeRTOS Modular Audio Pipeline · Core 1 RT DSP · Core 0 Async WebServer
+  ESP32-S3-DSP FreeRTOS WebUI
 </footer>
 
 <script>
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Constants & Color Map (Nord Palette)
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 const FS = 48000;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
-  '#5E81AC', '#88C0D0', '#81A1C1', '#8FBCBB',
-  '#B48EAD', '#D08770', '#EBCB8B', '#A3BE8C',
-  '#BF616A', '#4C566A'
+  '#BF616A', // Nord11 Red
+  '#D08770', // Nord12 Orange
+  '#EBCB8B', // Nord13 Yellow
+  '#A3BE8C', // Nord14 Green
+  '#B48EAD', // Nord15 Purple
+  '#C2677C', // Aurora Coral Rose
+  '#DB9760', // Aurora Tangerine
+  '#8CA870', // Aurora Olive Green
+  '#68B092', // Aurora Emerald
+  '#9B6FB0'  // Aurora Violet
 ];
 
+function hexToRgb(hex) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
+function hexToHsl(hex) {
+  let { r, g, b } = hexToRgb(hex);
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
 // Initial default: 5 bands (Low Shelf, 3 Peakings, High Shelf)
-let eqEnabled = true;
+let eqEnabled = false;
 let eqPreamp  = 0.0;
-let currentPreset = 'flat';
+let currentPreset = 'flat_5';
 
 let bands = [
   { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true }, // Low Shelf
@@ -1268,12 +2058,24 @@ let bands = [
 ];
 
 const PRESETS = {
-  flat: [
+  flat_5: [
     { freq: 100.0,   gain: 0.0,  q: 0.707, type: 1, order: 2, enabled: true },
     { freq: 500.0,   gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
     { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
     { freq: 4000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
     { freq: 10000.0, gain: 0.0,  q: 0.707, type: 2, order: 2, enabled: true }
+  ],
+  flat_10: [
+    { freq: 31.5,    gain: 0.0,  q: 1.414, type: 1, order: 2, enabled: true },
+    { freq: 63.0,    gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 125.0,   gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 250.0,   gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 500.0,   gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 2000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 8000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 16000.0, gain: 0.0,  q: 1.414, type: 2, order: 2, enabled: true }
   ],
   low_boost: [
     { freq: 100.0,   gain: 6.0,  q: 0.707, type: 1, order: 2, enabled: true },
@@ -1290,12 +2092,14 @@ const PRESETS = {
     { freq: 10000.0, gain: 6.0,  q: 0.707, type: 2, order: 2, enabled: true }
   ]
 };
+PRESETS.flat = PRESETS.flat_5;
 
 function applyPreset(name) {
+  if (name === 'flat') name = 'flat_5';
   if (!PRESETS[name]) return;
   currentPreset = name;
   document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(`btn-pre-${name === 'low_boost' ? 'low' : (name === 'high_boost' ? 'high' : 'flat')}`);
+  const btn = document.getElementById(`btn-pre-${name === 'low_boost' ? 'low' : (name === 'high_boost' ? 'high' : (name === 'flat_10' ? 'flat_10' : 'flat_5'))}`);
   if (btn) btn.classList.add('active');
 
   bands = PRESETS[name].map((p, idx) => ({
@@ -1492,25 +2296,53 @@ function renderCustomPresets() {
   });
 }
 
+let isPreampDragging = false;
+
 function initPreamp() {
   const slider = document.getElementById('preamp-slider');
   const input  = document.getElementById('preamp-num');
   if (!slider || !input) return;
 
-  const onPreampChange = (v) => {
-    v = Math.max(-18, Math.min(18, parseFloat(v) || 0));
+  slider.addEventListener('input', e => {
+    isPreampDragging = true;
+    eqPreamp = Math.max(-18, Math.min(18, parseFloat(e.target.value) || 0));
+    input.value = eqPreamp.toFixed(1);
+    requestDrawResponse(); // Local visual preview only while sliding!
+  });
+
+  slider.addEventListener('change', () => {
+    isPreampDragging = false;
+    wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+    requestDrawResponse(); // Apply to ESP32 on mouse release!
+  });
+
+  slider.addEventListener('dblclick', () => {
+    isPreampDragging = false;
+    eqPreamp = 0.0;
+    slider.value = 0.0;
+    input.value = "0.0";
+    wsTx({ t: 'eq_preamp', preamp: 0.0 });
+    requestDrawResponse();
+  });
+
+  input.addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (isNaN(v)) v = eqPreamp;
+    v = Math.max(-18, Math.min(18, v));
     eqPreamp = v;
     slider.value = v;
-    input.value  = v.toFixed(1);
-    drawResponse();
+    input.value = v.toFixed(1);
     wsTx({ t: 'eq_preamp', preamp: Math.round(v * 100) / 100 });
-  };
+    requestDrawResponse();
+  });
 
-  slider.addEventListener('input', e => onPreampChange(e.target.value));
-  slider.addEventListener('dblclick', () => onPreampChange(0.0));
-
-  input.addEventListener('change', e => onPreampChange(e.target.value));
-  input.addEventListener('dblclick', () => onPreampChange(0.0));
+  input.addEventListener('dblclick', () => {
+    eqPreamp = 0.0;
+    slider.value = 0.0;
+    input.value = "0.0";
+    wsTx({ t: 'eq_preamp', preamp: 0.0 });
+    requestDrawResponse();
+  });
 }
 
 function updatePreampUI() {
@@ -1520,23 +2352,29 @@ function updatePreampUI() {
   if (input)  input.value  = eqPreamp.toFixed(1);
 }
 
+let subsonicParams = {
+  enabled: false, freq: 80.0, order: 2,
+  balance: 0, delayL: 0.0, delayR: 0.0, phaseL: 0, phaseR: 0
+};
+
 let compParams = {
-  enabled: true, threshold: -18.0, ratio: 4.0,
+  enabled: false, threshold: -18.0, ratio: 4.0,
   attackMs: 5.0, releaseMs: 150.0, makeup: 0.0
 };
 
 let limParams = {
-  enabled: true, ceiling: -0.5, knee: 3.0
+  enabled: false, ceiling: -0.5, knee: 3.0
 };
 
 // References to UI Knob instances
-let bandKnobs = []; // Array of { freqKnob, gainKnob, qKnob }
+let bandKnobs = []; // Array of { fKnob, qKnob }
+let subsonicKnobs = {};
 let compKnobs = {};
 let limKnobs  = {};
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // WebSocket Client
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 let ws = null, wsRetry = null;
 
 function wsConnect() {
@@ -1555,7 +2393,7 @@ function wsConnect() {
       wsTx({ t: 'getState' });
     };
     ws.onclose = () => {
-      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting…');
+      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting...');
       ws = null;
       wsRetry = setTimeout(wsConnect, 3000);
     };
@@ -1577,8 +2415,73 @@ function wsTx(obj) {
 }
 
 function setDot(cls, txt) {
-  document.getElementById('ws-dot').className = cls;
-  document.getElementById('ws-lbl').textContent = txt;
+  const dot = document.getElementById('ws-dot');
+  const lbl = document.getElementById('ws-lbl');
+  if (dot) dot.className = cls;
+  if (lbl) lbl.textContent = txt;
+
+  const overlay = document.getElementById('conn-overlay');
+  if (overlay) {
+    if (location.protocol === 'file:') {
+      overlay.style.display = 'none';
+    } else {
+      overlay.style.display = (cls === 'ok') ? 'none' : 'flex';
+      const desc = document.getElementById('conn-desc');
+      if (desc) desc.textContent = (cls === 'ok') ? '' : txt;
+    }
+  }
+}
+
+function updateSysStatsUI(s) {
+  if (!s) return;
+  // Core 0 (System / Network)
+  if (s.cpu0 !== undefined) {
+    const v = Math.min(100, Math.max(0, s.cpu0));
+    const elVal = document.getElementById('sys-val-cpu0');
+    const elBar = document.getElementById('sys-bar-cpu0');
+    if (elVal) elVal.textContent = v.toFixed(1) + '%';
+    if (elBar) {
+      elBar.style.width = v + '%';
+      elBar.style.background = v > 85 ? 'var(--nord11)' : (v > 65 ? 'var(--nord12)' : 'var(--nord10)');
+    }
+  }
+  // Core 1 (Audio DSP)
+  if (s.cpu1 !== undefined) {
+    const v = Math.min(100, Math.max(0, s.cpu1));
+    const elVal = document.getElementById('sys-val-cpu1');
+    const elBar = document.getElementById('sys-bar-cpu1');
+    if (elVal) elVal.textContent = v.toFixed(1) + '%';
+    if (elBar) {
+      elBar.style.width = v + '%';
+      elBar.style.background = v > 85 ? 'var(--nord11)' : (v > 65 ? 'var(--nord12)' : 'var(--nord14)');
+    }
+  }
+  // Internal RAM
+  if (s.heap_t && s.heap_t > 0) {
+    const usedKb = Math.round((s.heap_u || 0) / 1024);
+    const totKb  = Math.round(s.heap_t / 1024);
+    const pct    = Math.min(100, Math.max(0, Math.round(((s.heap_u || 0) / s.heap_t) * 100)));
+    const elVal  = document.getElementById('sys-val-ram');
+    const elBar  = document.getElementById('sys-bar-ram');
+    if (elVal) elVal.textContent = `${usedKb} / ${totKb} KB (${pct}%)`;
+    if (elBar) {
+      elBar.style.width = pct + '%';
+      elBar.style.background = pct > 85 ? 'var(--nord11)' : (pct > 70 ? 'var(--nord12)' : 'var(--nord10)');
+    }
+  }
+  // Flash Memory
+  if (s.flash_t && s.flash_t > 0) {
+    const usedMb = ((s.flash_u || 0) / (1024 * 1024)).toFixed(2);
+    const totMb  = (s.flash_t / (1024 * 1024)).toFixed(1);
+    const pct    = Math.min(100, Math.max(0, Math.round(((s.flash_u || 0) / s.flash_t) * 100)));
+    const elVal  = document.getElementById('sys-val-flash');
+    const elBar  = document.getElementById('sys-bar-flash');
+    if (elVal) elVal.textContent = `${usedMb} / ${totMb} MB (${pct}%)`;
+    if (elBar) {
+      elBar.style.width = pct + '%';
+      elBar.style.background = pct > 90 ? 'var(--nord11)' : 'var(--nord10)';
+    }
+  }
 }
 
 function handleMsg(d) {
@@ -1586,20 +2489,32 @@ function handleMsg(d) {
     updateBluetoothUI(d);
     return;
   }
+  if (d.t === 'wifi_meta') {
+    updateWiFiStreamUI(d);
+    return;
+  }
+  if (d.t === 'sys') {
+    updateSysStatsUI(d);
+    return;
+  }
   if (d.t !== 'state') return;
+
+  if (d.sys) {
+    updateSysStatsUI(d.sys);
+  }
 
   // 1. EQ State
   if (d.eq) {
     eqEnabled = d.eq.enabled !== undefined ? d.eq.enabled : true;
     updateBypassUI('eq', eqEnabled);
 
-    if (d.eq.preamp !== undefined) {
+    if (d.eq.preamp !== undefined && !isPreampDragging) {
       eqPreamp = parseFloat(d.eq.preamp) || 0.0;
       updatePreampUI();
     }
 
     if (Array.isArray(d.eq.bands)) {
-      bands = d.eq.bands.map(b => {
+      const incomingBands = d.eq.bands.map(b => {
         let t = parseInt(b.type) || 0;
         let ord = parseInt(b.order) || 2;
         if (t === 5) { t = 3; ord = 4; }
@@ -1614,25 +2529,54 @@ function handleMsg(d) {
           enabled: b.enabled !== undefined ? b.enabled : true
         };
       });
-      rebuildBandsUI();
+
+      const root = document.getElementById('bands-container');
+      const needsFullRebuild = (incomingBands.length !== bands.length) || (root && root.children.length === 0);
+
+      if (needsFullRebuild) {
+        bands = incomingBands;
+        rebuildBandsUI();
+      } else {
+        incomingBands.forEach((b, idx) => {
+          if (bands[idx]) {
+            bands[idx].type = b.type;
+            bands[idx].order = b.order;
+            bands[idx].enabled = b.enabled;
+            const isDraggingThis = bandKnobs[idx] && ((bandKnobs[idx].fKnob && bandKnobs[idx].fKnob._drag) || (bandKnobs[idx].qKnob && bandKnobs[idx].qKnob._drag));
+            if (!isDraggingThis) {
+              bands[idx].freq = b.freq;
+              bands[idx].gain = b.gain;
+              bands[idx].q = b.q;
+            }
+            syncBandCardUI(idx);
+          }
+        });
+      }
     }
   }
 
-  // 2. Compander State
+  // 2. Subsonic Filter State
+  if (d.subsonic) {
+    Object.assign(subsonicParams, d.subsonic);
+    updateBypassUI('subsonic', subsonicParams.enabled);
+    syncSubsonicUI();
+  }
+
+  // 3. Compander State
   if (d.compander) {
     Object.assign(compParams, d.compander);
     updateBypassUI('comp', compParams.enabled);
     syncCompanderUI();
   }
 
-  // 3. Limiter State
+  // 4. Limiter State
   if (d.limiter) {
     Object.assign(limParams, d.limiter);
     updateBypassUI('lim', limParams.enabled);
     syncLimiterUI();
   }
 
-  // 4. Input Source State
+  // 5. Input Source State
   if (d.input) {
     if (d.input.source !== undefined) {
       selectedInputSource = parseInt(d.input.source) || 1;
@@ -1643,15 +2587,91 @@ function handleMsg(d) {
     updateInputSourceUI();
   }
 
-  // 5. Bluetooth Metadata State
+  // 6. Bluetooth Metadata State
   if (d.bt) {
     updateBluetoothUI(d.bt);
+  }
+
+  // 6b. Wi-Fi Stream State
+  if (d.wifi_stream) {
+    updateWiFiStreamUI(d.wifi_stream);
+  }
+
+  // 7. Boot Defaults State
+  if (d.boot_defaults) {
+    const isCustom = !!d.boot_defaults.custom;
+    const rLast = document.getElementById('boot-mode-last');
+    const rCust = document.getElementById('boot-mode-custom');
+    if (rLast) rLast.checked = !isCustom;
+    if (rCust) rCust.checked = isCustom;
+
+    const bEq = document.getElementById('boot-def-eq');
+    const bSub = document.getElementById('boot-def-sub');
+    const bComp = document.getElementById('boot-def-comp');
+    const bLim = document.getElementById('boot-def-lim');
+    if (bEq) bEq.checked = !!d.boot_defaults.eq;
+    if (bSub) bSub.checked = !!d.boot_defaults.sub;
+    if (bComp) bComp.checked = !!d.boot_defaults.comp;
+    if (bLim) bLim.checked = !!d.boot_defaults.lim;
+    updateBootConfigUI();
   }
 
   drawResponse();
 }
 
-// ── Input Source Functions ──────────────────────────────────
+function updateBootConfigUI() {
+  const isCustom = document.getElementById('boot-mode-custom')?.checked;
+  const wrap = document.getElementById('boot-toggles-wrap');
+  if (wrap) {
+    wrap.style.opacity = isCustom ? '1' : '0.4';
+    wrap.style.pointerEvents = isCustom ? 'auto' : 'none';
+  }
+}
+
+function sendBootDefaults() {
+  const isCustom = document.getElementById('boot-mode-custom')?.checked || false;
+  const eqOn = document.getElementById('boot-def-eq')?.checked || false;
+  const subOn = document.getElementById('boot-def-sub')?.checked || false;
+  const compOn = document.getElementById('boot-def-comp')?.checked || false;
+  const limOn = document.getElementById('boot-def-lim')?.checked || false;
+
+  wsTx({
+    t: 'boot_defaults',
+    custom: isCustom,
+    eq: eqOn,
+    sub: subOn,
+    comp: compOn,
+    lim: limOn
+  });
+
+  const ind = document.getElementById('boot-saved-indicator');
+  if (ind) {
+    ind.classList.add('visible');
+    setTimeout(() => ind.classList.remove('visible'), 2000);
+  }
+}
+
+function saveCurrentAsBootDefaults() {
+  const rCust = document.getElementById('boot-mode-custom');
+  if (rCust) rCust.checked = true;
+
+  const bEq = document.getElementById('boot-def-eq');
+  const bSub = document.getElementById('boot-def-sub');
+  const bComp = document.getElementById('boot-def-comp');
+  const bLim = document.getElementById('boot-def-lim');
+  if (bEq) bEq.checked = eqEnabled;
+  const swSub = document.getElementById('switch-subsonic');
+  if (bSub) bSub.checked = swSub ? swSub.checked : false;
+  const swComp = document.getElementById('switch-comp');
+  if (bComp) bComp.checked = swComp ? swComp.checked : false;
+  const swLim = document.getElementById('switch-lim');
+  if (bLim) bLim.checked = swLim ? swLim.checked : false;
+
+  updateBootConfigUI();
+  sendBootDefaults();
+}
+
+// -- Input Source Functions ----------------------------------
 let selectedInputSource = 1; // 1: AUX, 2: BT, 3: WIFI
 let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
 
@@ -1663,34 +2683,78 @@ function setInputSource(src) {
 }
 
 function updateInputSourceUI() {
-  const isBt = (selectedInputSource === 2);
+  const isAux  = (selectedInputSource === 1);
+  const isBt   = (selectedInputSource === 2);
+  const isWifi = (selectedInputSource === 3);
 
   // 1. Update Input Source Cards
-  const btnAux = document.getElementById('btn-src-1');
-  const btnBt  = document.getElementById('btn-src-2');
-  const badgeAux = document.getElementById('badge-src-1');
-  const badgeBt  = document.getElementById('badge-src-2');
+  const btnAux  = document.getElementById('btn-src-1');
+  const btnBt   = document.getElementById('btn-src-2');
+  const btnWifi = document.getElementById('btn-src-3');
 
-  if (btnAux && btnBt) {
-    if (isBt) {
-      btnAux.classList.remove('active');
-      btnBt.classList.add('active');
-      if (badgeAux) badgeAux.textContent = 'STANDBY';
-      if (badgeBt) badgeBt.textContent = 'ACTIVE';
-    } else {
-      btnAux.classList.add('active');
-      btnBt.classList.remove('active');
-      if (badgeAux) badgeAux.textContent = 'ACTIVE';
-      if (badgeBt) badgeBt.textContent = 'STANDBY';
-    }
-  }
+  if (btnAux)  btnAux.classList.toggle('active', isAux);
+  if (btnBt)   btnBt.classList.toggle('active', isBt);
+  if (btnWifi) btnWifi.classList.toggle('active', isWifi);
+
+  const b1 = document.getElementById('badge-src-1');
+  const b2 = document.getElementById('badge-src-2');
+  const b3 = document.getElementById('badge-src-3');
+  if (b1) b1.textContent = isAux ? 'ACTIVE' : 'STANDBY';
+  if (b2) b2.textContent = isBt ? 'ACTIVE' : 'STANDBY';
+  if (b3) b3.textContent = isWifi ? 'ACTIVE' : 'STANDBY';
 
   // 2. Order and Visibility of Bluetooth Now Playing Module:
-  // Visible only when bluetooth is connected (selectedInputSource === 2 && isBtConnected)
   updateBtModuleVisibility();
+
+  // 3. Order and Visibility of Wi-Fi Streaming Module:
+  updateWiFiModuleVisibility();
 }
 
-// ── Bluetooth Metadata & Artwork Functions ───────────────────
+function updateWiFiModuleVisibility() {
+  const wfMod = document.getElementById('mod-wifi-meta');
+  if (wfMod) {
+    const isWifi = (selectedInputSource === 3);
+    wfMod.style.display = isWifi ? 'block' : 'none';
+  }
+}
+
+function updateWiFiStreamUI(wf) {
+  if (!wf) return;
+  const dotEl    = document.getElementById('wifi-status-dot');
+  const textEl   = document.getElementById('wifi-status-text');
+  const serverEl = document.getElementById('wifi-server-val');
+  const formatEl = document.getElementById('wifi-format-val');
+  const stateEl  = document.getElementById('wifi-state-val');
+
+  if (wf.connected) {
+    if (dotEl) {
+      dotEl.style.backgroundColor = wf.streaming ? 'var(--nord14)' : 'var(--nord10)';
+      dotEl.style.borderColor = wf.streaming ? 'var(--nord14)' : 'var(--nord10)';
+    }
+    if (textEl) textEl.textContent = wf.streaming ? (wf.paused ? 'PAUSED' : 'STREAMING') : 'CONNECTED';
+    if (serverEl) serverEl.textContent = wf.server || wf.server_ip || 'Connected';
+  } else {
+    if (dotEl) {
+      dotEl.style.backgroundColor = 'var(--muted)';
+      dotEl.style.borderColor = 'var(--muted)';
+    }
+    if (textEl) textEl.textContent = 'SEARCHING';
+    if (serverEl) serverEl.textContent = 'Searching for server...';
+  }
+
+  if (formatEl && wf.format) formatEl.textContent = wf.format;
+  if (stateEl) {
+    if (wf.streaming) {
+      stateEl.textContent = wf.paused ? 'Paused' : 'Playing Stream';
+    } else if (wf.connected) {
+      stateEl.textContent = 'Ready (Idle)';
+    } else {
+      stateEl.textContent = 'Listening on Port 3483';
+    }
+  }
+}
+
+// -- Bluetooth Metadata & Artwork Functions -------------------
 let currentTrackTitle = '';
 let currentTrackArtist = '';
 let isBtConnected = false;
@@ -1878,16 +2942,50 @@ function toggleBtPlayPause() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-// Rotary Knob Component (Nord Light Style)
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
+// Vector Rotary Knob Component (Pure SVG - High Precision & Razor Sharp)
+// ===========================================================
+function polarToCartesian(cx, cy, r, angleInRad) {
+  return {
+    x: cx + r * Math.cos(angleInRad),
+    y: cy + r * Math.sin(angleInRad)
+  };
+}
+
+function describeArc(cx, cy, r, startAngle, endAngle) {
+  let diff = endAngle - startAngle;
+  if (diff <= 0.001) return '';
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end   = polarToCartesian(cx, cy, r, endAngle);
+  const largeArcFlag = diff > Math.PI ? 1 : 0;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
 class Knob {
-  constructor(canvas, opts) {
-    this.cv  = canvas;
-    this.ctx = canvas.getContext('2d');
+  constructor(el, opts) {
+    if (!el) return;
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    let svg;
+    if (el.tagName.toLowerCase() === 'svg') {
+      svg = el;
+    } else {
+      svg = document.createElementNS(svgNS, 'svg');
+      if (el.id) svg.id = el.id;
+      if (el.className) svg.setAttribute('class', el.className);
+      const w = el.getAttribute('width') || el.clientWidth || 54;
+      const h = el.getAttribute('height') || el.clientHeight || 54;
+      svg.setAttribute('width', w);
+      svg.setAttribute('height', h);
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      if (el.parentNode) el.parentNode.replaceChild(svg, el);
+    }
+    this.el = svg;
+
     Object.assign(this, {
       min: 0,
       max: 100,
+      step: null,
       value: 0,
       defaultVal: undefined,
       unit: '',
@@ -1895,49 +2993,115 @@ class Knob {
       decimals: 1,
       centerZero: false,
       logScale: false,
-      onChange: null
+      onSlide: null,
+      onChange: null,
+      onApply: null,
+      onEnd: null
     }, opts);
 
-    // If defaultVal is not supplied, use centerZero or min
     if (this.defaultVal === undefined) {
       this.defaultVal = this.centerZero ? 0 : this.min;
     }
+
+    const W = parseFloat(svg.getAttribute('width')) || 54;
+    const H = parseFloat(svg.getAttribute('height')) || 54;
+    this.W = W;
+    this.H = H;
+    this.cx = W / 2;
+    this.cy = H / 2;
+    this.R = Math.min(W, H) / 2 - 1.5;
+    this.rDisc = this.R - 1.5;
+
+    // Build SVG vector structure - Clean solid black knob with sharp white indicator notch
+    svg.innerHTML = `
+      <circle class="knob-disc-shadow" cx="${this.cx}" cy="${this.cy + 1}" r="${this.rDisc}" fill="#1B1F27" opacity="0.3"/>
+      <circle class="knob-disc" cx="${this.cx}" cy="${this.cy}" r="${this.rDisc}" fill="#2E3440" stroke="#434C5E" stroke-width="1.5"/>
+      <line class="knob-notch" stroke="#ECEFF4" stroke-width="2.8" stroke-linecap="round"/>
+    `;
+
+    this._notchEl = svg.querySelector('.knob-notch');
+
+    // Static angular sweep from 135 deg to 405 deg (270 degrees)
+    this.SA  = Math.PI * 0.75;
+    this.SWP = Math.PI * 1.5;
 
     this._drag = false;
     this._y0   = 0;
     this._v0   = 0;
 
-    canvas.addEventListener('mousedown',  e => this._md(e.clientY));
-    canvas.addEventListener('dblclick',   () => {
-      // RESET TO defaultVal (e.g. Q resets to 0.707!)
-      this.set(this.defaultVal, true);
-    });
-    canvas.addEventListener('wheel', e => {
+    this._onMove = (e) => {
+      if (!this._drag) return;
+      this._mm(e.clientY, e.shiftKey);
+    };
+
+    this._onUp = () => {
+      if (!this._drag) return;
+      this._drag = false;
+      window.removeEventListener('mousemove', this._onMove);
+      window.removeEventListener('mouseup', this._onUp);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    };
+
+    this._onTouchMove = (e) => {
+      if (!this._drag) return;
       e.preventDefault();
-      if (this.logScale) {
-        // Less sensitive, proportional step (~2.5% per notch)
+      this._mm(e.touches[0].clientY, false);
+    };
+
+    this._onTouchEnd = () => {
+      if (!this._drag) return;
+      this._drag = false;
+      window.removeEventListener('touchmove', this._onTouchMove);
+      window.removeEventListener('touchend', this._onTouchEnd);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    };
+
+    svg.addEventListener('mousedown', e => {
+      this._md(e.clientY);
+      window.addEventListener('mousemove', this._onMove, { passive: true });
+      window.addEventListener('mouseup', this._onUp);
+    });
+
+    svg.addEventListener('dblclick', () => {
+      this.set(this.defaultVal, true);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    });
+
+    svg.addEventListener('wheel', e => {
+      e.preventDefault();
+      if (this.step && this.step > 0) {
+        this.set(this.value - Math.sign(e.deltaY) * this.step, true);
+      } else if (this.logScale) {
         const factor = Math.pow(1.025, -Math.sign(e.deltaY));
         this.set(this.value * factor, true);
       } else {
         const step = (this.max - this.min) / 100;
         this.set(this.value - Math.sign(e.deltaY) * step, true);
       }
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
     }, { passive: false });
 
-    canvas.addEventListener('touchstart', e => {
+    svg.addEventListener('touchstart', e => {
       e.preventDefault();
       this._md(e.touches[0].clientY);
+      window.addEventListener('touchmove', this._onTouchMove, { passive: false });
+      window.addEventListener('touchend', this._onTouchEnd);
     }, { passive: false });
-    canvas.addEventListener('touchmove', e => {
-      e.preventDefault();
-      this._mm(e.touches[0].clientY, false);
-    }, { passive: false });
-    canvas.addEventListener('touchend', () => { this._drag = false; });
-
-    window.addEventListener('mousemove', e => this._mm(e.clientY, e.shiftKey));
-    window.addEventListener('mouseup',   () => { this._drag = false; });
 
     this.draw();
+  }
+
+  configure(opts) {
+    Object.assign(this, opts);
+    if (this.defaultVal === undefined) {
+      this.defaultVal = this.centerZero ? 0 : this.min;
+    }
+    this.set(this.value, false);
+    return this;
   }
 
   _md(y) {
@@ -1950,12 +3114,17 @@ class Knob {
     if (!this._drag) return;
     const dy = this._y0 - y;
     if (this.logScale) {
-      // Logarithmic scaling for frequency: significantly less sensitive (500px travel; 1500px with shift)
       const sens = fineTune ? 1500 : 500;
       const range = Math.log(this.max / this.min);
       const curT  = Math.log(this._v0 / this.min) / range;
       const newT  = Math.max(0, Math.min(1, curT + dy / sens));
       this.set(this.min * Math.exp(newT * range), true);
+    } else if (this.step && this.step > 0) {
+      const sens = 120;
+      const range = this.max - this.min;
+      const rawV = this._v0 + dy * range / sens;
+      const stepped = Math.round((rawV - this.min) / this.step) * this.step + this.min;
+      this.set(stepped, true);
     } else {
       const sens = fineTune ? 500 : 180;
       const range = this.max - this.min;
@@ -1963,30 +3132,32 @@ class Knob {
     }
   }
 
-  set(v, fire = false) {
-    const clamped = Math.max(this.min, Math.min(this.max, v));
+  set(v, isSlide = false) {
+    let clamped = Math.max(this.min, Math.min(this.max, v));
+    if (this.step && this.step > 0) {
+      clamped = Math.round((clamped - this.min) / this.step) * this.step + this.min;
+    }
     this.value = +clamped.toFixed(this.decimals + 1);
     this.draw();
-    if (fire && this.onChange) this.onChange(this.value);
+    if (isSlide) {
+      if (this.onSlide) this.onSlide(this.value);
+      else if (this.onChange) this.onChange(this.value);
+    }
     return this;
   }
 
   setQuiet(v) {
     if (this._drag) return this;
-    return this.set(v, false);
+    let clamped = Math.max(this.min, Math.min(this.max, v));
+    if (this.step && this.step > 0) {
+      clamped = Math.round((clamped - this.min) / this.step) * this.step + this.min;
+    }
+    this.value = +clamped.toFixed(this.decimals + 1);
+    this.draw();
+    return this;
   }
 
   draw() {
-    const cv = this.cv;
-    const c  = this.ctx;
-    const W  = cv.width, H = cv.height;
-    const cx = W / 2, cy = H / 2;
-    const R  = Math.min(W, H) / 2 - 3;
-
-    // 270 degree sweep
-    const SA  = Math.PI * 0.75;
-    const SWP = Math.PI * 1.5;
-
     let t = 0;
     if (this.logScale) {
       t = Math.log(this.value / this.min) / Math.log(this.max / this.min);
@@ -1995,76 +3166,27 @@ class Knob {
     }
     t = Math.max(0, Math.min(1, t));
 
-    const vA   = SA + t * SWP;
-    const midA = SA + 0.5 * SWP;
+    const vA = this.SA + t * this.SWP;
 
-    c.clearRect(0, 0, W, H);
-
-    // Knob outer body
-    c.beginPath();
-    c.arc(cx, cy, R, 0, Math.PI * 2);
-    c.fillStyle = '#E5E9F0'; // Nord 5
-    c.fill();
-    c.strokeStyle = '#D8DEE9'; // Nord 4
-    c.lineWidth = 1;
-    c.stroke();
-
-    // Background track arc
-    c.beginPath();
-    c.arc(cx, cy, R - 4, SA, SA + SWP);
-    c.strokeStyle = '#D8DEE9';
-    c.lineWidth = 4;
-    c.lineCap = 'round';
-    c.stroke();
-
-    // Value active arc
-    const arc0 = this.centerZero ? midA : SA;
-    const arc1 = vA;
-    if (Math.abs(arc1 - arc0) > 0.01) {
-      c.beginPath();
-      if (arc1 >= arc0) c.arc(cx, cy, R - 4, arc0, arc1);
-      else              c.arc(cx, cy, R - 4, arc1, arc0);
-      c.strokeStyle = (this.centerZero && this.value < 0) ? '#D08770' : this.color;
-      c.lineWidth = 4;
-      c.lineCap = 'round';
-      c.stroke();
+    // Crisp high-contrast white notch spanning from disc interior towards outer disc edge
+    const notchR1 = Math.max(2, this.rDisc - 13);
+    const notchR2 = Math.max(4, this.rDisc - 2);
+    const x1 = this.cx + notchR1 * Math.cos(vA);
+    const y1 = this.cy + notchR1 * Math.sin(vA);
+    const x2 = this.cx + notchR2 * Math.cos(vA);
+    const y2 = this.cy + notchR2 * Math.sin(vA);
+    if (this._notchEl) {
+      this._notchEl.setAttribute('x1', x1.toFixed(2));
+      this._notchEl.setAttribute('y1', y1.toFixed(2));
+      this._notchEl.setAttribute('x2', x2.toFixed(2));
+      this._notchEl.setAttribute('y2', y2.toFixed(2));
     }
-
-    // Indicator needle dot
-    c.beginPath();
-    c.arc(cx + (R - 4) * Math.cos(vA), cy + (R - 4) * Math.sin(vA), 2.5, 0, Math.PI * 2);
-    c.fillStyle = '#2E3440';
-    c.fill();
-
-    // Center disc
-    c.beginPath();
-    c.arc(cx, cy, R - 10, 0, Math.PI * 2);
-    c.fillStyle = '#FFFFFF';
-    c.fill();
-    c.strokeStyle = '#D8DEE9';
-    c.lineWidth = 1;
-    c.stroke();
-
-    // Display value inside knob
-    const fs = Math.max(7, Math.floor(W * 0.17));
-    c.font = `600 ${fs}px ui-monospace, SFMono-Regular, monospace`;
-    c.fillStyle = '#2E3440';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-
-    let displayVal = this.value;
-    if (this.logScale && displayVal >= 1000) {
-      displayVal = (displayVal / 1000).toFixed(1) + 'k';
-    } else {
-      displayVal = displayVal.toFixed(this.decimals);
-    }
-    c.fillText(displayVal, cx, cy - 1);
   }
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Frequency Response Canvas (Nord Light)
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 const fCanvas = document.getElementById('freq-canvas');
 const fCtx    = fCanvas.getContext('2d');
 const DB_MAX  = 18;
@@ -2238,11 +3360,24 @@ function totalMagAt(f) {
   return eqPreamp + bands.reduce((s, b) => s + bandMagAt(b, f), 0);
 }
 
+let drawResponseRafId = null;
+function requestDrawResponse() {
+  if (drawResponseRafId) return;
+  drawResponseRafId = requestAnimationFrame(() => {
+    drawResponseRafId = null;
+    drawResponse();
+  });
+}
+
 function drawResponse() {
   const rect = fCanvas.getBoundingClientRect();
   const DPR  = window.devicePixelRatio || 1;
-  const W    = fCanvas.width  = Math.round(rect.width * DPR);
-  const H    = fCanvas.height = Math.round(rect.height * DPR);
+  const W    = Math.round(rect.width * DPR);
+  const H    = Math.round(rect.height * DPR);
+  if (fCanvas.width !== W || fCanvas.height !== H) {
+    fCanvas.width  = W;
+    fCanvas.height = H;
+  }
   const c    = fCtx;
 
   c.clearRect(0, 0, W, H);
@@ -2260,14 +3395,6 @@ function drawResponse() {
     c.strokeStyle = db === 0 ? '#4C566A' : '#E5E9F0';
     c.lineWidth   = db === 0 ? 1.5 * DPR : 1 * DPR;
     c.stroke();
-
-    if (db !== -18 && db !== 18) {
-      c.font = `700 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
-      c.fillStyle = db === 0 ? '#2E3440' : '#718096';
-      c.textAlign = 'left';
-      c.textBaseline = 'middle';
-      c.fillText((db > 0 ? '+' : '') + db + ' dB', 6 * DPR, y - 1);
-    }
   });
 
   // Frequency vertical grid
@@ -2346,244 +3473,53 @@ function drawResponse() {
     c.fill();
     c.stroke();
   });
+
+  // -- Y-axis labels (rendered on top of response curves with uniform length) --
+  [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
+    if (db === -18 || db === 18) return;
+    const y = db2y(db, H);
+    let txt;
+    if (db === 0) {
+      txt = '  0';
+    } else if (Math.abs(db) < 10) {
+      txt = (db > 0 ? ' +' : ' -') + Math.abs(db);
+    } else {
+      txt = (db > 0 ? '+' : '') + db;
+    }
+    c.save();
+    c.font = `700 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+
+    const tw = c.measureText(txt).width;
+    const px = 5 * DPR;
+    const py = y - 7 * DPR;
+    const pw = tw + 8 * DPR;
+    const ph = 14 * DPR;
+
+    // Crisp protective badge ensuring response curves never obscure the numbers
+    c.fillStyle = 'rgba(255, 255, 255, 0.94)';
+    c.beginPath();
+    c.rect(px, py, pw, ph);
+    c.fill();
+    c.strokeStyle = db === 0 ? '#4C566A' : '#D8DEE9';
+    c.lineWidth   = 1 * DPR;
+    c.stroke();
+
+    // High contrast label text on top
+    c.fillStyle = db === 0 ? '#2E3440' : '#4C566A';
+    c.fillText(txt, px + 4 * DPR, y);
+    c.restore();
+  });
 }
 
 new ResizeObserver(drawResponse).observe(fCanvas);
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Dynamic EQ Bands UI Builder
-// ═══════════════════════════════════════════════════════════
-function rebuildBandsUI() {
-  const root = document.getElementById('bands-container');
-  root.innerHTML = '';
-  bandKnobs = [];
-
-  document.getElementById('band-count-lbl').textContent = `${bands.length} / ${MAX_BANDS} Bands`;
-  document.getElementById('btn-add-band').disabled = bands.length >= MAX_BANDS;
-
-  bands.forEach((b, i) => {
-    b.band = i;
-    if (b.type === undefined) b.type = 0;
-    if (b.order === undefined) b.order = 2;
-    if (b.type === 5) { b.type = 3; b.order = 4; }
-    else if (b.type === 6) { b.type = 4; b.order = 4; }
-    const card = document.createElement('div');
-    card.className = 'band-card';
-    card.id = `band-card-${i}`;
-
-    // Header: Band # + Toggle dot + Remove btn
-    const hdr = document.createElement('div');
-    hdr.className = 'band-card-header';
-    hdr.innerHTML = `
-      <span class="band-id" style="color:${BAND_COLORS[i % BAND_COLORS.length]}">Band ${i + 1}</span>
-      <div class="band-actions">
-        <div class="band-dot ${b.enabled ? 'on' : ''}" id="band-dot-${i}" title="Toggle Band"></div>
-        ${bands.length > 1 ? `<button class="btn-icon" title="Remove Band" onclick="removeBand(${i})">✕</button>` : ''}
-      </div>
-    `;
-    card.appendChild(hdr);
-
-    // Toggle band dot event
-    hdr.querySelector(`#band-dot-${i}`).addEventListener('click', () => {
-      b.enabled = !b.enabled;
-      document.getElementById(`band-dot-${i}`).className = 'band-dot ' + (b.enabled ? 'on' : '');
-      sendBand(i);
-      drawResponse();
-    });
-
-    // Filter Type Dropdown
-    const typeRow = document.createElement('div');
-    typeRow.className = 'band-type-row';
-    typeRow.innerHTML = `
-      <select id="sel-type-${i}" class="band-type-select">
-        <option value="0" ${b.type === 0 ? 'selected' : ''}>Peaking</option>
-        <option value="1" ${b.type === 1 ? 'selected' : ''}>Low Shelf</option>
-        <option value="2" ${b.type === 2 ? 'selected' : ''}>High Shelf</option>
-        <option value="3" ${b.type === 3 ? 'selected' : ''}>Low Pass</option>
-        <option value="4" ${b.type === 4 ? 'selected' : ''}>High Pass</option>
-      </select>
-    `;
-    card.appendChild(typeRow);
-
-    // Filter Order Dropdown (shown for Low Pass and High Pass)
-    const orderRow = document.createElement('div');
-    orderRow.className = 'band-order-row';
-    orderRow.id = `order-row-${i}`;
-    orderRow.style.display = (b.type === 3 || b.type === 4) ? 'flex' : 'none';
-    orderRow.innerHTML = `
-      <select id="sel-order-${i}" class="band-order-select">
-        <option value="1" ${b.order === 1 ? 'selected' : ''}>1st (6 dB/oct)</option>
-        <option value="2" ${(b.order === 2 || !b.order) ? 'selected' : ''}>2nd (12 dB/oct)</option>
-        <option value="3" ${b.order === 3 ? 'selected' : ''}>3rd (18 dB/oct)</option>
-        <option value="4" ${b.order === 4 ? 'selected' : ''}>4th (24 dB/oct)</option>
-      </select>
-    `;
-    card.appendChild(orderRow);
-
-    // 1. Frequency Control
-    const colF = document.createElement('div');
-    colF.className = 'param-unit-col';
-    colF.innerHTML = `
-      <span class="param-unit-label">Freq (Hz)</span>
-      <canvas id="knob-f-${i}" class="knob" width="56" height="56"></canvas>
-      <input type="number" id="num-f-${i}" class="param-input-box" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
-    `;
-    card.appendChild(colF);
-
-    // 2. Gain Control
-    const colG = document.createElement('div');
-    colG.className = 'param-unit-col';
-    colG.id = `gain-col-${i}`;
-    colG.innerHTML = `
-      <span class="param-unit-label">Gain (dB)</span>
-      <canvas id="knob-g-${i}" class="knob" width="56" height="56"></canvas>
-      <input type="number" id="num-g-${i}" class="param-input-box" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}">
-    `;
-    card.appendChild(colG);
-
-    // 3. Q Control
-    const colQ = document.createElement('div');
-    colQ.className = 'param-unit-col';
-    colQ.id = `q-col-${i}`;
-    colQ.innerHTML = `
-      <span class="param-unit-label">Q Factor</span>
-      <canvas id="knob-q-${i}" class="knob" width="56" height="56"></canvas>
-      <input type="number" id="num-q-${i}" class="param-input-box" min="0.1" max="8" step="0.01" value="${b.q.toFixed(3)}">
-    `;
-    card.appendChild(colQ);
-
-    root.appendChild(card);
-
-    // Instantiate Frequency Knob
-    const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
-      min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
-      logScale: true, color: BAND_COLORS[i % BAND_COLORS.length],
-      decimals: 0,
-      onChange: v => {
-        b.freq = v;
-        card.querySelector(`#num-f-${i}`).value = Math.round(v);
-        sendBand(i);
-        drawResponse();
-      }
-    });
-
-    // Frequency Text Input Box Link
-    card.querySelector(`#num-f-${i}`).addEventListener('change', e => {
-      let v = parseFloat(e.target.value);
-      if (isNaN(v)) v = b.freq;
-      v = Math.max(20, Math.min(20000, v));
-      e.target.value = Math.round(v);
-      b.freq = v;
-      fKnob.set(v, false);
-      sendBand(i);
-      drawResponse();
-    });
-
-    // Instantiate Gain Knob (resets to 0.0)
-    const gKnob = new Knob(card.querySelector(`#knob-g-${i}`), {
-      min: -18, max: 18, value: b.gain, defaultVal: 0.0,
-      centerZero: true, color: BAND_COLORS[i % BAND_COLORS.length],
-      decimals: 1,
-      onChange: v => {
-        b.gain = v;
-        card.querySelector(`#num-g-${i}`).value = v.toFixed(1);
-        sendBand(i);
-        drawResponse();
-      }
-    });
-
-    // Helper to dim/disable gain knob & Q knob for Pass and Flat filter types
-    const updateBandParamStates = () => {
-      const isPassFilter = (b.type === 3 || b.type === 4);
-      const oRow = card.querySelector(`#order-row-${i}`);
-      if (oRow) {
-        oRow.style.display = isPassFilter ? 'flex' : 'none';
-      }
-
-      if (isPassFilter) {
-        colG.classList.add('disabled-param');
-        card.querySelector(`#num-g-${i}`).disabled = true;
-        b.gain = 0;
-        card.querySelector(`#num-g-${i}`).value = "0.0";
-        gKnob.set(0, false);
-
-        // For orders 1, 3, 4: Q is fixed flat (Butterworth). For order 2: Q can be adjusted
-        if (b.order === 2) {
-          colQ.classList.remove('disabled-param');
-          card.querySelector(`#num-q-${i}`).disabled = false;
-        } else {
-          colQ.classList.add('disabled-param');
-          card.querySelector(`#num-q-${i}`).disabled = true;
-        }
-      } else {
-        colG.classList.remove('disabled-param');
-        card.querySelector(`#num-g-${i}`).disabled = false;
-        colQ.classList.remove('disabled-param');
-        card.querySelector(`#num-q-${i}`).disabled = false;
-      }
-    };
-
-    // Filter Type Change Event
-    card.querySelector(`#sel-type-${i}`).addEventListener('change', e => {
-      b.type = parseInt(e.target.value) || 0;
-      updateBandParamStates();
-      sendBand(i);
-      drawResponse();
-    });
-
-    // Filter Order Change Event
-    card.querySelector(`#sel-order-${i}`).addEventListener('change', e => {
-      b.order = parseInt(e.target.value) || 2;
-      updateBandParamStates();
-      sendBand(i);
-      drawResponse();
-    });
-
-    // Initialize Gain & Q states based on current type & order
-    updateBandParamStates();
-
-    // Gain Text Input Box Link
-    card.querySelector(`#num-g-${i}`).addEventListener('change', e => {
-      let v = parseFloat(e.target.value);
-      if (isNaN(v)) v = b.gain;
-      v = Math.max(-18, Math.min(18, v));
-      e.target.value = v.toFixed(1);
-      b.gain = v;
-      gKnob.set(v, false);
-      sendBand(i);
-      drawResponse();
-    });
-
-    // Instantiate Q Knob (resets to 0.707 on double click!)
-    const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
-      min: 0.1, max: 8.0, value: b.q, defaultVal: 0.707,
-      color: '#81A1C1',
-      decimals: 3,
-      onChange: v => {
-        b.q = v;
-        card.querySelector(`#num-q-${i}`).value = v.toFixed(3);
-        sendBand(i);
-        drawResponse();
-      }
-    });
-
-    // Q Text Input Box Link
-    card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
-      let v = parseFloat(e.target.value);
-      if (isNaN(v)) v = b.q;
-      v = Math.max(0.1, Math.min(8.0, v));
-      e.target.value = v.toFixed(3);
-      b.q = v;
-      qKnob.set(v, false);
-      sendBand(i);
-      drawResponse();
-    });
-
-    bandKnobs.push({ fKnob, gKnob, qKnob });
-  });
-
-  drawResponse();
-}
+// ===========================================================
+let dragSourceIndex = null;
+let bandSendTimers = {};
 
 function sendBand(i) {
   const b = bands[i];
@@ -2600,6 +3536,670 @@ function sendBand(i) {
   });
 }
 
+function sendBandThrottled(i, immediate = false) {
+  if (immediate) {
+    if (bandSendTimers[i]) {
+      clearTimeout(bandSendTimers[i]);
+      delete bandSendTimers[i];
+    }
+    sendBand(i);
+    return;
+  }
+  if (!bandSendTimers[i]) {
+    sendBand(i);
+    bandSendTimers[i] = setTimeout(() => {
+      delete bandSendTimers[i];
+      sendBand(i);
+    }, 40);
+  }
+}
+
+function getBandTypeLabel(type) {
+  switch (type) {
+    case 0: return 'Peaking';
+    case 1: return 'Low Shelf';
+    case 2: return 'High Shelf';
+    case 3: return 'Low Pass';
+    case 4: return 'High Pass';
+    default: return 'Peaking';
+  }
+}
+
+function toggleBandMenu(i, event) {
+  if (event) event.stopPropagation();
+  const wrap = document.getElementById(`band-type-wrap-${i}`);
+  if (!wrap) return;
+  const wasOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
+    w.classList.remove('open');
+  });
+  if (!wasOpen) {
+    wrap.classList.add('open');
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.band-type-menu-wrap')) {
+    document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
+      w.classList.remove('open');
+    });
+  }
+});
+
+function selectBandFilter(i, type) {
+  const b = bands[i];
+  if (!b) return;
+  b.type = type;
+  if (type === 3 || type === 4) {
+    if (!b.order || b.order < 1 || b.order > 4) b.order = 2;
+  }
+
+  // Close menus
+  document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
+    w.classList.remove('open');
+  });
+
+  updateBandCardParamStates(i);
+  sendBand(i);
+  requestDrawResponse();
+}
+
+function updateBandCardParamStates(i) {
+  const b = bands[i];
+  if (!b) return;
+  const card = document.getElementById(`band-card-${i}`);
+  if (!card) return;
+
+  const gainCol = card.querySelector(`#gain-col-${i}`);
+  const qUnit = card.querySelector(`#q-col-${i}`);
+  const gSlider = card.querySelector(`#slider-g-${i}`);
+  const gNumInput = card.querySelector(`#num-g-${i}`);
+  const btnLabel = card.querySelector(`#type-btn-label-${i}`);
+  const qBadgeLbl = card.querySelector(`#lbl-q-${i}`);
+  const qNumInput = card.querySelector(`#num-q-${i}`);
+
+  if (btnLabel) {
+    btnLabel.textContent = getBandTypeLabel(b.type);
+  }
+
+  const menu = card.querySelector(`#band-type-menu-${i}`);
+  if (menu) {
+    menu.querySelectorAll('.band-menu-opt').forEach(el => el.classList.remove('selected'));
+    const opts = menu.querySelectorAll('.band-menu-opt');
+    if (opts[b.type]) opts[b.type].classList.add('selected');
+  }
+
+  const isPassFilter = (b.type === 3 || b.type === 4);
+  if (isPassFilter) {
+    if (gainCol) {
+      gainCol.style.opacity = '0.3';
+      gainCol.style.pointerEvents = 'none';
+    }
+    b.gain = 0;
+    if (gNumInput) gNumInput.value = "0.0";
+    if (gSlider) gSlider.value = 0;
+
+    if (qBadgeLbl) qBadgeLbl.textContent = 'SLOPE';
+    if (qNumInput) {
+      qNumInput.min = '6';
+      qNumInput.max = '24';
+      qNumInput.step = '6';
+      qNumInput.value = (b.order || 2) * 6;
+    }
+    if (bandKnobs[i] && bandKnobs[i].qKnob) {
+      bandKnobs[i].qKnob.configure({
+        min: 6, max: 24, step: 6, decimals: 0,
+        value: (b.order || 2) * 6
+      });
+    }
+  } else {
+    if (gainCol) {
+      gainCol.style.opacity = '1';
+      gainCol.style.pointerEvents = 'auto';
+    }
+    if (qBadgeLbl) qBadgeLbl.textContent = 'Q';
+    if (qNumInput) {
+      qNumInput.min = '0.1';
+      qNumInput.max = '8.0';
+      qNumInput.step = '0.01';
+      qNumInput.value = b.q.toFixed(2);
+    }
+    if (bandKnobs[i] && bandKnobs[i].qKnob) {
+      bandKnobs[i].qKnob.configure({
+        min: 0.1, max: 8.0, step: null, decimals: 2,
+        value: b.q
+      });
+    }
+  }
+}
+
+// ===========================================================
+// Bulk Band Selection & Action Card
+// ===========================================================
+let isSelectMode = false;
+let selectedBandIndices = new Set();
+
+function toggleSelectMode() {
+  if (isSelectMode) exitSelectMode();
+  else enterSelectMode();
+}
+
+function enterSelectMode() {
+  isSelectMode = true;
+  selectedBandIndices.clear();
+  const container = document.getElementById('bands-container');
+  if (container) container.classList.add('select-mode');
+  updateActionCardButtons();
+}
+
+function exitSelectMode() {
+  isSelectMode = false;
+  selectedBandIndices.clear();
+  const container = document.getElementById('bands-container');
+  if (container) container.classList.remove('select-mode');
+  document.querySelectorAll('.band-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.band-select-checkbox').forEach(cb => { cb.checked = false; });
+  updateActionCardButtons();
+}
+
+function toggleBandSelection(index) {
+  if (!isSelectMode) return;
+  if (selectedBandIndices.has(index)) {
+    selectedBandIndices.delete(index);
+  } else {
+    selectedBandIndices.add(index);
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  bands.forEach((_, i) => {
+    const card = document.getElementById(`band-card-${i}`);
+    const cb = card ? card.querySelector('.band-select-checkbox') : null;
+    const isSel = selectedBandIndices.has(i);
+    if (card) {
+      if (isSel) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
+    if (cb) cb.checked = isSel;
+  });
+  updateActionCardButtons();
+}
+
+function updateActionCardButtons() {
+  const btnTop = document.getElementById('btn-action-top');
+  const btnBottom = document.getElementById('btn-action-bottom');
+  if (!btnTop || !btnBottom) return;
+
+  if (isSelectMode) {
+    btnTop.innerHTML = '<span>Cancel</span>';
+    btnTop.disabled = false;
+    btnTop.classList.remove('btn-danger');
+
+    const count = selectedBandIndices.size;
+    btnBottom.innerHTML = `<span>Delete (${count})</span>`;
+    btnBottom.disabled = (count === 0 || count >= bands.length);
+    btnBottom.classList.add('btn-danger');
+  } else {
+    btnTop.innerHTML = '<span>Add band</span>';
+    btnTop.disabled = bands.length >= MAX_BANDS;
+    btnTop.classList.remove('btn-danger');
+
+    btnBottom.innerHTML = '<span>Select band</span>';
+    btnBottom.disabled = bands.length <= 1;
+    btnBottom.classList.remove('btn-danger');
+  }
+}
+
+function handleActionTopClick() {
+  if (isSelectMode) {
+    exitSelectMode();
+  } else {
+    addBand();
+  }
+}
+
+function handleActionBottomClick() {
+  if (isSelectMode) {
+    deleteSelectedBands();
+  } else {
+    enterSelectMode();
+  }
+}
+
+function deleteSelectedBands() {
+  if (selectedBandIndices.size === 0) return;
+  if (selectedBandIndices.size >= bands.length) {
+    alert("Cannot remove all bands. At least 1 band must remain.");
+    return;
+  }
+
+  // Sort descending so splicing doesn't shift earlier indices
+  const toDelete = Array.from(selectedBandIndices).sort((a, b) => b - a);
+  toDelete.forEach(idx => {
+    bands.splice(idx, 1);
+    wsTx({ t: 'remove_band', band: idx });
+  });
+
+  exitSelectMode();
+  rebuildBandsUI();
+  bands.forEach((_, idx) => sendBand(idx));
+  requestDrawResponse();
+}
+
+function rebuildBandsUI() {
+  const root = document.getElementById('bands-container');
+  if (!root) return;
+  root.innerHTML = '';
+  bandKnobs = [];
+
+  bands.forEach((b, i) => {
+    b.band = i;
+    if (b.type === undefined) b.type = 0;
+    if (b.order === undefined) b.order = 2;
+    if (b.type === 5) { b.type = 3; b.order = 4; }
+    else if (b.type === 6) { b.type = 4; b.order = 4; }
+
+    const bandColor = BAND_COLORS[i % BAND_COLORS.length];
+    const hsl = hexToHsl(bandColor);
+    // Rich saturated background tint (55-80% saturation, ~88% lightness)
+    const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+
+    const card = document.createElement('div');
+    card.className = 'band-card' + (b.enabled ? '' : ' band-bypassed');
+    card.id = `band-card-${i}`;
+
+    card.addEventListener('click', (e) => {
+      if (isSelectMode && !e.target.closest('button, input, svg')) {
+        toggleBandSelection(i);
+      }
+    });
+
+    // 1. Draggable Title Bar (Full width, transparent, no border)
+    const draggerBar = document.createElement('div');
+    draggerBar.className = 'band-dragger-titlebar';
+    draggerBar.setAttribute('draggable', 'true');
+    draggerBar.title = 'Drag to reorder band position';
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'band-select-checkbox';
+    chk.checked = selectedBandIndices.has(i);
+    chk.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleBandSelection(i);
+    });
+    draggerBar.appendChild(chk);
+
+    const grip = document.createElement('span');
+    grip.className = 'drag-grip';
+    grip.textContent = ':::';
+    draggerBar.appendChild(grip);
+
+    card.appendChild(draggerBar);
+
+    // Setup drag and drop events on title bar
+    draggerBar.addEventListener('dragstart', (e) => {
+      if (isSelectMode) {
+        e.preventDefault();
+        return;
+      }
+      dragSourceIndex = i;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', i);
+    });
+
+    draggerBar.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      document.querySelectorAll('.band-card').forEach(c => c.classList.remove('drag-over'));
+    });
+
+    card.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (dragSourceIndex === null || dragSourceIndex === i) return;
+      card.classList.add('drag-over');
+      e.dataTransfer.dropEffect = 'move';
+    });
+
+    card.addEventListener('dragleave', () => {
+      card.classList.remove('drag-over');
+    });
+
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      card.classList.remove('drag-over');
+      if (dragSourceIndex === null || dragSourceIndex === i) return;
+
+      const [movedBand] = bands.splice(dragSourceIndex, 1);
+      bands.splice(i, 0, movedBand);
+      dragSourceIndex = null;
+
+      bands.forEach((bd, idx) => {
+        bd.band = idx;
+        sendBand(idx);
+      });
+      rebuildBandsUI();
+      requestDrawResponse();
+    });
+
+    // 2. Centered Band Type 1-Level Dropdown
+    const typeRow = document.createElement('div');
+    typeRow.className = 'band-type-row';
+    const currentLabel = getBandTypeLabel(b.type);
+    typeRow.innerHTML = `
+      <div class="band-type-menu-wrap" id="band-type-wrap-${i}">
+        <button type="button" class="band-type-menu-btn" id="type-btn-${i}" onclick="toggleBandMenu(${i}, event)">
+          <span id="type-btn-label-${i}">${currentLabel}</span>
+          <span class="type-btn-caret">v</span>
+        </button>
+        <div class="band-type-dropdown" id="band-type-menu-${i}">
+          <div class="band-menu-opt ${b.type === 0 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 0)">Peaking</div>
+          <div class="band-menu-opt ${b.type === 1 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 1)">Low Shelf</div>
+          <div class="band-menu-opt ${b.type === 2 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 2)">High Shelf</div>
+          <div class="band-menu-opt ${b.type === 3 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 3)">Low Pass</div>
+          <div class="band-menu-opt ${b.type === 4 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 4)">High Pass</div>
+        </div>
+      </div>
+    `;
+    card.appendChild(typeRow);
+
+    // 3. Main Card Controls (Two-Column Layout matching reference image)
+    const mainGrid = document.createElement('div');
+    mainGrid.className = 'band-card-main-grid';
+
+    // Left Column: Vertical Gain Slider + Badge
+    const gainCol = document.createElement('div');
+    gainCol.className = 'band-gain-col';
+    gainCol.id = `gain-col-${i}`;
+    gainCol.innerHTML = `
+      <div class="band-slider-wrap">
+        <input type="range" id="slider-g-${i}" class="band-vslider" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}" orient="vertical">
+      </div>
+      <div class="card-val-badge">
+        <span class="badge-lbl">Gain</span>
+        <div class="badge-input-row">
+          <input type="number" id="num-g-${i}" class="badge-val-input" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}">
+        </div>
+      </div>
+    `;
+    mainGrid.appendChild(gainCol);
+
+    // Right Column: Q Knob + Freq Knob (with badges)
+    const knobsCol = document.createElement('div');
+    knobsCol.className = 'band-knobs-col';
+
+    // Q Unit
+    const qUnit = document.createElement('div');
+    qUnit.className = 'band-knob-unit';
+    qUnit.id = `q-col-${i}`;
+    const isPass = (b.type === 3 || b.type === 4);
+    qUnit.innerHTML = `
+      <svg id="knob-q-${i}" class="knob" width="54" height="54" viewBox="0 0 54 54"></svg>
+      <div class="card-val-badge">
+        <span class="badge-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
+        <div class="badge-input-row">
+          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '6' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? ((b.order || 2) * 6) : b.q.toFixed(2)}">
+          ${isPass ? '<span class="badge-unit">dB</span>' : ''}
+        </div>
+      </div>
+    `;
+    knobsCol.appendChild(qUnit);
+
+    // Freq Unit
+    const fUnit = document.createElement('div');
+    fUnit.className = 'band-knob-unit';
+    fUnit.id = `f-col-${i}`;
+    fUnit.innerHTML = `
+      <svg id="knob-f-${i}" class="knob" width="54" height="54" viewBox="0 0 54 54"></svg>
+      <div class="card-val-badge">
+        <span class="badge-lbl">Freq</span>
+        <div class="badge-input-row">
+          <input type="number" id="num-f-${i}" class="badge-val-input" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
+        </div>
+      </div>
+    `;
+    knobsCol.appendChild(fUnit);
+
+    mainGrid.appendChild(knobsCol);
+    card.appendChild(mainGrid);
+
+    // 4. Bottom Action Row: Bypass Button (centered to Gain) + Delete Button (centered to Knobs)
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'band-card-bottom-row';
+    bottomRow.innerHTML = `
+      <div class="band-card-bottom-col band-bottom-gain">
+        <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
+          </svg>
+        </button>
+      </div>
+      <div class="band-card-bottom-col band-bottom-knobs">
+        ${bands.length > 1 ? `
+        <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" onclick="removeBand(${i})" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>` : ''}
+      </div>
+    `;
+    card.appendChild(bottomRow);
+
+    // Apply color styling to card and bypass button
+    const applyBandCardStyle = () => {
+      const bypassBtn = card.querySelector(`#band-bypass-${i}`);
+      if (b.enabled) {
+        card.style.backgroundColor = cardBg;
+        card.style.borderColor = bandColor;
+        card.style.borderWidth = '3px';
+        if (bypassBtn) {
+          bypassBtn.style.color = 'var(--muted)';
+        }
+        card.classList.remove('band-bypassed');
+      } else {
+        card.style.backgroundColor = 'var(--nord5)';
+        card.style.borderColor = 'var(--border-strong)';
+        card.style.borderWidth = '3px';
+        if (bypassBtn) {
+          bypassBtn.style.color = 'var(--muted)';
+        }
+        card.classList.add('band-bypassed');
+      }
+    };
+
+    bottomRow.querySelector(`#band-bypass-${i}`).addEventListener('click', (e) => {
+      e.stopPropagation();
+      b.enabled = !b.enabled;
+      applyBandCardStyle();
+      sendBand(i);
+      requestDrawResponse();
+    });
+
+    applyBandCardStyle();
+    root.appendChild(card);
+
+    // Frequency Knob
+    const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
+      min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
+      logScale: true, color: bandColor,
+      decimals: 0,
+      onSlide: v => {
+        b.freq = v;
+        card.querySelector(`#num-f-${i}`).value = Math.round(v);
+        requestDrawResponse();
+      },
+      onApply: v => {
+        b.freq = v;
+        card.querySelector(`#num-f-${i}`).value = Math.round(v);
+        sendBand(i);
+        requestDrawResponse();
+      }
+    });
+
+    card.querySelector(`#num-f-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.freq;
+      v = Math.max(20, Math.min(20000, v));
+      e.target.value = Math.round(v);
+      b.freq = v;
+      fKnob.set(v, false);
+      sendBand(i);
+      requestDrawResponse();
+    });
+
+    // Q / Slope Knob
+    const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
+      min: isPass ? 6 : 0.1,
+      max: isPass ? 24 : 8.0,
+      step: isPass ? 6 : null,
+      value: isPass ? ((b.order || 2) * 6) : b.q,
+      defaultVal: isPass ? 12 : 0.707,
+      decimals: isPass ? 0 : 2,
+      onSlide: v => {
+        if (b.type === 3 || b.type === 4) {
+          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+          card.querySelector(`#num-q-${i}`).value = b.order * 6;
+        } else {
+          b.q = v;
+          card.querySelector(`#num-q-${i}`).value = v.toFixed(2);
+        }
+        requestDrawResponse();
+      },
+      onApply: v => {
+        if (b.type === 3 || b.type === 4) {
+          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+          card.querySelector(`#num-q-${i}`).value = b.order * 6;
+        } else {
+          b.q = v;
+          card.querySelector(`#num-q-${i}`).value = v.toFixed(2);
+        }
+        sendBand(i);
+        requestDrawResponse();
+      }
+    });
+
+    card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (b.type === 3 || b.type === 4) {
+        if (isNaN(v)) v = (b.order || 2) * 6;
+        v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
+        e.target.value = v;
+        b.order = Math.round(v / 6);
+        qKnob.set(v, false);
+      } else {
+        if (isNaN(v)) v = b.q;
+        v = Math.max(0.1, Math.min(8.0, v));
+        e.target.value = v.toFixed(2);
+        b.q = v;
+        qKnob.set(v, false);
+      }
+      sendBand(i);
+      requestDrawResponse();
+    });
+
+    // Gain Vertical Slider Link
+    const gSlider = card.querySelector(`#slider-g-${i}`);
+    const gNumInput = card.querySelector(`#num-g-${i}`);
+
+    gSlider.addEventListener('input', e => {
+      let v = parseFloat(e.target.value);
+      b.gain = v;
+      gNumInput.value = v.toFixed(1);
+      requestDrawResponse();
+    });
+
+    gSlider.addEventListener('change', () => {
+      sendBand(i);
+      requestDrawResponse();
+    });
+
+    gNumInput.addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.gain;
+      v = Math.max(-18, Math.min(18, v));
+      e.target.value = v.toFixed(1);
+      b.gain = v;
+      gSlider.value = v;
+      sendBand(i);
+      requestDrawResponse();
+    });
+
+    bandKnobs.push({ fKnob, qKnob });
+    updateBandCardParamStates(i);
+  });
+
+  // 5. Append EQ Actions Card (Add & Select / Delete) to the right end
+  const actionCard = document.createElement('div');
+  actionCard.className = 'eq-actions-card';
+  actionCard.id = 'eq-actions-card';
+  actionCard.innerHTML = `
+    <button type="button" class="btn-card-action" id="btn-action-top" onclick="handleActionTopClick()">
+      <span>Add band</span>
+    </button>
+    <button type="button" class="btn-card-action" id="btn-action-bottom" onclick="handleActionBottomClick()">
+      <span>Select band</span>
+    </button>
+  `;
+  root.appendChild(actionCard);
+
+  updateActionCardButtons();
+  requestDrawResponse();
+}
+
+function syncBandCardUI(i) {
+  const b = bands[i];
+  if (!b) return;
+  const card = document.getElementById(`band-card-${i}`);
+  if (!card) return;
+
+  const numF = card.querySelector(`#num-f-${i}`);
+  const numQ = card.querySelector(`#num-q-${i}`);
+  const numG = card.querySelector(`#num-g-${i}`);
+  const gSlider = card.querySelector(`#slider-g-${i}`);
+  const bypassBtn = card.querySelector(`#band-bypass-${i}`);
+
+  if (numF) numF.value = Math.round(b.freq);
+  if (numQ) {
+    if (b.type === 3 || b.type === 4) numQ.value = (b.order || 2) * 6;
+    else numQ.value = b.q.toFixed(2);
+  }
+  if (numG) numG.value = b.gain.toFixed(1);
+  if (gSlider) gSlider.value = b.gain.toFixed(1);
+  updateBandCardParamStates(i);
+
+  const bandColor = BAND_COLORS[i % BAND_COLORS.length];
+  const hsl = hexToHsl(bandColor);
+  const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+
+  if (b.enabled) {
+    card.style.backgroundColor = cardBg;
+    card.style.borderColor = bandColor;
+    card.style.borderWidth = '3px';
+    if (bypassBtn) {
+      bypassBtn.style.color = bandColor;
+    }
+    card.classList.remove('band-bypassed');
+  } else {
+    card.style.backgroundColor = 'var(--nord5)';
+    card.style.borderColor = 'var(--border-strong)';
+    card.style.borderWidth = '3px';
+    if (bypassBtn) {
+      bypassBtn.style.color = 'var(--muted)';
+    }
+    card.classList.add('band-bypassed');
+  }
+
+  if (bandKnobs[i]) {
+    if (bandKnobs[i].fKnob) bandKnobs[i].fKnob.setQuiet(b.freq);
+    if (bandKnobs[i].qKnob) {
+      if (b.type === 3 || b.type === 4) bandKnobs[i].qKnob.setQuiet((b.order || 2) * 6);
+      else bandKnobs[i].qKnob.setQuiet(b.q);
+    }
+  }
+}
+
 function addBand() {
   if (bands.length >= MAX_BANDS) return;
 
@@ -2613,8 +4213,9 @@ function addBand() {
     }
   }
 
+  const newIndex = bands.length;
   const newBand = {
-    band: bands.length,
+    band: newIndex,
     freq: nextFreq,
     gain: 0.0,
     q: 0.707,
@@ -2624,6 +4225,11 @@ function addBand() {
   };
   bands.push(newBand);
   rebuildBandsUI();
+
+  const container = document.getElementById('bands-container');
+  if (container) {
+    container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+  }
 
   wsTx({
     t: 'add_band',
@@ -2640,13 +4246,15 @@ function removeBand(index) {
   bands.splice(index, 1);
   rebuildBandsUI();
   wsTx({ t: 'remove_band', band: index });
+  bands.forEach((_, i) => sendBand(i));
+  requestDrawResponse();
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Module Bypass Controls
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 function updateBypassUI(mod, enabled) {
-  const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'comp' ? 'compander' : 'limiter')}`;
+  const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'subsonic' ? 'subsonic' : (mod === 'comp' ? 'compander' : 'limiter'))}`;
   const box = document.getElementById(boxId);
   const sw = document.getElementById(`switch-${mod}`);
 
@@ -2662,12 +4270,21 @@ function updateBypassUI(mod, enabled) {
 }
 
 function toggleModuleCollapse(mod) {
-  const boxId = (mod === 'input' || mod === 'bt-meta') ? `mod-${mod}` : `mod-${mod === 'eq' ? 'eq' : (mod === 'comp' ? 'compander' : 'limiter')}`;
+  const map = {
+    'eq': 'mod-eq',
+    'subsonic': 'mod-subsonic',
+    'comp': 'mod-compander',
+    'lim': 'mod-limiter',
+    'boot-cfg': 'mod-boot-cfg',
+    'input': 'mod-input',
+    'bt-meta': 'mod-bt-meta'
+  };
+  const boxId = map[mod] || `mod-${mod}`;
   const box = document.getElementById(boxId);
   if (!box) return;
   box.classList.toggle('collapsed');
   if (mod === 'eq' && !box.classList.contains('collapsed')) {
-    setTimeout(drawResponse, 60);
+    setTimeout(requestDrawResponse, 60);
   }
 }
 
@@ -2680,6 +4297,16 @@ function toggleEQModule(checked) {
   updateBypassUI('eq', eqEnabled);
   drawResponse();
   wsTx({ t: 'eq_module', enabled: eqEnabled });
+}
+
+function toggleSubsonicModule(checked) {
+  if (typeof checked === 'boolean') {
+    subsonicParams.enabled = checked;
+  } else {
+    subsonicParams.enabled = !subsonicParams.enabled;
+  }
+  updateBypassUI('subsonic', subsonicParams.enabled);
+  sendSubsonic();
 }
 
 function toggleCompanderModule(checked) {
@@ -2702,9 +4329,265 @@ function toggleLimiterModule(checked) {
   sendLimiter();
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
+// Subsonic Filter UI Binding
+// ===========================================================
+let subSendTimer = null;
+function sendSubsonicThrottled(immediate = false) {
+  if (immediate) {
+    if (subSendTimer) { clearTimeout(subSendTimer); subSendTimer = null; }
+    sendSubsonic();
+    return;
+  }
+  if (!subSendTimer) {
+    sendSubsonic();
+    subSendTimer = setTimeout(() => {
+      subSendTimer = null;
+      sendSubsonic();
+    }, 40);
+  }
+}
+
+function initSubsonicKnobs() {
+  // 1. Subsonic Frequency (20 to 100 Hz)
+  subsonicKnobs.freq = new Knob(document.getElementById('knob-sub-freq'), {
+    min: 20, max: 100, value: subsonicParams.freq, defaultVal: 80,
+    logScale: true, color: '#88C0D0', decimals: 0,
+    onChange: v => {
+      subsonicParams.freq = v;
+      document.getElementById('num-sub-freq').value = Math.round(v);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-sub-freq').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(20, Math.min(100, v));
+      subsonicParams.freq = v;
+      subsonicKnobs.freq.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  // 2. Stepped Slope (6, 12, 18, 24 dB)
+  subsonicKnobs.order = new Knob(document.getElementById('knob-sub-order'), {
+    min: 6, max: 24, step: 6, value: (subsonicParams.order || 2) * 6, defaultVal: 12,
+    decimals: 0,
+    onChange: v => {
+      const ord = Math.max(1, Math.min(4, Math.round(v / 6)));
+      subsonicParams.order = ord;
+      document.getElementById('num-sub-order').value = ord * 6;
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-sub-order').addEventListener('change', e => {
+    let v = parseInt(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
+      const ord = Math.max(1, Math.min(4, v / 6));
+      subsonicParams.order = ord;
+      e.target.value = ord * 6;
+      subsonicKnobs.order.set(ord * 6, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  // 3. Balance (-100 to +100, centerZero: true)
+  subsonicKnobs.balance = new Knob(document.getElementById('knob-spk-bal'), {
+    min: -100, max: 100, step: 1, value: subsonicParams.balance || 0, defaultVal: 0,
+    centerZero: true, decimals: 0, color: '#88C0D0',
+    onChange: v => {
+      subsonicParams.balance = Math.round(v);
+      document.getElementById('num-spk-bal').value = Math.round(v);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-bal').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-100, Math.min(100, Math.round(v)));
+      subsonicParams.balance = v;
+      subsonicKnobs.balance.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  // 4. Time Shift L (-20.0 to 20.0 ms, step 0.1)
+  subsonicKnobs.delayL = new Knob(document.getElementById('knob-spk-delay-l'), {
+    min: -20, max: 20, step: 0.1, value: subsonicParams.delayL || 0.0, defaultVal: 0.0,
+    centerZero: true, decimals: 1, color: '#81A1C1',
+    onChange: v => {
+      subsonicParams.delayL = parseFloat(v.toFixed(1));
+      document.getElementById('num-spk-delay-l').value = v.toFixed(1);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-delay-l').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-20, Math.min(20, Math.round(v * 10) / 10));
+      subsonicParams.delayL = v;
+      subsonicKnobs.delayL.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  // 5. Time Shift R (-20.0 to 20.0 ms, step 0.1)
+  subsonicKnobs.delayR = new Knob(document.getElementById('knob-spk-delay-r'), {
+    min: -20, max: 20, step: 0.1, value: subsonicParams.delayR || 0.0, defaultVal: 0.0,
+    centerZero: true, decimals: 1, color: '#81A1C1',
+    onChange: v => {
+      subsonicParams.delayR = parseFloat(v.toFixed(1));
+      document.getElementById('num-spk-delay-r').value = v.toFixed(1);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-delay-r').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-20, Math.min(20, Math.round(v * 10) / 10));
+      subsonicParams.delayR = v;
+      subsonicKnobs.delayR.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  // 6. Phase Shift L (-180, -135, -90, -45, 0, 45, 90, 135, 180 deg)
+  subsonicKnobs.phaseL = new Knob(document.getElementById('knob-spk-phase-l'), {
+    min: -180, max: 180, step: 45, value: subsonicParams.phaseL || 0, defaultVal: 0,
+    centerZero: true, decimals: 0, color: '#B48EAD',
+    onChange: v => {
+      const p = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseL = p;
+      document.getElementById('num-spk-phase-l').value = p;
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-phase-l').addEventListener('change', e => {
+    let v = parseInt(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseL = v;
+      e.target.value = v;
+      subsonicKnobs.phaseL.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  // 7. Phase Shift R (-180, -135, -90, -45, 0, 45, 90, 135, 180 deg)
+  subsonicKnobs.phaseR = new Knob(document.getElementById('knob-spk-phase-r'), {
+    min: -180, max: 180, step: 45, value: subsonicParams.phaseR || 0, defaultVal: 0,
+    centerZero: true, decimals: 0, color: '#B48EAD',
+    onChange: v => {
+      const p = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseR = p;
+      document.getElementById('num-spk-phase-r').value = p;
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-phase-r').addEventListener('change', e => {
+    let v = parseInt(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseR = v;
+      e.target.value = v;
+      subsonicKnobs.phaseR.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+}
+
+function syncSubsonicUI() {
+  if (subsonicKnobs.freq) {
+    subsonicKnobs.freq.setQuiet(subsonicParams.freq);
+    document.getElementById('num-sub-freq').value = Math.round(subsonicParams.freq);
+    const slopeDb = (subsonicParams.order || 2) * 6;
+    subsonicKnobs.order.setQuiet(slopeDb);
+    document.getElementById('num-sub-order').value = slopeDb;
+  }
+  if (subsonicKnobs.balance) {
+    subsonicKnobs.balance.setQuiet(subsonicParams.balance || 0);
+    const el = document.getElementById('num-spk-bal');
+    if (el) el.value = Math.round(subsonicParams.balance || 0);
+  }
+  if (subsonicKnobs.delayL) {
+    subsonicKnobs.delayL.setQuiet(subsonicParams.delayL || 0.0);
+    const el = document.getElementById('num-spk-delay-l');
+    if (el) el.value = (subsonicParams.delayL || 0.0).toFixed(1);
+  }
+  if (subsonicKnobs.delayR) {
+    subsonicKnobs.delayR.setQuiet(subsonicParams.delayR || 0.0);
+    const el = document.getElementById('num-spk-delay-r');
+    if (el) el.value = (subsonicParams.delayR || 0.0).toFixed(1);
+  }
+  if (subsonicKnobs.phaseL) {
+    subsonicKnobs.phaseL.setQuiet(subsonicParams.phaseL || 0);
+    const el = document.getElementById('num-spk-phase-l');
+    if (el) el.value = subsonicParams.phaseL || 0;
+  }
+  if (subsonicKnobs.phaseR) {
+    subsonicKnobs.phaseR.setQuiet(subsonicParams.phaseR || 0);
+    const el = document.getElementById('num-spk-phase-r');
+    if (el) el.value = subsonicParams.phaseR || 0;
+  }
+}
+
+function sendSubsonic() {
+  wsTx({
+    t: 'subsonic',
+    freq: subsonicParams.freq,
+    order: subsonicParams.order,
+    enabled: subsonicParams.enabled,
+    balance: subsonicParams.balance,
+    delayL: subsonicParams.delayL,
+    delayR: subsonicParams.delayR,
+    phaseL: subsonicParams.phaseL,
+    phaseR: subsonicParams.phaseR
+  });
+}
+
+// ===========================================================
 // Compander & Limiter UI Binding
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
+let compSendTimer = null;
+function sendCompanderThrottled(immediate = false) {
+  if (immediate) {
+    if (compSendTimer) { clearTimeout(compSendTimer); compSendTimer = null; }
+    sendCompander();
+    return;
+  }
+  if (!compSendTimer) {
+    sendCompander();
+    compSendTimer = setTimeout(() => {
+      compSendTimer = null;
+      sendCompander();
+    }, 40);
+  }
+}
+
+let limSendTimer = null;
+function sendLimiterThrottled(immediate = false) {
+  if (immediate) {
+    if (limSendTimer) { clearTimeout(limSendTimer); limSendTimer = null; }
+    sendLimiter();
+    return;
+  }
+  if (!limSendTimer) {
+    sendLimiter();
+    limSendTimer = setTimeout(() => {
+      limSendTimer = null;
+      sendLimiter();
+    }, 40);
+  }
+}
+
 function initCompanderKnobs() {
   // Threshold (-60 to 0)
   compKnobs.thresh = new Knob(document.getElementById('knob-comp-thresh'), {
@@ -2713,8 +4596,9 @@ function initCompanderKnobs() {
     onChange: v => {
       compParams.threshold = v;
       document.getElementById('num-comp-thresh').value = v.toFixed(1);
-      sendCompander();
-    }
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
   });
   document.getElementById('num-comp-thresh').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2722,7 +4606,7 @@ function initCompanderKnobs() {
       v = Math.max(-60, Math.min(0, v));
       compParams.threshold = v;
       compKnobs.thresh.set(v, false);
-      sendCompander();
+      sendCompanderThrottled(true);
     }
   });
 
@@ -2733,8 +4617,9 @@ function initCompanderKnobs() {
     onChange: v => {
       compParams.ratio = v;
       document.getElementById('num-comp-ratio').value = v.toFixed(1);
-      sendCompander();
-    }
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
   });
   document.getElementById('num-comp-ratio').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2742,7 +4627,7 @@ function initCompanderKnobs() {
       v = Math.max(1, Math.min(20, v));
       compParams.ratio = v;
       compKnobs.ratio.set(v, false);
-      sendCompander();
+      sendCompanderThrottled(true);
     }
   });
 
@@ -2753,8 +4638,9 @@ function initCompanderKnobs() {
     onChange: v => {
       compParams.attackMs = v;
       document.getElementById('num-comp-att').value = v.toFixed(1);
-      sendCompander();
-    }
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
   });
   document.getElementById('num-comp-att').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2762,7 +4648,7 @@ function initCompanderKnobs() {
       v = Math.max(0.1, Math.min(200, v));
       compParams.attackMs = v;
       compKnobs.att.set(v, false);
-      sendCompander();
+      sendCompanderThrottled(true);
     }
   });
 
@@ -2773,8 +4659,9 @@ function initCompanderKnobs() {
     onChange: v => {
       compParams.releaseMs = v;
       document.getElementById('num-comp-rel').value = Math.round(v);
-      sendCompander();
-    }
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
   });
   document.getElementById('num-comp-rel').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2782,7 +4669,7 @@ function initCompanderKnobs() {
       v = Math.max(10, Math.min(2000, v));
       compParams.releaseMs = v;
       compKnobs.rel.set(v, false);
-      sendCompander();
+      sendCompanderThrottled(true);
     }
   });
 
@@ -2793,8 +4680,9 @@ function initCompanderKnobs() {
     onChange: v => {
       compParams.makeup = v;
       document.getElementById('num-comp-gain').value = v.toFixed(1);
-      sendCompander();
-    }
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
   });
   document.getElementById('num-comp-gain').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2802,7 +4690,7 @@ function initCompanderKnobs() {
       v = Math.max(-12, Math.min(24, v));
       compParams.makeup = v;
       compKnobs.gain.set(v, false);
-      sendCompander();
+      sendCompanderThrottled(true);
     }
   });
 }
@@ -2842,8 +4730,9 @@ function initLimiterKnobs() {
     onChange: v => {
       limParams.ceiling = v;
       document.getElementById('num-lim-ceil').value = v.toFixed(1);
-      sendLimiter();
-    }
+      sendLimiterThrottled(false);
+    },
+    onEnd: () => sendLimiterThrottled(true)
   });
   document.getElementById('num-lim-ceil').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2851,7 +4740,7 @@ function initLimiterKnobs() {
       v = Math.max(-6, Math.min(0, v));
       limParams.ceiling = v;
       limKnobs.ceil.set(v, false);
-      sendLimiter();
+      sendLimiterThrottled(true);
     }
   });
 
@@ -2862,8 +4751,9 @@ function initLimiterKnobs() {
     onChange: v => {
       limParams.knee = v;
       document.getElementById('num-lim-knee').value = v.toFixed(1);
-      sendLimiter();
-    }
+      sendLimiterThrottled(false);
+    },
+    onEnd: () => sendLimiterThrottled(true)
   });
   document.getElementById('num-lim-knee').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -2871,7 +4761,7 @@ function initLimiterKnobs() {
       v = Math.max(0, Math.min(6, v));
       limParams.knee = v;
       limKnobs.knee.set(v, false);
-      sendLimiter();
+      sendLimiterThrottled(true);
     }
   });
 }
@@ -2894,15 +4784,35 @@ function sendLimiter() {
   });
 }
 
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 // Initialization
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 updateInputSourceUI();
 initPreamp();
 renderCustomPresets();
 rebuildBandsUI();
+initSubsonicKnobs();
 initCompanderKnobs();
 initLimiterKnobs();
+
+// Ensure initial module bypassed states are reliably reflected
+updateBypassUI('eq', eqEnabled);
+updateBypassUI('subsonic', subsonicParams.enabled);
+updateBypassUI('comp', compParams.enabled);
+updateBypassUI('lim', limParams.enabled);
+
+// Click anywhere on a badge box to instantly focus and select all numbers
+document.addEventListener('click', (e) => {
+  const badge = e.target.closest('.card-val-badge');
+  if (badge) {
+    const inp = badge.querySelector('input.badge-val-input');
+    if (inp) {
+      inp.focus();
+      setTimeout(() => inp.select(), 10);
+    }
+  }
+});
+
 wsConnect();
 </script>
 </body>
