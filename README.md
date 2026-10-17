@@ -1,6 +1,6 @@
 # ESP32-S3-DSP
 
-Real-time stereo digital audio processor on dual ESP32 microcontrollers. Combines an ESP32-S3 audio engine with an ESP32-WROOM Bluetooth co-processor, PCM1808 ADC, PCM5102A DAC, and responsive WebUI.
+Real-time stereo digital audio processor on dual ESP32 microcontrollers. Combines an ESP32-S3 audio engine with an ESP32-WROOM Bluetooth co-processor, PCM1808 ADC, PCM5102A DAC, and WebUI.
 
 ---
 
@@ -21,7 +21,7 @@ Phone / PC ----->|  AVRCP Metadata and Transport |
 AUX Line In ---->|  Input Selector:              |
  (PCM1808 ADC)   |   1. AUX Line In (PCM1808)    |
 Wi-Fi Stream --->|   2. Bluetooth A2DP           |
-(LMS / Roon)     |   3. Wi-Fi Lossless (SlimProto|
+                 |   3. Wi-Fi Lossless (SlimProto|
                  +-------------------------------+
                  |  Core 1: DSP Pipeline         |
                  |   - Preamp Gain Stage         |
