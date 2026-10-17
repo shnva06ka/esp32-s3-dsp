@@ -819,16 +819,14 @@ main {
   flex: 1;
   min-height: 0;
   width: 100%;
-  padding: 6px 0;
+  padding: 4px 0;
 }
 .preamp-slider {
   -webkit-appearance: slider-vertical;
-  writing-mode: vertical-lr;
-  direction: rtl;
-  width: 18px;
-  height: 100%;
-  max-height: 200px;
-  cursor: ns-resize;
+  writing-mode: bt-lr;
+  width: 22px;
+  height: 200px;
+  cursor: pointer;
   accent-color: #2E3440;
   background: transparent;
   border: none;
@@ -1183,6 +1181,7 @@ main {
 .preamp-slider::-webkit-slider-runnable-track,
 .band-vslider::-webkit-slider-runnable-track {
   width: 6px;
+  height: 100%;
   background: #FFFFFF;
   border: 1px solid rgba(76, 86, 106, 0.22);
   border-radius: 9999px;
@@ -1191,6 +1190,7 @@ main {
 .preamp-slider::-moz-range-track,
 .band-vslider::-moz-range-track {
   width: 6px;
+  height: 100%;
   background: #FFFFFF;
   border: 1px solid rgba(76, 86, 106, 0.22);
   border-radius: 9999px;
