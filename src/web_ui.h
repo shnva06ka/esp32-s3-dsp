@@ -196,6 +196,7 @@ private:
             case WS_EVT_CONNECT:
                 Serial.printf("[WS] Client #%u connected from %s\n",
                               client->id(), client->remoteIP().toString().c_str());
+                client->setCloseClientOnQueueFull(false);
                 client->text(_buildStateJson());
                 client->text(_buildSysJson());
                 client->text(_buildBtMetaJson(_params.getBluetoothMetadata()));
@@ -206,8 +207,7 @@ private:
             case WS_EVT_DATA: {
                 auto* info = static_cast<AwsFrameInfo*>(arg);
                 if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
-                    data[len] = 0;
-                    _handleWsMessage(client, reinterpret_cast<char*>(data));
+                    _handleWsMessage(client, reinterpret_cast<const char*>(data), len);
                 }
                 break;
             }
@@ -217,9 +217,9 @@ private:
     }
 
     // -- Inbound WS message dispatcher ------------------------
-    void _handleWsMessage(AsyncWebSocketClient* client, const char* json) {
-        StaticJsonDocument<384> doc;
-        if (deserializeJson(doc, json) != DeserializationError::Ok) return;
+    void _handleWsMessage(AsyncWebSocketClient* client, const char* json, size_t len) {
+        StaticJsonDocument<512> doc;
+        if (deserializeJson(doc, json, len) != DeserializationError::Ok) return;
 
         const char* t = doc["t"] | "";
 
@@ -227,7 +227,7 @@ private:
             _handleEQMsg(doc);
             _ws.textAll(_buildStateJson());
         }
-        else if (strcmp(t, "eq_toggle") == 0) {
+        else if (strcmp(t, "eq_toggle") == 0 || strcmp(t, "eq_module") == 0) {
             if (doc.containsKey("enabled")) {
                 _params.setEQEnabled(doc["enabled"].as<bool>());
             }
@@ -312,7 +312,7 @@ private:
     }
 
     // -- EQ message handler -----------------------------------
-    void _handleEQMsg(const StaticJsonDocument<384>& doc) {
+    void _handleEQMsg(const JsonDocument& doc) {
         const int band = doc["band"] | -1;
         if (band < 0 || band >= kEQBands) return;
 
@@ -342,7 +342,7 @@ private:
     }
 
     // -- Speakers correction (Subsonic + Channel correction) message handler --
-    void _handleSubsonicMsg(const StaticJsonDocument<384>& doc) {
+    void _handleSubsonicMsg(const JsonDocument& doc) {
         SubsonicParams p = _params.getSubsonic();
         if (doc.containsKey("freq"))    p.freq     = doc["freq"].as<float>();
         if (doc.containsKey("order"))   p.order    = doc["order"].as<uint8_t>();
@@ -365,7 +365,7 @@ private:
     }
 
     // -- Compander message handler ----------------------------
-    void _handleCompanderMsg(const StaticJsonDocument<384>& doc) {
+    void _handleCompanderMsg(const JsonDocument& doc) {
         CompanderParams p = _params.getCompander();
         if (doc.containsKey("threshold")) p.threshold  = doc["threshold"].as<float>();
         if (doc.containsKey("ratio"))     p.ratio      = doc["ratio"].as<float>();
@@ -377,7 +377,7 @@ private:
     }
 
     // -- Limiter message handler ------------------------------
-    void _handleLimiterMsg(const StaticJsonDocument<384>& doc) {
+    void _handleLimiterMsg(const JsonDocument& doc) {
         LimiterParams p = _params.getLimiter();
         if (doc.containsKey("ceiling")) p.ceilingDb = doc["ceiling"].as<float>();
         if (doc.containsKey("knee"))    p.kneeDb    = doc["knee"].as<float>();
@@ -387,7 +387,7 @@ private:
 
     // -- JSON builder -----------------------------------------
     String _buildStateJson() {
-        DynamicJsonDocument doc(3072);
+        DynamicJsonDocument doc(4096);
         doc["t"] = "state";
 
         // Input Source Module

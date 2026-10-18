@@ -2392,10 +2392,11 @@ function wsConnect() {
       setDot('ok', 'Connected');
       wsTx({ t: 'getState' });
     };
-    ws.onclose = () => {
+    ws.onclose = e => {
+      console.log('[WS] Disconnected, code:', e.code, 'reason:', e.reason);
       setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting...');
       ws = null;
-      wsRetry = setTimeout(wsConnect, 3000);
+      wsRetry = setTimeout(wsConnect, 1500);
     };
     ws.onerror = () => {
       setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Error');
@@ -4296,7 +4297,7 @@ function toggleEQModule(checked) {
   }
   updateBypassUI('eq', eqEnabled);
   drawResponse();
-  wsTx({ t: 'eq_module', enabled: eqEnabled });
+  wsTx({ t: 'eq_toggle', enabled: eqEnabled });
 }
 
 function toggleSubsonicModule(checked) {

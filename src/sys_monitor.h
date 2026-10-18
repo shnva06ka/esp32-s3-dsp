@@ -8,8 +8,8 @@ private:
     struct State {
         volatile uint32_t idleCount0{0};
         volatile uint32_t idleCount1{0};
-        uint32_t          maxIdleRate0{8000000};
-        uint32_t          maxIdleRate1{8000000};
+        uint32_t          maxIdleRate0{0};
+        uint32_t          maxIdleRate1{0};
         unsigned long     lastSampleTime{0};
         float             cpu0Usage{0.0f};
         float             cpu1Usage{0.0f};
@@ -85,14 +85,14 @@ public:
 
         if (_s().maxIdleRate0 > 1000) {
             float idlePct0 = ((float)rate0 / (float)_s().maxIdleRate0) * 100.0f;
-            float usage0 = 100.0f - idlePct0;
-            _s().cpu0Usage = _clamp(usage0, 0.0f, 100.0f);
+            float raw0 = _clamp(100.0f - idlePct0, 0.0f, 100.0f);
+            _s().cpu0Usage = (_s().cpu0Usage * 0.4f) + (raw0 * 0.6f);
         }
 
         if (_s().maxIdleRate1 > 1000) {
             float idlePct1 = ((float)rate1 / (float)_s().maxIdleRate1) * 100.0f;
-            float usage1 = 100.0f - idlePct1;
-            _s().cpu1Usage = _clamp(usage1, 0.0f, 100.0f);
+            float raw1 = _clamp(100.0f - idlePct1, 0.0f, 100.0f);
+            _s().cpu1Usage = (_s().cpu1Usage * 0.4f) + (raw1 * 0.6f);
         }
     }
 };
