@@ -108,6 +108,11 @@ void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
 }
 
 // ── Callbacks for state monitoring ───────────────────────────
+void avrc_volume_change_callback(int vol) {
+    Serial.printf("[AVRC] Volume changed to %d -> enforcing 100%% (127)\n", vol);
+    a2dp_sink.set_volume(127);
+}
+
 void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
     switch (state) {
         case ESP_A2D_CONNECTION_STATE_DISCONNECTED:
@@ -124,6 +129,7 @@ void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
         case ESP_A2D_CONNECTION_STATE_CONNECTED:
             Serial.println("[BT] Connected to Bluetooth source!");
             g_btState = BT_CONNECTED_IDLE;
+            a2dp_sink.set_volume(127); // Enforce 100% volume on connection
             g_metadataChanged = true;
             break;
         case ESP_A2D_CONNECTION_STATE_DISCONNECTING:
@@ -195,6 +201,11 @@ void setup() {
     a2dp_sink.set_pin_config(pin_config);
     a2dp_sink.set_i2s_config(i2s_config);
 
+    // Hardcode Bluetooth audio to 100% (disable internal digital attenuation)
+    static A2DPNoVolumeControl no_vol;
+    a2dp_sink.set_volume_control(&no_vol);
+    a2dp_sink.set_avrc_rn_volumechange(avrc_volume_change_callback);
+
     // Register callbacks and request attributes
     a2dp_sink.set_avrc_metadata_attribute_mask(
         ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST |
@@ -207,7 +218,8 @@ void setup() {
 
     // Start Bluetooth A2DP Sink
     a2dp_sink.start(BT_DEV_NAME);
-    Serial.println("[INIT] Bluetooth A2DP Sink started successfully.");
+    a2dp_sink.set_volume(127); // Always enforce 100% volume
+    Serial.println("[INIT] Bluetooth A2DP Sink started successfully (Volume locked at 100%).");
     Serial.println("[INIT] Connect your phone/PC to 'ESP32-DSP-BT'.");
 
     // Send initial metadata snapshot
