@@ -87,6 +87,12 @@ private:
     // Wi-Fi Stream ring buffer (16384 frames = ~341 ms buffer at 48kHz)
     AudioRingBuffer<16384> _wifiRingBuffer;
 
+    // Bluetooth Stream ring buffer & 44.1kHz -> 48.0kHz resampler state
+    AudioRingBuffer<8192>  _btRingBuffer;
+    float                  _btLastL{0.0f};
+    float                  _btLastR{0.0f};
+    float                  _btResampPhase{0.0f};
+
     // Crossfade gain states (0.0 to 1.0)
     float _gainAux{1.0f};
     float _gainBt{0.0f};
@@ -105,5 +111,6 @@ private:
 
     void  _allocBuffers();
     void  _freeBuffers();
+    void  _resampleAndWriteBt(size_t frames);
     float _calcRMS(const float* buf, size_t n) const;
 };

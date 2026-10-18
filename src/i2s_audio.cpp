@@ -109,7 +109,6 @@ void I2SAudio::process(const AudioCallback& cb)
     esp_err_t errAux = i2s_read(kI2SPortMaster, _rxBufAux, byteCount, &bytesReadAux, pdMS_TO_TICKS(20));
     if (errAux != ESP_OK || bytesReadAux == 0) {
         memset(_rxBufAux, 0, byteCount);
-        vTaskDelay(pdMS_TO_TICKS(1));
     }
 
     for (size_t i = 0; i < kBufferFrames; ++i) {
@@ -119,44 +118,18 @@ void I2SAudio::process(const AudioCallback& cb)
     _rmsAuxL = _calcRMS(_leftAux,  kBufferFrames);
     _rmsAuxR = _calcRMS(_rightAux, kBufferFrames);
 
-    // -- 2. Read Bluetooth from I2S_NUM_1 (Slave RX) -----------
-    // Non-blocking read (timeout = 0) so lack of external clock never stalls Core 1
+    // -- 2. Read Bluetooth from I2S_NUM_1 (Slave RX) into Ring Buffer --
+    // Drain incoming 44.1kHz / 32-bit DMA frames, resample to 48.0kHz, and store in _btRingBuffer
     size_t bytesReadBt = 0;
-    i2s_read(kI2SPortSlave, _rxBufBt, byteCount, &bytesReadBt, 0);
-
-    // In non-blocking mode, i2s_read can return ESP_ERR_TIMEOUT with partial bytes.
-    // Preserve all valid received frames; pad only the trailing unread frames with silence.
-    size_t framesReadBt = bytesReadBt / (kChannels * sizeof(int32_t));
-    if (framesReadBt > kBufferFrames) framesReadBt = kBufferFrames;
-
-    for (size_t i = framesReadBt; i < kBufferFrames; ++i) {
-        _rxBufBt[i * 2    ] = 0;
-        _rxBufBt[i * 2 + 1] = 0;
+    while (i2s_read(kI2SPortSlave, _rxBufBt, byteCount, &bytesReadBt, 0) == ESP_OK && bytesReadBt > 0) {
+        size_t frames = bytesReadBt / (kChannels * sizeof(int32_t));
+        _resampleAndWriteBt(frames);
     }
 
-    // Inspect peak integer amplitude to handle 32-bit MSB (expanded) vs 16-bit LSB formats
-    int32_t maxAbsBt = 0;
-    for (size_t i = 0; i < framesReadBt; ++i) {
-        int32_t aL = std::abs(_rxBufBt[i * 2    ]);
-        int32_t aR = std::abs(_rxBufBt[i * 2 + 1]);
-        if (aL > maxAbsBt) maxAbsBt = aL;
-        if (aR > maxAbsBt) maxAbsBt = aR;
-    }
-
-    // Adaptive scale factor:
-    // If audio is expanded to 32-bit (via i2s_write_expand), peak > 32767.
-    // If audio is unshifted 16-bit in lower bits, peak <= 32767.
-    const float btScale = (maxAbsBt > 32767) ? (1.0f / 2147483648.0f) : (1.0f / 32768.0f);
-
-    for (size_t i = 0; i < kBufferFrames; ++i) {
-        _leftBt[i]  = static_cast<float>(_rxBufBt[i * 2    ]) * btScale;
-        _rightBt[i] = static_cast<float>(_rxBufBt[i * 2 + 1]) * btScale;
-    }
-
-    // Compute RMS from valid frames (or silence if 0 frames)
-    _rmsBtL = (framesReadBt > 0) ? _calcRMS(_leftBt, framesReadBt) : 0.0f;
-    _rmsBtR = (framesReadBt > 0) ? _calcRMS(_rightBt, framesReadBt) : 0.0f;
-    const float btMaxRms = (_rmsBtL > _rmsBtR) ? _rmsBtL : _rmsBtR;
+    // Read 256 resampled 48.0kHz frames for DSP pipeline
+    _btRingBuffer.read(_leftBt, _rightBt, kBufferFrames);
+    _rmsBtL = _calcRMS(_leftBt, kBufferFrames);
+    _rmsBtR = _calcRMS(_rightBt, kBufferFrames);
 
     // -- 3. Read Wi-Fi Stream stub from Ring Buffer ------------
     _wifiRingBuffer.read(_leftWifi, _rightWifi, kBufferFrames);
@@ -276,4 +249,47 @@ float I2SAudio::_calcRMS(const float* buf, size_t n) const
     float sum = 0.0f;
     for (size_t i = 0; i < n; ++i) sum += buf[i] * buf[i];
     return (n > 0) ? sqrtf(sum / static_cast<float>(n)) : 0.0f;
+}
+
+void I2SAudio::_resampleAndWriteBt(size_t frames)
+{
+    if (frames == 0) return;
+
+    // Prevent buffer latency growth beyond ~85ms (4096 frames)
+    if (_btRingBuffer.available() > 4096) {
+        float dropL[256], dropR[256];
+        _btRingBuffer.read(dropL, dropR, 256);
+    }
+
+    float resampL[512];
+    float resampR[512];
+    size_t outCount = 0;
+    constexpr float step = 44100.0f / 48000.0f; // 0.91875f
+
+    for (size_t i = 0; i < frames; ++i) {
+        float curL = static_cast<float>(_rxBufBt[i * 2    ]) * kScale;
+        float curR = static_cast<float>(_rxBufBt[i * 2 + 1]) * kScale;
+
+        while (_btResampPhase < 1.0f && outCount < 512) {
+            resampL[outCount] = _btLastL + _btResampPhase * (curL - _btLastL);
+            resampR[outCount] = _btLastR + _btResampPhase * (curR - _btLastR);
+            outCount++;
+            _btResampPhase += step;
+        }
+
+        if (_btResampPhase >= 1.0f) {
+            _btResampPhase -= 1.0f;
+        }
+        _btLastL = curL;
+        _btLastR = curR;
+
+        if (outCount >= 480) {
+            _btRingBuffer.write(resampL, resampR, outCount);
+            outCount = 0;
+        }
+    }
+
+    if (outCount > 0) {
+        _btRingBuffer.write(resampL, resampR, outCount);
+    }
 }
