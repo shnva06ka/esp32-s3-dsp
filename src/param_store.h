@@ -154,6 +154,13 @@ public:
                     _eqEnabled = prefs.getBool("eq_en", false);
                 }
 
+                String savedOrder = prefs.getString("mod_order", "eq,subsonic,comp,lim");
+                if (savedOrder.length() > 0) {
+                    strncpy(_moduleOrder, savedOrder.c_str(), sizeof(_moduleOrder) - 1);
+                    _moduleOrder[sizeof(_moduleOrder) - 1] = '\0';
+                }
+                _orderVersion++;
+
                 _eqVersion++;
                 _subsonicVersion++;
                 _compVersion++;
@@ -189,6 +196,7 @@ public:
         prefs.putBool("boot_sub", _bootSubsonic);
         prefs.putBool("boot_comp", _bootComp);
         prefs.putBool("boot_lim", _bootLim);
+        prefs.putString("mod_order", _moduleOrder);
         prefs.end();
         _dirty = false;
         xSemaphoreGive(_mutex);
@@ -236,6 +244,47 @@ public:
         _bootSubsonic       = subsonic;
         _dirty              = true;
         _lastDirtyTime      = millis();
+        xSemaphoreGive(_mutex);
+    }
+
+    // -- Module Execution Order -------------------------------
+    String getModuleOrder() const {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        String s = _moduleOrder;
+        xSemaphoreGive(_mutex);
+        return s;
+    }
+
+    void getModuleOrder(char* dest, size_t maxLen) const {
+        if (!dest || maxLen == 0) return;
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        strncpy(dest, _moduleOrder, maxLen - 1);
+        dest[maxLen - 1] = '\0';
+        xSemaphoreGive(_mutex);
+    }
+
+    bool getModuleOrderIfChanged(char* dest, size_t maxLen, uint32_t& localVersion) const {
+        if (!dest || maxLen == 0) return false;
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        if (localVersion == _orderVersion) {
+            xSemaphoreGive(_mutex);
+            return false;
+        }
+        strncpy(dest, _moduleOrder, maxLen - 1);
+        dest[maxLen - 1] = '\0';
+        localVersion = _orderVersion;
+        xSemaphoreGive(_mutex);
+        return true;
+    }
+
+    void setModuleOrder(const char* order) {
+        if (!order || strlen(order) == 0) return;
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        strncpy(_moduleOrder, order, sizeof(_moduleOrder) - 1);
+        _moduleOrder[sizeof(_moduleOrder) - 1] = '\0';
+        _orderVersion++;
+        _dirty = true;
+        _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
     }
 
@@ -608,6 +657,8 @@ private:
     uint32_t                  _inputVersion{1};
     uint32_t                  _btMetaVersion{1};
     uint32_t                  _wifiMetaVersion{1};
+    char                      _moduleOrder[64]{"eq,subsonic,comp,lim"};
+    uint32_t                  _orderVersion{1};
 
     void _loadDefaults() {
         // Default 5 initial bands: Low Shelf (100 Hz), 3 Peaking (500, 1000, 4000 Hz), High Shelf (10000 Hz)
@@ -638,5 +689,7 @@ private:
         _bootSubsonic       = false;
         _bootComp           = false;
         _bootLim            = false;
+        strncpy(_moduleOrder, "eq,subsonic,comp,lim", sizeof(_moduleOrder) - 1);
+        _moduleOrder[sizeof(_moduleOrder) - 1] = '\0';
     }
 };

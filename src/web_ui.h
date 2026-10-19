@@ -306,6 +306,26 @@ private:
             _params.save();
             _ws.textAll(_buildStateJson());
         }
+        else if (strcmp(t, "module_order") == 0) {
+            String orderStr = "";
+            if (doc["order"].is<JsonArray>()) {
+                JsonArray arr = doc["order"].as<JsonArray>();
+                for (JsonVariant v : arr) {
+                    const char* name = v.as<const char*>();
+                    if (name && strlen(name) > 0) {
+                        if (orderStr.length() > 0) orderStr += ",";
+                        orderStr += name;
+                    }
+                }
+            } else if (doc["order"].is<const char*>()) {
+                orderStr = doc["order"].as<const char*>();
+            }
+            if (orderStr.length() > 0) {
+                _params.setModuleOrder(orderStr.c_str());
+                _params.save();
+                _ws.textAll(_buildStateJson());
+            }
+        }
         else if (strcmp(t, "getState") == 0) {
             client->text(_buildStateJson());
         }
@@ -453,6 +473,19 @@ private:
         bootObj["sub"]      = bSub;
         bootObj["comp"]     = bComp;
         bootObj["lim"]      = bLim;
+
+        // Module Execution Order
+        String orderStr = _params.getModuleOrder();
+        JsonArray orderArr = doc.createNestedArray("module_order");
+        int startIdx = 0;
+        while (startIdx < orderStr.length()) {
+            int comma = orderStr.indexOf(',', startIdx);
+            if (comma < 0) comma = orderStr.length();
+            String item = orderStr.substring(startIdx, comma);
+            item.trim();
+            if (item.length() > 0) orderArr.add(item);
+            startIdx = comma + 1;
+        }
 
         // Bluetooth Metadata Module
         auto bt = _params.getBluetoothMetadata();

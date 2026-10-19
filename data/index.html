@@ -580,6 +580,55 @@ main {
 .module-box.collapsed .module-header {
   border-bottom: none;
 }
+#dsp-modules-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+.module-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.module-dragger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  width: 34px;
+  height: 34px;
+  background: #6C7A89;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 800;
+  font-family: var(--mono);
+  border-radius: 4px;
+  cursor: grab;
+  cursor: -webkit-grab;
+  user-select: none;
+  touch-action: none;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.module-dragger:hover {
+  background: #4C566A;
+  transform: scale(1.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+.module-dragger:active {
+  cursor: grabbing;
+  cursor: -webkit-grabbing;
+  background: #5E81AC;
+  color: #ECEFF4;
+}
+.module-box.dragging {
+  opacity: 0.45;
+  transform: scale(0.995);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  border: 2px dashed #88C0D0;
+}
 .module-title-area {
   display: flex;
   align-items: center;
@@ -1666,16 +1715,26 @@ footer {
   </section>
 
   <!-- ======================================================= -->
-  <!-- MODULE 1: PARAMETRIC EQUALIZER                          -->
+  <!-- DYNAMIC DSP SIGNAL PROCESSING PIPELINE CONTAINER        -->
   <!-- ======================================================= -->
-  <section class="module-box bypassed" id="mod-eq">
+  <div id="dsp-modules-container">
+
+  <!-- ======================================================= -->
+  <!-- MODULE: PARAMETRIC EQUALIZER                            -->
+  <!-- ======================================================= -->
+  <section class="module-box bypassed" id="mod-eq" data-module="eq">
     <div class="module-header" onclick="toggleModuleCollapse('eq')">
-      <div class="module-title-area">
-        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-eq" onchange="toggleEQModule(this.checked)">
-          <span class="slider"></span>
-        </label>
-        <span class="module-title">Parametric Equalizer</span>
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <span class="dragger-num">1</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-eq" onchange="toggleEQModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Parametric Equalizer</span>
+        </div>
       </div>
       <span class="collapse-icon">▼</span>
     </div>
@@ -1722,16 +1781,21 @@ footer {
   </section>
 
   <!-- ======================================================= -->
-  <!-- MODULE 2: COMPRESSOR                                    -->
+  <!-- MODULE: COMPRESSOR                                      -->
   <!-- ======================================================= -->
-  <section class="module-box bypassed" id="mod-compander">
+  <section class="module-box bypassed" id="mod-compander" data-module="comp">
     <div class="module-header" onclick="toggleModuleCollapse('comp')">
-      <div class="module-title-area">
-        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-comp" onchange="toggleCompanderModule(this.checked)">
-          <span class="slider"></span>
-        </label>
-        <span class="module-title">Compressor</span>
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <span class="dragger-num">2</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-comp" onchange="toggleCompanderModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Compressor</span>
+        </div>
       </div>
       <span class="collapse-icon">▼</span>
     </div>
@@ -1797,16 +1861,21 @@ footer {
   </section>
 
   <!-- ======================================================= -->
-  <!-- MODULE 3: LIMITER                                       -->
+  <!-- MODULE: LIMITER                                         -->
   <!-- ======================================================= -->
-  <section class="module-box bypassed" id="mod-limiter">
+  <section class="module-box bypassed" id="mod-limiter" data-module="lim">
     <div class="module-header" onclick="toggleModuleCollapse('lim')">
-      <div class="module-title-area">
-        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-lim" onchange="toggleLimiterModule(this.checked)">
-          <span class="slider"></span>
-        </label>
-        <span class="module-title">Limiter</span>
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <span class="dragger-num">3</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-lim" onchange="toggleLimiterModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Limiter</span>
+        </div>
       </div>
       <span class="collapse-icon">▼</span>
     </div>
@@ -1841,14 +1910,19 @@ footer {
   <!-- ======================================================= -->
   <!-- MODULE: SPEAKERS CORRECTION                             -->
   <!-- ======================================================= -->
-  <section class="module-box bypassed" id="mod-subsonic">
+  <section class="module-box bypassed" id="mod-subsonic" data-module="subsonic">
     <div class="module-header" onclick="toggleModuleCollapse('subsonic')">
-      <div class="module-title-area">
-        <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
-          <input type="checkbox" id="switch-subsonic" onchange="toggleSubsonicModule(this.checked)">
-          <span class="slider"></span>
-        </label>
-        <span class="module-title">Speakers correction</span>
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <span class="dragger-num">4</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-subsonic" onchange="toggleSubsonicModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Speakers correction</span>
+        </div>
       </div>
       <span class="collapse-icon">▼</span>
     </div>
@@ -1948,6 +2022,7 @@ footer {
       </div>
     </div>
   </section>
+  </div> <!-- /#dsp-modules-container -->
 
   <!-- ======================================================= -->
   <!-- MODULE 4: STARTUP EFFECTS CONFIGURATION                 -->
@@ -2617,6 +2692,10 @@ function handleMsg(d) {
     updateBootConfigUI();
   }
 
+  if (d.module_order && !isDraggingModule) {
+    applyModuleOrder(d.module_order);
+  }
+
   drawResponse();
 }
 
@@ -2677,6 +2756,132 @@ function saveCurrentAsBootDefaults() {
 
   updateBootConfigUI();
   sendBootDefaults();
+}
+
+// -- Dynamic DSP Module Reordering ---------------------------
+let isDraggingModule = false;
+let draggedModuleBox = null;
+let lastSentModuleOrder = '';
+
+function getCurrentModuleOrder() {
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return [];
+  return [...container.querySelectorAll('.module-box[data-module]')].map(el => el.getAttribute('data-module')).filter(Boolean);
+}
+
+function updateDraggerNumbers() {
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return;
+  const modules = container.querySelectorAll('.module-box[data-module]');
+  modules.forEach((mod, idx) => {
+    const numEl = mod.querySelector('.dragger-num');
+    if (numEl) numEl.textContent = (idx + 1);
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const draggableElements = [...container.querySelectorAll('.module-box[data-module]:not(.dragging)')];
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function initModuleReordering() {
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return;
+
+  const draggers = container.querySelectorAll('.module-dragger');
+  draggers.forEach(dragger => {
+    dragger.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const box = dragger.closest('.module-box');
+      if (!box) return;
+
+      isDraggingModule = true;
+      draggedModuleBox = box;
+      box.classList.add('dragging');
+
+      try {
+        dragger.setPointerCapture(e.pointerId);
+      } catch (_) {}
+
+      const onPointerMove = (ev) => {
+        if (!isDraggingModule || !draggedModuleBox) return;
+        ev.preventDefault();
+        const afterElement = getDragAfterElement(container, ev.clientY);
+        if (afterElement == null) {
+          container.appendChild(draggedModuleBox);
+        } else if (afterElement !== draggedModuleBox) {
+          container.insertBefore(draggedModuleBox, afterElement);
+        }
+        updateDraggerNumbers();
+      };
+
+      const onPointerUp = (ev) => {
+        if (!isDraggingModule) return;
+        isDraggingModule = false;
+
+        try {
+          dragger.releasePointerCapture(ev.pointerId);
+        } catch (_) {}
+
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        dragger.removeEventListener('pointermove', onPointerMove);
+        dragger.removeEventListener('pointerup', onPointerUp);
+        dragger.removeEventListener('pointercancel', onPointerUp);
+
+        if (draggedModuleBox) {
+          draggedModuleBox.classList.remove('dragging');
+          draggedModuleBox = null;
+        }
+
+        updateDraggerNumbers();
+
+        const order = getCurrentModuleOrder();
+        const orderStr = order.join(',');
+        if (orderStr && orderStr !== lastSentModuleOrder) {
+          lastSentModuleOrder = orderStr;
+          wsTx({ t: 'module_order', order: order });
+        }
+      };
+
+      dragger.addEventListener('pointermove', onPointerMove);
+      dragger.addEventListener('pointerup', onPointerUp);
+      dragger.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+    });
+  });
+}
+
+function applyModuleOrder(orderList) {
+  if (!orderList) return;
+  if (typeof orderList === 'string') {
+    orderList = orderList.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(orderList) || orderList.length === 0) return;
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return;
+
+  orderList.forEach(id => {
+    const el = container.querySelector(`[data-module="${id}"]`);
+    if (el) container.appendChild(el);
+  });
+
+  updateDraggerNumbers();
+  lastSentModuleOrder = getCurrentModuleOrder().join(',');
 }
 
 // -- Input Source Functions ----------------------------------
@@ -4802,6 +5007,8 @@ rebuildBandsUI();
 initSubsonicKnobs();
 initCompanderKnobs();
 initLimiterKnobs();
+initModuleReordering();
+updateDraggerNumbers();
 
 // Ensure initial module bypassed states are reliably reflected
 updateBypassUI('eq', eqEnabled);
