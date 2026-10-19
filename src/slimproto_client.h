@@ -77,6 +77,7 @@ private:
     bool _connectControl();
     void _sendHelo();
     void _sendStat(const char* eventCode, uint32_t serverTimestamp = 0);
+    void _sendResp(const char* header, size_t len);
 
     bool _handleControlPacket();
     void _processStrm(const uint8_t* payload, size_t len);

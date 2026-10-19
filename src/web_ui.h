@@ -297,11 +297,11 @@ private:
             _ws.textAll(_buildBtMetaJson(meta));
         }
         else if (strcmp(t, "boot_defaults") == 0) {
-            bool custom   = doc["custom"]   | false;
-            bool eq       = doc["eq"]       | false;
-            bool subsonic = doc["subsonic"] | false;
-            bool comp     = doc["comp"]     | false;
-            bool lim      = doc["lim"]      | false;
+            bool custom   = doc.containsKey("custom") ? doc["custom"].as<bool>() : false;
+            bool eq       = doc.containsKey("eq") ? doc["eq"].as<bool>() : false;
+            bool subsonic = doc.containsKey("subsonic") ? doc["subsonic"].as<bool>() : (doc.containsKey("sub") ? doc["sub"].as<bool>() : false);
+            bool comp     = doc.containsKey("comp") ? doc["comp"].as<bool>() : false;
+            bool lim      = doc.containsKey("lim") ? doc["lim"].as<bool>() : false;
             _params.setBootDefaults(custom, eq, comp, lim, subsonic);
             _params.save();
             _ws.textAll(_buildStateJson());
@@ -450,6 +450,7 @@ private:
         bootObj["custom"]   = bCustom;
         bootObj["eq"]       = bEQ;
         bootObj["subsonic"] = bSub;
+        bootObj["sub"]      = bSub;
         bootObj["comp"]     = bComp;
         bootObj["lim"]      = bLim;
 

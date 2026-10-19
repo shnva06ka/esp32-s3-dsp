@@ -1973,19 +1973,19 @@ footer {
         </div>
         <div class="boot-toggles-row" id="boot-toggles-wrap" style="opacity: 0.4; pointer-events: none;">
           <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-eq" onchange="sendBootDefaults()">
+            <input type="checkbox" id="boot-def-eq" onchange="onBootToggleChanged()">
             <span>Equalizer ON</span>
           </label>
           <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-sub" onchange="sendBootDefaults()">
+            <input type="checkbox" id="boot-def-sub" onchange="onBootToggleChanged()">
             <span>Speakers Correction ON</span>
           </label>
           <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-comp" onchange="sendBootDefaults()">
+            <input type="checkbox" id="boot-def-comp" onchange="onBootToggleChanged()">
             <span>Compressor ON</span>
           </label>
           <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-lim" onchange="sendBootDefaults()">
+            <input type="checkbox" id="boot-def-lim" onchange="onBootToggleChanged()">
             <span>Limiter ON</span>
           </label>
         </div>
@@ -2611,7 +2611,7 @@ function handleMsg(d) {
     const bComp = document.getElementById('boot-def-comp');
     const bLim = document.getElementById('boot-def-lim');
     if (bEq) bEq.checked = !!d.boot_defaults.eq;
-    if (bSub) bSub.checked = !!d.boot_defaults.sub;
+    if (bSub) bSub.checked = !!(d.boot_defaults.sub || d.boot_defaults.subsonic);
     if (bComp) bComp.checked = !!d.boot_defaults.comp;
     if (bLim) bLim.checked = !!d.boot_defaults.lim;
     updateBootConfigUI();
@@ -2629,6 +2629,15 @@ function updateBootConfigUI() {
   }
 }
 
+function onBootToggleChanged() {
+  const rCust = document.getElementById('boot-mode-custom');
+  if (rCust && !rCust.checked) {
+    rCust.checked = true;
+    updateBootConfigUI();
+  }
+  sendBootDefaults();
+}
+
 function sendBootDefaults() {
   const isCustom = document.getElementById('boot-mode-custom')?.checked || false;
   const eqOn = document.getElementById('boot-def-eq')?.checked || false;
@@ -2641,6 +2650,7 @@ function sendBootDefaults() {
     custom: isCustom,
     eq: eqOn,
     sub: subOn,
+    subsonic: subOn,
     comp: compOn,
     lim: limOn
   });
@@ -2660,13 +2670,10 @@ function saveCurrentAsBootDefaults() {
   const bSub = document.getElementById('boot-def-sub');
   const bComp = document.getElementById('boot-def-comp');
   const bLim = document.getElementById('boot-def-lim');
-  if (bEq) bEq.checked = eqEnabled;
-  const swSub = document.getElementById('switch-subsonic');
-  if (bSub) bSub.checked = swSub ? swSub.checked : false;
-  const swComp = document.getElementById('switch-comp');
-  if (bComp) bComp.checked = swComp ? swComp.checked : false;
-  const swLim = document.getElementById('switch-lim');
-  if (bLim) bLim.checked = swLim ? swLim.checked : false;
+  if (bEq) bEq.checked = !!eqEnabled;
+  if (bSub) bSub.checked = !!(subsonicParams && subsonicParams.enabled);
+  if (bComp) bComp.checked = !!(compParams && compParams.enabled);
+  if (bLim) bLim.checked = !!(limParams && limParams.enabled);
 
   updateBootConfigUI();
   sendBootDefaults();

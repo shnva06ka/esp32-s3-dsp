@@ -371,7 +371,7 @@ void SlimprotoClient::_sendHelo()
 
     // Capabilities announcement: identify as Squeezelite player named ESP32-S3-DSP
     const char* baseCap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=v1.0";
-    const char* customCap = ",ModelName=ESP32-S3-DSP,MaxSampleRate=48000,pcm";
+    const char* customCap = ",ModelName=ESP32-S3-DSP,MaxSampleRate=48000,pcm,raw,wav";
 
     size_t capLen = strlen(baseCap) + strlen(customCap);
 
@@ -411,12 +411,12 @@ void SlimprotoClient::_sendStat(const char* eventCode, uint32_t serverTimestamp)
     memcpy(pkt.event, eventCode, 4);
 
     uint32_t now = millis();
-    uint32_t elapsedMs = (_streamStartTime > 0 && now >= _streamStartTime) ? (now - _streamStartTime) : 0;
+    uint32_t elapsedMs = (_streaming && _streamStartTime > 0 && now >= _streamStartTime) ? (now - _streamStartTime) : 0;
 
-    pkt.stream_buffer_size     = htonl(_ringBuffer.capacity());
-    pkt.stream_buffer_fullness = htonl(_ringBuffer.available());
-    pkt.output_buffer_size     = htonl(_ringBuffer.capacity());
-    pkt.output_buffer_fullness = htonl(_ringBuffer.available());
+    pkt.stream_buffer_size     = htonl(static_cast<uint32_t>(_ringBuffer.capacity() * sizeof(float) * 2));
+    pkt.stream_buffer_fullness = htonl(static_cast<uint32_t>(_ringBuffer.available() * sizeof(float) * 2));
+    pkt.output_buffer_size     = htonl(static_cast<uint32_t>(_ringBuffer.capacity() * sizeof(float) * 2));
+    pkt.output_buffer_fullness = htonl(static_cast<uint32_t>(_ringBuffer.available() * sizeof(float) * 2));
     pkt.bytes_received_H       = 0;
     pkt.bytes_received_L       = htonl(_bytesReceived);
     pkt.signal_strength        = htons(static_cast<uint16_t>(WiFi.RSSI() & 0xFFFF));
@@ -426,6 +426,25 @@ void SlimprotoClient::_sendStat(const char* eventCode, uint32_t serverTimestamp)
     pkt.server_timestamp       = serverTimestamp; // Already in server byte order
 
     send(_controlSock, &pkt, sizeof(pkt), 0);
+}
+
+// -------------------------------------------------------------
+void SlimprotoClient::_sendResp(const char* header, size_t len)
+{
+    if (_controlSock < 0 || !header || len == 0) return;
+
+    struct RespHeader {
+        char     opcode[4];
+        uint32_t length;
+    } __attribute__((packed));
+
+    RespHeader pkt;
+    memcpy(pkt.opcode, "RESP", 4);
+    pkt.length = htonl(len);
+
+    send(_controlSock, reinterpret_cast<const char*>(&pkt), sizeof(pkt), 0);
+    send(_controlSock, header, len, 0);
+    Serial.printf("[SLIMPROTO] Relayed HTTP response headers to server via RESP (%u bytes)\n", (unsigned)len);
 }
 
 // -------------------------------------------------------------
@@ -541,25 +560,33 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
                 _serverIp = IPAddress(sIp);
             }
             _streamPort = ntohs(strm->server_port);
+            if (_streamPort == 0) {
+                _streamPort = 9000;
+            }
 
-            size_t reqLen = len - sizeof(StrmPacket);
+            size_t reqLen = (len > sizeof(StrmPacket)) ? (len - sizeof(StrmPacket)) : 0;
             String httpRequest = "";
             if (reqLen > 0) {
-                const char* reqPtr = reinterpret_cast<const char*>(payload + sizeof(StrmPacket));
-                httpRequest = String(reqPtr).substring(0, reqLen);
+                std::string reqStr(reinterpret_cast<const char*>(payload + sizeof(StrmPacket)), reqLen);
+                httpRequest = reqStr.c_str();
             }
 
             Serial.printf("[SLIMPROTO] Audio format: PCM %u Hz, %u-bit, %u ch, %s-endian\n",
                           _sampleRate, _bitDepth, _channels, _bigEndian ? "big" : "little");
             Serial.printf("[SLIMPROTO] Stream target: %s:%d\n", _serverIp.toString().c_str(), _streamPort);
 
+            // Acknowledge stream flush
             _sendStat("STMf");
-            _sendStat("STMs");
 
+            // Automatically switch active input mode to Wi-Fi so user hears the music
+            _params.setInputMode(INPUT_MODE_WIFI);
+
+            // Connect audio stream, receive HTTP response headers, and relay RESP
             if (_startAudioStream(httpRequest)) {
                 _streaming = true;
                 _paused = false;
-                _sendStat("STMo");
+                _sendStat("STMc"); // Stream connected
+                _sendStat("STMs"); // Stream playback started
                 _updateMetadata(true, true, false, "Streaming PCM");
             } else {
                 _sendStat("STMu");
@@ -641,7 +668,8 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     streamAddr.sin_addr.s_addr = static_cast<uint32_t>(_serverIp);
 
     if (connect(_streamSock, (struct sockaddr*)&streamAddr, sizeof(streamAddr)) < 0) {
-        Serial.println("[SLIMPROTO] Audio stream socket connection failed");
+        Serial.printf("[SLIMPROTO] Audio stream socket connection to %s:%d failed (errno=%d)\n",
+                      _serverIp.toString().c_str(), _streamPort, errno);
         close(_streamSock);
         _streamSock = -1;
         return false;
@@ -650,13 +678,21 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     // Send HTTP GET request
     if (httpRequest.length() > 0) {
         send(_streamSock, httpRequest.c_str(), httpRequest.length(), 0);
+        // Ensure terminated with double CRLF if not already
+        if (!httpRequest.endsWith("\r\n\r\n")) {
+            if (httpRequest.endsWith("\r\n")) {
+                send(_streamSock, "\r\n", 2, 0);
+            } else {
+                send(_streamSock, "\r\n\r\n", 4, 0);
+            }
+        }
     } else {
         String defaultGet = "GET /stream.pcm HTTP/1.0\r\nConnection: close\r\n\r\n";
         send(_streamSock, defaultGet.c_str(), defaultGet.length(), 0);
     }
 
     // Read HTTP response header until "\r\n\r\n" or "\n\n"
-    char headerBuf[512];
+    char headerBuf[1024];
     int headerPos = 0;
     bool headerEnd = false;
 
@@ -675,8 +711,18 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
         }
     }
 
+    if (!headerEnd || headerPos == 0) {
+        Serial.printf("[SLIMPROTO] Failed to read HTTP response headers (read %d bytes)\n", headerPos);
+        close(_streamSock);
+        _streamSock = -1;
+        return false;
+    }
+
     headerBuf[headerPos] = '\0';
-    Serial.println("[SLIMPROTO] HTTP stream headers received, playback commencing");
+    Serial.printf("[SLIMPROTO] HTTP stream headers received (%d bytes):\n%s\n", headerPos, headerBuf);
+
+    // CRITICAL: Relay response headers back to LMS / Roon over control socket
+    _sendResp(headerBuf, headerPos);
 
     // Reset resampler state
     _resampPhase = 0.0f;
