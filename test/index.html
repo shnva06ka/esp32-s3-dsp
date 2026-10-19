@@ -50,12 +50,17 @@ html, body, button, input, select, textarea {
   font-family: var(--mono);
 }
 
-html, body {
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+body {
   background: var(--bg);
   color: var(--text);
   font-size: 12px;
   line-height: 1.4;
-  overflow-x: hidden;
 }
 
 /* -- Global Dropdown Selects (No Arrows Anywhere) ---------- */
@@ -1004,7 +1009,8 @@ main {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 8px;
+  overflow-y: clip;
+  padding: 6px 0 8px 0;
   scroll-behavior: smooth;
 }
 .band-card {
@@ -1482,6 +1488,7 @@ main {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  overflow-y: clip;
   padding: 6px 4px 10px;
   scroll-behavior: smooth;
 }
