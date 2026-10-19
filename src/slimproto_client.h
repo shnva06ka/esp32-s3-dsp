@@ -60,10 +60,15 @@ private:
     uint32_t                 _sampleRate{44100};
     uint8_t                  _bitDepth{16};
     uint8_t                  _channels{2};
-    bool                     _bigEndian{true};
+    bool                     _bigEndian{false};
 
     uint32_t                 _bytesReceived{0};
     uint32_t                 _streamStartTime{0};
+    bool                     _headerParsed{false};
+    bool                     _startedSent{false};
+
+    uint8_t                  _carryBuf[8]{0};
+    size_t                   _carryLen{0};
 
     // Resampler state (44.1kHz -> 48kHz)
     float                    _resampPhase{0.0f};

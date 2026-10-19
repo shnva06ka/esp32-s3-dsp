@@ -253,13 +253,6 @@ void SlimprotoClient::_runTask()
             }
         }
 
-        // If streaming and buffer has space, pull audio data without waiting on select
-        if (_streaming && _streamSock >= 0 && !_paused) {
-            if (_ringBuffer.space() > 1024) {
-                _readAudioStreamData();
-            }
-        }
-
         // Periodic STAT heartbeat every 1000 ms
         uint32_t now = millis();
         if (_connected && (now - lastStatTime >= 1000)) {
@@ -532,7 +525,7 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
             switch (strm->pcm_sample_rate) {
                 case '0': _sampleRate = 11025; break;
                 case '1': _sampleRate = 22050; break;
-                case '2': _sampleRate = 31000; break;
+                case '2': _sampleRate = 32000; break;
                 case '3': _sampleRate = 44100; break;
                 case '4': _sampleRate = 48000; break;
                 case '5': _sampleRate = 8000;  break;
@@ -543,17 +536,26 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
                 default:  _sampleRate = 44100; break;
             }
 
-            // Decode bit depth
+            // Decode bit depth (In Slimproto: '0'=1 byte (8-bit), '1'=2 bytes (16-bit), '2'=3 bytes (24-bit), '3'=4 bytes (32-bit))
             switch (strm->pcm_sample_size) {
-                case '0': _bitDepth = 16; break;
-                case '1': _bitDepth = 24; break;
-                case '2': _bitDepth = 32; break;
-                case '3': _bitDepth = 8;  break;
+                case '1': _bitDepth = 16; break;
+                case '2': _bitDepth = 24; break;
+                case '3': _bitDepth = 32; break;
+                case '0': _bitDepth = 8;  break;
                 default:  _bitDepth = 16; break;
             }
 
             _channels  = (strm->pcm_channels == '1') ? 1 : 2;
-            _bigEndian = (strm->pcm_endianness == '1');
+            // In Slimproto: '0'=Big-endian, '1'=Little-endian
+            _bigEndian = (strm->pcm_endianness == '0');
+
+            _carryLen = 0;
+            _headerParsed = false;
+            _startedSent = false;
+
+            if (strm->format == 'f') {
+                Serial.println("[SLIMPROTO] WARNING: Server sent FLAC format! In Roon Device Setup, set 'Use FLAC compression' -> 'No' for lossless PCM streaming.");
+            }
 
             uint32_t sIp = strm->server_ip;
             if (sIp != 0) {
@@ -586,8 +588,8 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
                 _streaming = true;
                 _paused = false;
                 _sendStat("STMc"); // Stream connected
-                _sendStat("STMs"); // Stream playback started
-                _updateMetadata(true, true, false, "Streaming PCM");
+                // STMs is sent upon buffering the first batch of frames in _readAudioStreamData
+                _updateMetadata(true, true, false, "Buffering...");
             } else {
                 _sendStat("STMu");
             }
@@ -748,123 +750,223 @@ void SlimprotoClient::_readAudioStreamData()
 {
     if (_streamSock < 0 || _paused) return;
 
-    // Buffer to read incoming raw PCM bytes
-    uint8_t rawBuf[1024];
-    int bytesRead = recv(_streamSock, rawBuf, sizeof(rawBuf), MSG_DONTWAIT);
+    // Drain available socket data into ring buffer
+    while (_streaming && _streamSock >= 0 && _ringBuffer.space() >= 512) {
+        uint8_t inBuf[1024 + sizeof(_carryBuf)];
+        size_t totalBytes = _carryLen;
 
-    if (bytesRead <= 0) {
-        if (bytesRead < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        // Prepend carry-over bytes from previous read
+        if (_carryLen > 0) {
+            memcpy(inBuf, _carryBuf, _carryLen);
+            _carryLen = 0;
+        }
+
+        int bytesRead = recv(_streamSock, inBuf + totalBytes, 1024, MSG_DONTWAIT);
+
+        if (bytesRead <= 0) {
+            if (bytesRead < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+                // No more data in socket right now, return to select
+                if (totalBytes > 0) {
+                    memcpy(_carryBuf, inBuf, totalBytes);
+                    _carryLen = totalBytes;
+                }
+                break;
+            }
+            if (bytesRead == 0) {
+                Serial.println("[SLIMPROTO] Audio stream reached end of track (EOF)");
+                _stopAudioStream();
+                _sendStat("STMd");
+                _updateMetadata(true, false, false, "Track Ended");
+            } else {
+                Serial.printf("[SLIMPROTO] Audio stream read error: errno=%d\n", errno);
+                _stopAudioStream();
+                _sendStat("STMu");
+                _updateMetadata(true, false, false, "Stream Error");
+            }
             return;
         }
-        Serial.println("[SLIMPROTO] Audio stream reached end of file or closed");
-        _stopAudioStream();
-        _sendStat("STMu");
-        _updateMetadata(true, false, false, "Track Ended");
-        return;
-    }
 
-    _bytesReceived += bytesRead;
+        totalBytes += bytesRead;
+        _bytesReceived += bytesRead;
 
-    // Decode PCM bytes to stereo float samples [-1.0f, +1.0f]
-    float decodedL[512];
-    float decodedR[512];
-    size_t decodedFrames = 0;
+        // Check and parse container header (RIFF/WAVE or FORM/AIFF) on first packet
+        if (!_headerParsed) {
+            if (totalBytes >= 12) {
+                if (memcmp(inBuf, "RIFF", 4) == 0 && memcmp(inBuf + 8, "WAVE", 4) == 0) {
+                    size_t offset = 12;
+                    bool foundData = false;
+                    while (offset + 8 <= totalBytes) {
+                        if (memcmp(inBuf + offset, "data", 4) == 0) {
+                            offset += 8;
+                            foundData = true;
+                            break;
+                        }
+                        uint32_t chunkLen = inBuf[offset + 4] | (inBuf[offset + 5] << 8) |
+                                            (inBuf[offset + 6] << 16) | (inBuf[offset + 7] << 24);
+                        offset += 8 + chunkLen;
+                    }
 
-    if (_bitDepth == 16) {
-        size_t bytesPerFrame = _channels * 2;
-        size_t frameCount = bytesRead / bytesPerFrame;
-        if (frameCount > 512) frameCount = 512;
+                    if (foundData && offset <= totalBytes) {
+                        Serial.printf("[SLIMPROTO] Stripped %u-byte WAV header\n", (unsigned)offset);
+                        memmove(inBuf, inBuf + offset, totalBytes - offset);
+                        totalBytes -= offset;
+                        _headerParsed = true;
+                    } else if (!foundData && totalBytes < 512) {
+                        memcpy(_carryBuf, inBuf, totalBytes);
+                        _carryLen = totalBytes;
+                        break;
+                    } else {
+                        _headerParsed = true;
+                    }
+                } else if (memcmp(inBuf, "FORM", 4) == 0 &&
+                           (memcmp(inBuf + 8, "AIFF", 4) == 0 || memcmp(inBuf + 8, "AIFC", 4) == 0)) {
+                    size_t offset = 12;
+                    bool foundSsnd = false;
+                    while (offset + 8 <= totalBytes) {
+                        if (memcmp(inBuf + offset, "SSND", 4) == 0) {
+                            offset += 16;
+                            foundSsnd = true;
+                            break;
+                        }
+                        uint32_t chunkLen = (inBuf[offset + 4] << 24) | (inBuf[offset + 5] << 16) |
+                                            (inBuf[offset + 6] << 8) | inBuf[offset + 7];
+                        offset += 8 + chunkLen;
+                    }
 
-        for (size_t i = 0; i < frameCount; ++i) {
-            size_t offset = i * bytesPerFrame;
-            int16_t sL = 0;
-            int16_t sR = 0;
-
-            if (_bigEndian) {
-                sL = static_cast<int16_t>((rawBuf[offset] << 8) | rawBuf[offset + 1]);
-                if (_channels == 2) {
-                    sR = static_cast<int16_t>((rawBuf[offset + 2] << 8) | rawBuf[offset + 3]);
+                    if (foundSsnd && offset <= totalBytes) {
+                        Serial.printf("[SLIMPROTO] Stripped %u-byte AIFF header\n", (unsigned)offset);
+                        memmove(inBuf, inBuf + offset, totalBytes - offset);
+                        totalBytes -= offset;
+                        _headerParsed = true;
+                    } else {
+                        _headerParsed = true;
+                    }
                 } else {
-                    sR = sL;
+                    _headerParsed = true;
                 }
             } else {
-                sL = static_cast<int16_t>(rawBuf[offset] | (rawBuf[offset + 1] << 8));
-                if (_channels == 2) {
-                    sR = static_cast<int16_t>(rawBuf[offset + 2] | (rawBuf[offset + 3] << 8));
-                } else {
-                    sR = sL;
-                }
+                memcpy(_carryBuf, inBuf, totalBytes);
+                _carryLen = totalBytes;
+                break;
             }
-
-            decodedL[i] = static_cast<float>(sL) / 32768.0f;
-            decodedR[i] = static_cast<float>(sR) / 32768.0f;
         }
-        decodedFrames = frameCount;
-    } else if (_bitDepth == 24) {
-        size_t bytesPerFrame = _channels * 3;
-        size_t frameCount = bytesRead / bytesPerFrame;
-        if (frameCount > 512) frameCount = 512;
 
-        for (size_t i = 0; i < frameCount; ++i) {
-            size_t offset = i * bytesPerFrame;
-            int32_t sL = 0;
-            int32_t sR = 0;
+        size_t bytesPerSample = (_bitDepth == 24) ? 3 : 2;
+        size_t bytesPerFrame  = _channels * bytesPerSample;
 
-            if (_bigEndian) {
-                sL = static_cast<int32_t>((rawBuf[offset] << 24) | (rawBuf[offset + 1] << 16) | (rawBuf[offset + 2] << 8)) >> 8;
-                if (_channels == 2) {
-                    sR = static_cast<int32_t>((rawBuf[offset + 3] << 24) | (rawBuf[offset + 4] << 16) | (rawBuf[offset + 5] << 8)) >> 8;
-                } else {
-                    sR = sL;
-                }
-            } else {
-                sL = static_cast<int32_t>((rawBuf[offset + 2] << 24) | (rawBuf[offset + 1] << 16) | (rawBuf[offset] << 8)) >> 8;
-                if (_channels == 2) {
-                    sR = static_cast<int32_t>((rawBuf[offset + 5] << 24) | (rawBuf[offset + 4] << 16) | (rawBuf[offset + 3] << 8)) >> 8;
-                } else {
-                    sR = sL;
-                }
-            }
-
-            decodedL[i] = static_cast<float>(sL) / 8388608.0f;
-            decodedR[i] = static_cast<float>(sR) / 8388608.0f;
+        size_t frameCount = totalBytes / bytesPerFrame;
+        if (frameCount == 0) {
+            memcpy(_carryBuf, inBuf, totalBytes);
+            _carryLen = totalBytes;
+            break;
         }
-        decodedFrames = frameCount;
-    }
 
-    if (decodedFrames == 0) return;
+        if (frameCount > 256) frameCount = 256;
+        size_t bytesConsumed = frameCount * bytesPerFrame;
 
-    // Resample if incoming rate is 44.1 kHz (CD standard) to 48.0 kHz (DSP Engine standard)
-    if (_sampleRate == 44100) {
-        float resampledL[512];
-        float resampledR[512];
-        size_t outFrames = 0;
-        const float step = 44100.0f / 48000.0f; // 0.91875f
+        size_t remainder = totalBytes - bytesConsumed;
+        if (remainder > 0 && remainder <= sizeof(_carryBuf)) {
+            memcpy(_carryBuf, inBuf + bytesConsumed, remainder);
+            _carryLen = remainder;
+        } else {
+            _carryLen = 0;
+        }
 
-        for (size_t i = 0; i < decodedFrames; ++i) {
-            float curL = decodedL[i];
-            float curR = decodedR[i];
+        // Decode PCM bytes to stereo float samples [-1.0f, +1.0f]
+        float decodedL[256];
+        float decodedR[256];
 
-            while (_resampPhase < 1.0f && outFrames < 512) {
-                resampledL[outFrames] = _lastSampleL + _resampPhase * (curL - _lastSampleL);
-                resampledR[outFrames] = _lastSampleR + _resampPhase * (curR - _lastSampleR);
-                outFrames++;
-                _resampPhase += step;
+        if (_bitDepth == 16) {
+            for (size_t i = 0; i < frameCount; ++i) {
+                size_t offset = i * bytesPerFrame;
+                int16_t sL = 0;
+                int16_t sR = 0;
+
+                if (_bigEndian) {
+                    sL = static_cast<int16_t>((inBuf[offset] << 8) | inBuf[offset + 1]);
+                    if (_channels == 2) {
+                        sR = static_cast<int16_t>((inBuf[offset + 2] << 8) | inBuf[offset + 3]);
+                    } else {
+                        sR = sL;
+                    }
+                } else {
+                    sL = static_cast<int16_t>(inBuf[offset] | (inBuf[offset + 1] << 8));
+                    if (_channels == 2) {
+                        sR = static_cast<int16_t>(inBuf[offset + 2] | (inBuf[offset + 3] << 8));
+                    } else {
+                        sR = sL;
+                    }
+                }
+
+                decodedL[i] = static_cast<float>(sL) * (1.0f / 32768.0f);
+                decodedR[i] = static_cast<float>(sR) * (1.0f / 32768.0f);
             }
+        } else if (_bitDepth == 24) {
+            for (size_t i = 0; i < frameCount; ++i) {
+                size_t offset = i * bytesPerFrame;
+                int32_t sL = 0;
+                int32_t sR = 0;
 
-            if (_resampPhase >= 1.0f) {
+                if (_bigEndian) {
+                    sL = static_cast<int32_t>((inBuf[offset] << 24) | (inBuf[offset + 1] << 16) | (inBuf[offset + 2] << 8)) >> 8;
+                    if (_channels == 2) {
+                        sR = static_cast<int32_t>((inBuf[offset + 3] << 24) | (inBuf[offset + 4] << 16) | (inBuf[offset + 5] << 8)) >> 8;
+                    } else {
+                        sR = sL;
+                    }
+                } else {
+                    sL = static_cast<int32_t>((inBuf[offset + 2] << 24) | (inBuf[offset + 1] << 16) | (inBuf[offset] << 8)) >> 8;
+                    if (_channels == 2) {
+                        sR = static_cast<int32_t>((inBuf[offset + 5] << 24) | (inBuf[offset + 4] << 16) | (inBuf[offset + 3] << 8)) >> 8;
+                    } else {
+                        sR = sL;
+                    }
+                }
+
+                decodedL[i] = static_cast<float>(sL) * (1.0f / 8388608.0f);
+                decodedR[i] = static_cast<float>(sR) * (1.0f / 8388608.0f);
+            }
+        }
+
+        // Resample if incoming rate is 44.1 kHz (CD standard) to 48.0 kHz (DSP Engine standard)
+        if (_sampleRate == 44100) {
+            float resampledL[384];
+            float resampledR[384];
+            size_t outFrames = 0;
+            const float step = 44100.0f / 48000.0f; // 0.91875f
+
+            for (size_t i = 0; i < frameCount; ++i) {
+                float curL = decodedL[i];
+                float curR = decodedR[i];
+
+                while (_resampPhase < 1.0f && outFrames < 384) {
+                    resampledL[outFrames] = _lastSampleL + _resampPhase * (curL - _lastSampleL);
+                    resampledR[outFrames] = _lastSampleR + _resampPhase * (curR - _lastSampleR);
+                    outFrames++;
+                    _resampPhase += step;
+                }
+
                 _resampPhase -= 1.0f;
+                _lastSampleL = curL;
+                _lastSampleR = curR;
             }
-            _lastSampleL = curL;
-            _lastSampleR = curR;
+
+            if (outFrames > 0) {
+                _ringBuffer.write(resampledL, resampledR, outFrames);
+            }
+        } else {
+            // Direct 48.0 kHz 1:1 feed
+            _ringBuffer.write(decodedL, decodedR, frameCount);
         }
 
-        if (outFrames > 0) {
-            _ringBuffer.write(resampledL, resampledR, outFrames);
+        // Send STMs once initial buffering threshold is reached (~21 ms / 1024 frames)
+        if (!_startedSent && _ringBuffer.available() >= 1024) {
+            _startedSent = true;
+            _sendStat("STMs");
+            _updateMetadata(true, true, false, "Streaming PCM");
+            Serial.printf("[SLIMPROTO] Initial buffering complete (%u frames), sent STMs\n",
+                          (unsigned)_ringBuffer.available());
         }
-    } else {
-        // Direct 48.0 kHz 1:1 lossless feed
-        _ringBuffer.write(decodedL, decodedR, decodedFrames);
     }
 }
 
