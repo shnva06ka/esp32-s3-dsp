@@ -22,6 +22,7 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <Preferences.h>
 #include "BluetoothA2DPSink.h"
 
 // ── Pin Configuration (30-pin ESP32 DevKit V1) ─────────────────
@@ -38,6 +39,13 @@
 
 BluetoothA2DPSink a2dp_sink;
 HardwareSerial S3Serial(2); // UART2 (Full-duplex to S3)
+
+// Persistent Volume Storage (with 2.5s debounce to protect flash wear)
+static Preferences g_prefs;
+static uint8_t g_btVolume = 100; // Default volume ~80% (100 / 127) if not yet stored
+static volatile bool g_volDirty = false;
+static unsigned long g_lastVolChangeTime = 0;
+static const unsigned long kVolSaveDebounceMs = 2500; // 2.5s debounce
 
 // State tracking for onboard status LED and metadata
 enum BtState {
@@ -107,11 +115,36 @@ void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
     }
 }
 
-// ── Callbacks for state monitoring ───────────────────────────
+// ── NVS Volume Persistence Helper ────────────────────────────
+void save_volume_to_nvs() {
+    if (!g_volDirty) return;
+    g_volDirty = false;
+    if (g_prefs.begin("bt_cfg", false)) {
+        g_prefs.putUChar("vol", g_btVolume);
+        g_prefs.end();
+        Serial.printf("[NVS] Persisted Bluetooth volume %d / 127 (%d%%) to flash.\n",
+                      g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+    }
+}
+
+// ── Callbacks for state and volume monitoring ────────────────
+void avrc_volume_change_callback(int vol) {
+    if (vol < 0) vol = 0;
+    if (vol > 127) vol = 127;
+    if (static_cast<uint8_t>(vol) != g_btVolume) {
+        g_btVolume = static_cast<uint8_t>(vol);
+        g_volDirty = true;
+        g_lastVolChangeTime = millis();
+        Serial.printf("[AVRC] Volume updated by host: %d / 127 (%d%%) [pending NVS save]\n",
+                      g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+    }
+}
+
 void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
     switch (state) {
         case ESP_A2D_CONNECTION_STATE_DISCONNECTED:
             Serial.println("[BT] Device disconnected. Ready for pairing...");
+            save_volume_to_nvs(); // Immediately commit pending volume to flash on disconnect
             g_btState = BT_DISCONNECTED;
             strncpy(g_trackTitle, "No Track Playing", sizeof(g_trackTitle) - 1);
             strncpy(g_trackArtist, "Unknown Artist", sizeof(g_trackArtist) - 1);
@@ -124,6 +157,9 @@ void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
         case ESP_A2D_CONNECTION_STATE_CONNECTED:
             Serial.println("[BT] Connected to Bluetooth source!");
             g_btState = BT_CONNECTED_IDLE;
+            a2dp_sink.set_volume(g_btVolume); // Enforce remembered volume on connection
+            Serial.printf("[BT] Enforced remembered volume: %d / 127 (%d%%)\n",
+                          g_btVolume, (uint32_t)g_btVolume * 100 / 127);
             g_metadataChanged = true;
             break;
         case ESP_A2D_CONNECTION_STATE_DISCONNECTING:
@@ -195,6 +231,13 @@ void setup() {
     a2dp_sink.set_pin_config(pin_config);
     a2dp_sink.set_i2s_config(i2s_config);
 
+    // Load persisted Bluetooth volume from NVS (default 100 / 127 ~= 79%)
+    g_prefs.begin("bt_cfg", false);
+    g_btVolume = g_prefs.getUChar("vol", 100);
+    g_prefs.end();
+    Serial.printf("[INIT] Loaded Bluetooth volume from NVS: %d / 127 (%d%%)\n",
+                  g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+
     // Register callbacks and request attributes
     a2dp_sink.set_avrc_metadata_attribute_mask(
         ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST |
@@ -204,10 +247,12 @@ void setup() {
     a2dp_sink.set_avrc_rn_play_pos_callback(avrc_play_pos_callback, 1); // 1-second position notifications
     a2dp_sink.set_on_connection_state_changed(connection_state_changed);
     a2dp_sink.set_on_audio_state_changed(audio_state_changed);
+    a2dp_sink.set_on_volumechange(avrc_volume_change_callback);
 
     // Start Bluetooth A2DP Sink
     a2dp_sink.start(BT_DEV_NAME);
-    Serial.println("[INIT] Bluetooth A2DP Sink started successfully.");
+    a2dp_sink.set_volume(g_btVolume);
+    Serial.printf("[INIT] Bluetooth A2DP Sink started successfully. Initial volume: %d / 127.\n", g_btVolume);
     Serial.println("[INIT] Connect your phone/PC to 'ESP32-DSP-BT'.");
 
     // Send initial metadata snapshot
@@ -296,6 +341,11 @@ void loop() {
         case BT_PLAYING:
             digitalWrite(LED_PIN, HIGH); // Solid ON when streaming audio
             break;
+    }
+
+    // 4. Debounced NVS flash persistence for volume
+    if (g_volDirty && (now - g_lastVolChangeTime >= kVolSaveDebounceMs)) {
+        save_volume_to_nvs();
     }
 
     delay(10);
