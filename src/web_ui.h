@@ -223,7 +223,7 @@ private:
 
         const char* t = doc["t"] | "";
 
-        if (strcmp(t, "eq") == 0) {
+        if (strcmp(t, "eq") == 0 || strcmp(t, "eq_band") == 0) {
             _handleEQMsg(doc);
             _ws.textAll(_buildStateJson());
         }
