@@ -5,26 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ESP32-S3-DSP</title>
 <style>
-/* -- Nord Light Theme Palette (High-Contrast Flat & Mono) ---------------- */
 :root {
-  --nord0: #2E3440; /* darkest slate */
-  --nord1: #3B4252;
+  --nord0: #2E3440; --nord1: #3B4252;
   --nord2: #434C5E;
-  --nord3: #4C566A; /* muted slate */
-  --nord4: #D8DEE9; /* light border */
-  --nord5: #E5E9F0; /* subtle surface */
-  --nord6: #ECEFF4; /* app background */
-  --nord7: #8FBCBB; /* teal frost */
-  --nord8: #88C0D0; /* cyan frost */
-  --nord9: #81A1C1; /* soft frost blue */
-  --nord10: #5E81AC; /* deep frost blue */
-  --nord11: #BF616A; /* aurora red */
-  --nord12: #D08770; /* aurora orange */
-  --nord13: #EBCB8B; /* aurora yellow */
-  --nord14: #438728; /* high-contrast green */
-  --nord15: #B48EAD; /* aurora purple */
-
-  --bg: #EDF1F7;
+  --nord3: #4C566A; --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4; --nord7: #8FBCBB; --nord8: #88C0D0; --nord9: #81A1C1; --nord10: #5E81AC; --nord11: #BF616A; --nord12: #D08770; --nord13: #EBCB8B; --nord14: #438728; --nord15: #B48EAD; --bg: #EDF1F7;
   --card-bg: #FFFFFF;
   --card-header: #E5E9F0;
   --border: #CBD5E1;
@@ -63,7 +47,6 @@ body {
   line-height: 1.4;
 }
 
-/* -- Global Dropdown Selects (No Arrows Anywhere) ---------- */
 select {
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -75,7 +58,6 @@ select::-ms-expand {
   display: none;
 }
 
-/* -- Disconnected / Reconnecting Overlay ------------------- */
 .conn-overlay {
   position: fixed;
   top: 0;
@@ -126,7 +108,6 @@ select::-ms-expand {
   color: var(--muted);
 }
 
-/* -- Module 0: Input Selector ----------------------------- */
 .input-selector-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -208,7 +189,6 @@ select::-ms-expand {
   border-color: var(--nord10);
 }
 
-/* -- Hardware Telemetry (ESP32-S3-DSP) -- */
 .sys-stats-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -279,7 +259,6 @@ select::-ms-expand {
   border: 1px solid var(--muted);
 }
 
-/* -- Module 1: Bluetooth Now Playing Card ----------------- */
 #mod-bt-meta {
   border-color: var(--nord10);
 }
@@ -454,7 +433,6 @@ select::-ms-expand {
   transform: scale(0.96);
 }
 
-/* -- Module 1B: Wi-Fi Streaming Card ----------------------- */
 #mod-wifi-meta {
   border-color: var(--border);
 }
@@ -491,7 +469,6 @@ select::-ms-expand {
   word-break: break-word;
 }
 
-/* -- Container Layout ------------------------------------- */
 main {
   max-width: 1400px;
   margin: 16px auto;
@@ -501,7 +478,6 @@ main {
   gap: 16px;
 }
 
-/* -- Module Cards / Boxes (High Contrast Flat) ------------ */
 .module-box {
   background: var(--card-bg);
   border: 1px solid var(--border-strong);
@@ -649,7 +625,6 @@ main {
   display: none !important;
 }
 
-/* -- Drop Indicators & Drag Ghosts ------------------------ */
 .module-drop-indicator {
   height: 4px;
   background: var(--accent);
@@ -766,7 +741,6 @@ main {
   text-transform: uppercase;
 }
 
-/* -- Simple On/Off Toggle Switch (High Contrast & Perfectly Circular) -- */
 .switch {
   position: relative;
   display: inline-block;
@@ -818,7 +792,6 @@ main {
   display: none;
 }
 
-/* -- EQ Frequency Response Canvas ------------------------- */
 #canvas-wrap {
   position: relative;
   width: 100%;
@@ -834,7 +807,6 @@ main {
   display: block;
 }
 
-/* -- EQ Toolbar (Presets + Band Controls in 2 Separate Boxes) -- */
 .eq-toolbar-row {
   display: flex;
   align-items: center;
@@ -939,7 +911,6 @@ main {
   cursor: not-allowed;
 }
 
-/* -- EQ Main Layout: Preamp on Left, Horizontally Scrolling Bands on Right */
 .eq-body-layout {
   display: flex;
   align-items: flex-start;
@@ -996,7 +967,6 @@ main {
   outline: none;
 }
 
-/* -- Dynamic Band Cards (Static Width & Horizontal Scroll) -- */
 #bands-container {
   flex: 1 1 0;
   min-width: 0;
@@ -1053,7 +1023,6 @@ main {
 }
 
 
-/* Draggable Title Bar (Full width, no background, no border) */
 .band-dragger-titlebar {
   width: 100%;
   height: 24px;
@@ -1100,7 +1069,6 @@ main {
   box-shadow: 0 0 0 2px var(--nord11);
 }
 
-/* Appended Action Card for Add Band & Select */
 .eq-actions-card {
   width: 90px;
   min-width: 90px;
@@ -1159,14 +1127,12 @@ main {
   color: #FFFFFF;
 }
 
-/* Card Top: Type Pill Centered */
 .band-type-row {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-/* Filter Type Dropdown Menu (Clean 1-Level, No Arrow) */
 .band-type-menu-wrap {
   position: relative;
   width: 100%;
@@ -1199,7 +1165,6 @@ main {
   display: none;
 }
 
-/* 1st Level Filter Dropdown */
 .band-type-dropdown {
   display: none;
   position: absolute;
@@ -1237,7 +1202,6 @@ main {
   font-weight: 800;
 }
 
-/* Card Bottom: Bypass + Delete Buttons (Transparent & Column-Aligned) */
 .band-card-bottom-row {
   display: flex;
   flex-direction: row;
@@ -1299,7 +1263,6 @@ main {
   height: 17px;
 }
 
-/* Main Grid Inside Card: Left Fader, Right Knobs */
 .band-card-main-grid {
   display: flex;
   flex-direction: row;
@@ -1336,7 +1299,6 @@ main {
   border: none;
   outline: none;
 }
-/* Slider Bar (Crisp 6px rounded track, clean border, no blurry shadow) */
 .preamp-slider::-webkit-slider-runnable-track,
 .band-vslider::-webkit-slider-runnable-track {
   width: 6px;
@@ -1361,7 +1323,6 @@ main {
 .band-vslider::-moz-range-progress {
   background: transparent;
 }
-/* Circle knob matching the rotary knob disc (#2E3440 with #434C5E border) */
 .preamp-slider::-webkit-slider-thumb,
 .band-vslider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -1395,7 +1356,6 @@ main {
   background: #3B4252 !important;
   border-color: #5E81AC !important;
 }
-/* Rotary Knob - Clean Crisp Vector Dial without blurry halation */
 .knob {
   cursor: pointer;
   filter: none;
@@ -1420,7 +1380,6 @@ main {
   width: 100%;
 }
 
-/* -- Reference-Image Dark Rounded Badge Box ---------------- */
 .card-val-badge {
   background: #2E3440;
   color: #ECEFF4;
@@ -1477,7 +1436,6 @@ main {
   color: #88C0D0;
 }
 
-/* -- Compander & Limiter Controls Grid --------------------- */
 .module-grid-controls {
   display: flex;
   flex-direction: row;
@@ -1517,7 +1475,6 @@ main {
 }
 
 
-/* -- Startup Effects Configuration Panel ------------------- */
 .boot-cfg-container {
   display: flex;
   flex-direction: column;
@@ -1583,7 +1540,6 @@ main {
   opacity: 1;
 }
 
-/* -- Footer ----------------------------------------------- */
 footer {
   text-align: center;
   max-width: 1400px;
@@ -1597,7 +1553,6 @@ footer {
   box-sizing: border-box;
 }
 
-/* -- Mobile Layout Adjustments ----------------------------- */
 @media (max-width: 680px) {
   .input-selector-grid {
     grid-template-columns: 1fr;
@@ -1628,9 +1583,6 @@ footer {
 </div>
 
 <main>
-  <!-- ======================================================= -->
-  <!-- MODULE 0: INPUT SOURCE SELECTOR                         -->
-  <!-- ======================================================= -->
   <section class="module-box" id="mod-input">
     <div class="module-header static-header">
       <div class="module-title-area">
@@ -1639,7 +1591,6 @@ footer {
     </div>
     <div class="module-body">
       <div class="input-selector-grid">
-        <!-- AUX Card -->
         <button class="input-card active" id="btn-src-1" onclick="setInputSource(1)" type="button">
           <div class="input-card-main">
             <div class="input-card-icon">
@@ -1652,7 +1603,6 @@ footer {
           <span class="input-card-badge" id="badge-src-1">ACTIVE</span>
         </button>
 
-        <!-- Bluetooth Card -->
         <button class="input-card" id="btn-src-2" onclick="setInputSource(2)" type="button">
           <div class="input-card-main">
             <div class="input-card-icon">
@@ -1665,7 +1615,6 @@ footer {
           <span class="input-card-badge" id="badge-src-2">STANDBY</span>
         </button>
 
-        <!-- Wi-Fi Card -->
         <button class="input-card" id="btn-src-3" onclick="setInputSource(3)" type="button">
           <div class="input-card-main">
             <div class="input-card-icon">
@@ -1682,7 +1631,6 @@ footer {
         </button>
       </div>
 
-      <!-- Real-Time Hardware Resource Telemetry -->
       <div class="sys-stats-container">
         <div class="sys-stat-card">
           <div class="sys-stat-header">
@@ -1727,14 +1675,9 @@ footer {
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE 0B: BLUETOOTH NOW PLAYING / METADATA              -->
-  <!-- (Ordered on top directly below Input Selector when BT)  -->
-  <!-- ======================================================= -->
   <section class="module-box" id="mod-bt-meta" style="display: none;">
     <div class="module-body">
       <div class="bt-player-card">
-        <!-- 1. Album Art (Large, Centered) -->
         <div class="bt-art-box" id="bt-art-box">
           <img id="bt-art-img" class="bt-art-img" alt="Album Art" src="" />
           <div id="bt-art-fallback" class="bt-art-placeholder">
@@ -1747,15 +1690,12 @@ footer {
           </div>
         </div>
 
-        <!-- 2. Song Name (Large, Bold, Centered) -->
         <div class="bt-track-title" id="bt-track-title">No Track Playing</div>
 
-        <!-- 3. Artist  -  Album (Centered Subtitle) -->
         <div class="bt-artist-album">
           <span id="bt-track-artist">Unknown Artist</span>  -  <span id="bt-track-album" class="bt-track-album">Unknown Album</span>
         </div>
 
-        <!-- Progress Bar & Timestamps -->
         <div class="bt-progress-wrap" id="bt-progress-wrap">
           <div class="bt-progress-bar">
             <div class="bt-progress-fill" id="bt-progress-fill"></div>
@@ -1766,16 +1706,13 @@ footer {
           </div>
         </div>
 
-        <!-- 4. Transport Controls: PREV  -  PLAY/PAUSE  -  NEXT (Simple Round with Icon) -->
         <div class="bt-actions-row">
-          <!-- Previous Button -->
           <button class="btn-bt-round" onclick="sendBtCmd('prev')" title="Previous Track">
             <svg viewBox="0 0 24 24">
               <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
             </svg>
           </button>
 
-          <!-- Play / Pause Button -->
           <button class="btn-bt-round btn-bt-playpause" id="btn-bt-playpause" onclick="toggleBtPlayPause()" title="Play / Pause">
             <svg id="svg-play" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z"/>
@@ -1785,7 +1722,6 @@ footer {
             </svg>
           </button>
 
-          <!-- Next Button -->
           <button class="btn-bt-round" onclick="sendBtCmd('next')" title="Next Track">
             <svg viewBox="0 0 24 24">
               <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
@@ -1796,9 +1732,6 @@ footer {
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE 0C: WI-FI STREAMING                             -->
-  <!-- ======================================================= -->
   <section class="module-box" id="mod-wifi-meta" style="display: none;">
     <div class="module-header static-header">
       <div class="module-title-area">
@@ -1829,14 +1762,8 @@ footer {
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- DYNAMIC DSP SIGNAL PROCESSING PIPELINE CONTAINER        -->
-  <!-- ======================================================= -->
   <div id="dsp-modules-container">
 
-  <!-- ======================================================= -->
-  <!-- MODULE: PARAMETRIC EQUALIZER                            -->
-  <!-- ======================================================= -->
   <section class="module-box bypassed" id="mod-eq" data-module="eq">
     <div class="module-header" onclick="toggleModuleCollapse('eq')">
       <div class="module-header-left">
@@ -1862,12 +1789,10 @@ footer {
       <span class="collapse-icon">▼</span>
     </div>
     <div class="module-body">
-      <!-- Frequency response curve -->
       <div id="canvas-wrap">
         <canvas id="freq-canvas"></canvas>
       </div>
 
-      <!-- Action bar with Presets -->
       <div class="eq-toolbar-row">
         <div class="eq-preset-box">
           <span class="preset-label">Preset:</span>
@@ -1882,9 +1807,7 @@ footer {
         </div>
       </div>
 
-      <!-- Main EQ Layout: Preamp slider on leftmost + Horizontally scrolling static band cards -->
       <div class="eq-body-layout">
-        <!-- Always Present Preamp Slider Column -->
         <div class="preamp-col" id="eq-preamp-col">
           <div class="preamp-slider-wrap">
             <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
@@ -1897,15 +1820,11 @@ footer {
           </div>
         </div>
 
-        <!-- Dynamic EQ Bands Container (Static Width & Horizontally Scrolling) -->
         <div id="bands-container"></div>
       </div>
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE: COMPRESSOR                                      -->
-  <!-- ======================================================= -->
   <section class="module-box bypassed" id="mod-compander" data-module="comp">
     <div class="module-header" onclick="toggleModuleCollapse('comp')">
       <div class="module-header-left">
@@ -1932,7 +1851,6 @@ footer {
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
-        <!-- Threshold -->
         <div class="control-pod">
           <svg id="knob-comp-thresh" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -1943,7 +1861,6 @@ footer {
             </div>
           </div>
         </div>
-        <!-- Ratio -->
         <div class="control-pod">
           <svg id="knob-comp-ratio" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -1954,7 +1871,6 @@ footer {
             </div>
           </div>
         </div>
-        <!-- Attack -->
         <div class="control-pod">
           <svg id="knob-comp-att" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -1965,7 +1881,6 @@ footer {
             </div>
           </div>
         </div>
-        <!-- Release -->
         <div class="control-pod">
           <svg id="knob-comp-rel" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -1976,7 +1891,6 @@ footer {
             </div>
           </div>
         </div>
-        <!-- Makeup Gain -->
         <div class="control-pod">
           <svg id="knob-comp-gain" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -1991,9 +1905,6 @@ footer {
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE: LIMITER                                         -->
-  <!-- ======================================================= -->
   <section class="module-box bypassed" id="mod-limiter" data-module="lim">
     <div class="module-header" onclick="toggleModuleCollapse('lim')">
       <div class="module-header-left">
@@ -2020,7 +1931,6 @@ footer {
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
-        <!-- Ceiling -->
         <div class="control-pod">
           <svg id="knob-lim-ceil" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2031,7 +1941,6 @@ footer {
             </div>
           </div>
         </div>
-        <!-- Knee Width -->
         <div class="control-pod">
           <svg id="knob-lim-knee" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2046,9 +1955,6 @@ footer {
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE: SPEAKERS CORRECTION                             -->
-  <!-- ======================================================= -->
   <section class="module-box bypassed" id="mod-subsonic" data-module="subsonic">
     <div class="module-header" onclick="toggleModuleCollapse('subsonic')">
       <div class="module-header-left">
@@ -2074,10 +1980,8 @@ footer {
       <span class="collapse-icon">▼</span>
     </div>
     <div class="module-body">
-      <!-- Submodule 1: Subsonic filter -->
       <div class="submodule-title">Subsonic Filter</div>
       <div class="module-grid-controls">
-        <!-- Frequency -->
         <div class="control-pod">
           <svg id="knob-sub-freq" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2088,7 +1992,6 @@ footer {
             </div>
           </div>
         </div>
-        <!-- Slope (Stepped 6, 12, 18, 24 dB) -->
         <div class="control-pod">
           <svg id="knob-sub-order" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2101,13 +2004,10 @@ footer {
         </div>
       </div>
 
-      <!-- Horizontal separator between submodules -->
       <div class="submodule-separator"></div>
 
-      <!-- Submodule 2: Channel correction -->
       <div class="submodule-title">Channel Correction</div>
       <div class="module-grid-controls">
-        <!-- Balance: L/R knob -->
         <div class="control-pod">
           <svg id="knob-spk-bal" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2119,7 +2019,6 @@ footer {
           </div>
         </div>
 
-        <!-- Time Shift L (ms) -->
         <div class="control-pod">
           <svg id="knob-spk-delay-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2131,7 +2030,6 @@ footer {
           </div>
         </div>
 
-        <!-- Time Shift R (ms) -->
         <div class="control-pod">
           <svg id="knob-spk-delay-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2143,7 +2041,6 @@ footer {
           </div>
         </div>
 
-        <!-- Phase Shift L (-180 to 180 deg, step 45) -->
         <div class="control-pod">
           <svg id="knob-spk-phase-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2155,7 +2052,6 @@ footer {
           </div>
         </div>
 
-        <!-- Phase Shift R (-180 to 180 deg, step 45) -->
         <div class="control-pod">
           <svg id="knob-spk-phase-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
@@ -2169,12 +2065,7 @@ footer {
       </div>
     </div>
   </section>
-  </div> <!-- /#dsp-modules-container -->
-
-  <!-- ======================================================= -->
-  <!-- MODULE 4: STARTUP EFFECTS CONFIGURATION                 -->
-  <!-- ======================================================= -->
-  <section class="module-box" id="mod-boot-cfg">
+  </div> <section class="module-box" id="mod-boot-cfg">
     <div class="module-header" onclick="toggleModuleCollapse('boot-cfg')">
       <div class="module-title-area">
         <span class="module-title">Startup Effects Configuration</span>
@@ -2225,9 +2116,6 @@ footer {
 </footer>
 
 <script>
-// ===========================================================
-// Constants & Color Map (Nord Palette)
-// ===========================================================
 const FS = 48000;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
@@ -2266,7 +2154,6 @@ function hexToHsl(hex) {
   return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
 }
 
-// Initial default: 5 bands (Low Shelf, 3 Peakings, High Shelf)
 let eqEnabled = false;
 let eqPreamp  = 0.0;
 let currentPreset = 'flat_5';
@@ -2359,7 +2246,6 @@ function saveCurrentPreset() {
     }))
   };
 
-  // 1. Save to localStorage custom presets
   let customPresets = [];
   try {
     customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
@@ -2378,7 +2264,6 @@ function saveCurrentPreset() {
   const activeBtn = document.querySelector(`[data-custom-preset="${CSS.escape(name.trim())}"]`);
   if (activeBtn) activeBtn.classList.add('active');
 
-  // 2. Download JSON file
   const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2403,7 +2288,6 @@ function importPresetFile(event) {
         return;
       }
 
-      // Load preamp if provided
       if (typeof data.preamp === 'number') {
         eqPreamp = Math.max(-18, Math.min(18, data.preamp));
         updatePreampUI();
@@ -2450,7 +2334,6 @@ function importPresetFile(event) {
       rebuildBandsUI();
       drawResponse();
 
-      // Transmit to ESP32
       bands.forEach((_, i) => sendBand(i));
 
       event.target.value = '';
@@ -2588,15 +2471,11 @@ let limParams = {
   enabled: false, ceiling: -0.5, knee: 3.0
 };
 
-// References to UI Knob instances
 let bandKnobs = []; // Array of { fKnob, qKnob }
 let subsonicKnobs = {};
 let compKnobs = {};
 let limKnobs  = {};
 
-// ===========================================================
-// WebSocket Client
-// ===========================================================
 let ws = null, wsRetry = null;
 
 function wsConnect() {
@@ -2657,7 +2536,6 @@ function setDot(cls, txt) {
 
 function updateSysStatsUI(s) {
   if (!s) return;
-  // Core 0 (System / Network)
   if (s.cpu0 !== undefined) {
     const v = Math.min(100, Math.max(0, s.cpu0));
     const elVal = document.getElementById('sys-val-cpu0');
@@ -2668,7 +2546,6 @@ function updateSysStatsUI(s) {
       elBar.style.background = v > 85 ? 'var(--nord11)' : (v > 65 ? 'var(--nord12)' : 'var(--nord10)');
     }
   }
-  // Core 1 (Audio DSP)
   if (s.cpu1 !== undefined) {
     const v = Math.min(100, Math.max(0, s.cpu1));
     const elVal = document.getElementById('sys-val-cpu1');
@@ -2679,7 +2556,6 @@ function updateSysStatsUI(s) {
       elBar.style.background = v > 85 ? 'var(--nord11)' : (v > 65 ? 'var(--nord12)' : 'var(--nord14)');
     }
   }
-  // Internal RAM
   if (s.heap_t && s.heap_t > 0) {
     const usedKb = Math.round((s.heap_u || 0) / 1024);
     const totKb  = Math.round(s.heap_t / 1024);
@@ -2692,7 +2568,6 @@ function updateSysStatsUI(s) {
       elBar.style.background = pct > 85 ? 'var(--nord11)' : (pct > 70 ? 'var(--nord12)' : 'var(--nord10)');
     }
   }
-  // Flash Memory
   if (s.flash_t && s.flash_t > 0) {
     const usedMb = ((s.flash_u || 0) / (1024 * 1024)).toFixed(2);
     const totMb  = (s.flash_t / (1024 * 1024)).toFixed(1);
@@ -2726,7 +2601,6 @@ function handleMsg(d) {
     updateSysStatsUI(d.sys);
   }
 
-  // 1. EQ State
   if (d.eq) {
     eqEnabled = d.eq.enabled !== undefined ? d.eq.enabled : true;
     updateBypassUI('eq', eqEnabled);
@@ -2778,28 +2652,24 @@ function handleMsg(d) {
     }
   }
 
-  // 2. Subsonic Filter State
   if (d.subsonic) {
     Object.assign(subsonicParams, d.subsonic);
     updateBypassUI('subsonic', subsonicParams.enabled);
     syncSubsonicUI();
   }
 
-  // 3. Compander State
   if (d.compander) {
     Object.assign(compParams, d.compander);
     updateBypassUI('comp', compParams.enabled);
     syncCompanderUI();
   }
 
-  // 4. Limiter State
   if (d.limiter) {
     Object.assign(limParams, d.limiter);
     updateBypassUI('lim', limParams.enabled);
     syncLimiterUI();
   }
 
-  // 5. Input Source State
   if (d.input) {
     if (d.input.source !== undefined) {
       selectedInputSource = parseInt(d.input.source) || 1;
@@ -2810,17 +2680,14 @@ function handleMsg(d) {
     updateInputSourceUI();
   }
 
-  // 6. Bluetooth Metadata State
   if (d.bt) {
     updateBluetoothUI(d.bt);
   }
 
-  // 6b. Wi-Fi Stream State
   if (d.wifi_stream) {
     updateWiFiStreamUI(d.wifi_stream);
   }
 
-  // 7. Boot Defaults State
   if (d.boot_defaults) {
     const isCustom = !!d.boot_defaults.custom;
     const rLast = document.getElementById('boot-mode-last');
@@ -2905,7 +2772,6 @@ function saveCurrentAsBootDefaults() {
   sendBootDefaults();
 }
 
-// -- Dynamic DSP Module Reordering ---------------------------
 let isDraggingModule = false;
 let draggedModuleBox = null;
 let lastSentModuleOrder = '';
@@ -2957,12 +2823,10 @@ function initModuleReordering() {
       draggedModuleBox = box;
       box.classList.add('dragging');
 
-      // Create horizontal drop indicator bar
       const indicator = document.createElement('div');
       indicator.className = 'module-drop-indicator';
       box.after(indicator);
 
-      // Create floating ghost attached to mouse cursor
       const rect = box.getBoundingClientRect();
       const grabOffsetX = e.clientX - rect.left;
       const grabOffsetY = e.clientY - rect.top;
@@ -2985,7 +2849,6 @@ function initModuleReordering() {
         if (!isDraggingModule || !draggedModuleBox) return;
         ev.preventDefault();
 
-        // Follow mouse cursor
         ghost.style.left = (ev.clientX - grabOffsetX) + 'px';
         ghost.style.top = (ev.clientY - grabOffsetY) + 'px';
 
@@ -3068,7 +2931,6 @@ function applyModuleOrder(orderList) {
   lastSentModuleOrder = getCurrentModuleOrder().join(',');
 }
 
-// -- Input Source Functions ----------------------------------
 let selectedInputSource = 1; // 1: AUX, 2: BT, 3: WIFI
 let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
 
@@ -3084,7 +2946,6 @@ function updateInputSourceUI() {
   const isBt   = (selectedInputSource === 2);
   const isWifi = (selectedInputSource === 3);
 
-  // 1. Update Input Source Cards
   const btnAux  = document.getElementById('btn-src-1');
   const btnBt   = document.getElementById('btn-src-2');
   const btnWifi = document.getElementById('btn-src-3');
@@ -3100,10 +2961,8 @@ function updateInputSourceUI() {
   if (b2) b2.textContent = isBt ? 'ACTIVE' : 'STANDBY';
   if (b3) b3.textContent = isWifi ? 'ACTIVE' : 'STANDBY';
 
-  // 2. Order and Visibility of Bluetooth Now Playing Module:
   updateBtModuleVisibility();
 
-  // 3. Order and Visibility of Wi-Fi Streaming Module:
   updateWiFiModuleVisibility();
 }
 
@@ -3151,7 +3010,6 @@ function updateWiFiStreamUI(wf) {
   }
 }
 
-// -- Bluetooth Metadata & Artwork Functions -------------------
 let currentTrackTitle = '';
 let currentTrackArtist = '';
 let isBtConnected = false;
@@ -3161,7 +3019,6 @@ function updateBtModuleVisibility() {
   const btMod = document.getElementById('mod-bt-meta');
   if (btMod) {
     const isBt = (selectedInputSource === 2);
-    // Show only when Bluetooth is the active input AND device is connected
     btMod.style.display = (isBt && isBtConnected) ? 'block' : 'none';
   }
 }
@@ -3189,7 +3046,6 @@ function updateBluetoothUI(bt) {
 
   setPlayPauseUI(isBtPlaying);
 
-  // Synchronize duration and position if reported
   if (typeof bt.duration === 'number' && bt.duration > 0) {
     trackDurationSec = bt.duration;
   }
@@ -3204,10 +3060,8 @@ function updateBluetoothUI(bt) {
     stopProgressTimer();
   }
 
-  // Re-check visibility whenever connection state changes
   updateBtModuleVisibility();
 
-  // Query high-res artwork if track or artist changes
   if (title !== currentTrackTitle || artist !== currentTrackArtist) {
     currentTrackTitle = title;
     currentTrackArtist = artist;
@@ -3286,7 +3140,6 @@ function startProgressTimer() {
   trackProgressTimer = setInterval(() => {
     if (isBtPlaying) {
       if (trackDurationSec > 0 && trackCurrentSec >= trackDurationSec) {
-        // At track end
       } else {
         trackCurrentSec += 1;
         updateProgressBarUI();
@@ -3321,7 +3174,6 @@ function sendBtCmd(cmd) {
 }
 
 function toggleBtPlayPause() {
-  // Optimistic UI response: flip button state instantly without waiting for network/BT round-trip
   isBtPlaying = !isBtPlaying;
   setPlayPauseUI(isBtPlaying);
   if (isBtPlaying) {
@@ -3333,9 +3185,6 @@ function toggleBtPlayPause() {
   }
 }
 
-// ===========================================================
-// Vector Rotary Knob Component (Pure SVG - High Precision & Razor Sharp)
-// ===========================================================
 function polarToCartesian(cx, cy, r, angleInRad) {
   return {
     x: cx + r * Math.cos(angleInRad),
@@ -3403,7 +3252,6 @@ class Knob {
     this.R = Math.min(W, H) / 2 - 1.5;
     this.rDisc = this.R - 1.5;
 
-    // Build SVG vector structure - Clean solid black knob with sharp white indicator notch
     svg.innerHTML = `
       <circle class="knob-disc" cx="${this.cx}" cy="${this.cy}" r="${this.rDisc}" fill="#2E3440" stroke="#434C5E" stroke-width="1.5"/>
       <line class="knob-notch" stroke="#ECEFF4" stroke-width="2.8" stroke-linecap="round"/>
@@ -3411,7 +3259,6 @@ class Knob {
 
     this._notchEl = svg.querySelector('.knob-notch');
 
-    // Static angular sweep from 135 deg to 405 deg (270 degrees)
     this.SA  = Math.PI * 0.75;
     this.SWP = Math.PI * 1.5;
 
@@ -3558,7 +3405,6 @@ class Knob {
 
     const vA = this.SA + t * this.SWP;
 
-    // Crisp high-contrast white notch spanning from disc interior towards outer disc edge
     const notchR1 = Math.max(2, this.rDisc - 13);
     const notchR2 = Math.max(4, this.rDisc - 2);
     const x1 = this.cx + notchR1 * Math.cos(vA);
@@ -3574,9 +3420,6 @@ class Knob {
   }
 }
 
-// ===========================================================
-// Frequency Response Canvas (Nord Light)
-// ===========================================================
 const fCanvas = document.getElementById('freq-canvas');
 const fCtx    = fCanvas.getContext('2d');
 const DB_MAX  = 18;
@@ -3590,7 +3433,6 @@ function db2y(db, H) {
   return H * (0.5 - db / (2 * DB_MAX));
 }
 
-// Exact biquad magnitude for all filter types
 function singleBiquadMag(type, freq, gain, q, f) {
   const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
   const safeQ = Math.max(0.05, q);
@@ -3704,7 +3546,6 @@ function bandMagAt(b, f) {
   if (!b.enabled) return 0;
   let type  = b.type || 0;
   let order = b.order || 2;
-  // Backwards compatibility for legacy flat types
   if (type === 5) { type = 3; order = 4; }
   else if (type === 6) { type = 4; order = 4; }
 
@@ -3772,11 +3613,9 @@ function drawResponse() {
 
   c.clearRect(0, 0, W, H);
 
-  // Background
   c.fillStyle = '#FFFFFF';
   c.fillRect(0, 0, W, H);
 
-  // dB horizontal grid
   [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
     const y = db2y(db, H);
     c.beginPath();
@@ -3787,7 +3626,6 @@ function drawResponse() {
     c.stroke();
   });
 
-  // Frequency vertical grid
   [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(f => {
     const x = f2x(f, W);
     c.beginPath();
@@ -3805,7 +3643,6 @@ function drawResponse() {
     c.fillText(lbl, x, H - 4 * DPR);
   });
 
-  // Individual band curves (crisp, subtle)
   bands.forEach((b, i) => {
     if (!b.enabled) return;
     const isShelfOrPeak = (b.type === 0 || b.type === 1 || b.type === 2 || b.type === undefined);
@@ -3821,14 +3658,12 @@ function drawResponse() {
     c.stroke();
   });
 
-  // Combined curve points
   const pts = [];
   for (let k = 0; k <= NPTS; k++) {
     const f = F0 * Math.pow(F1 / F0, k / NPTS);
     pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
   }
 
-  // High-contrast flat subtle tint (no blurry glow)
   const zY = db2y(0, H);
   c.beginPath();
   c.moveTo(pts[0].x, zY);
@@ -3838,7 +3673,6 @@ function drawResponse() {
   c.fillStyle = eqEnabled ? 'rgba(94, 129, 172, 0.10)' : 'rgba(76, 86, 106, 0.06)';
   c.fill();
 
-  // Primary curve line (solid high contrast)
   c.beginPath();
   pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
   c.strokeStyle = eqEnabled ? '#5E81AC' : '#718096';
@@ -3846,7 +3680,6 @@ function drawResponse() {
   c.lineJoin    = 'round';
   c.stroke();
 
-  // Band center dot markers (solid crisp dots with sharp border)
   bands.forEach((b, i) => {
     const x = f2x(b.freq, W);
     const y = db2y(totalMagAt(b.freq), H);
@@ -3864,7 +3697,6 @@ function drawResponse() {
     c.stroke();
   });
 
-  // -- Y-axis labels (rendered on top of response curves with uniform length) --
   [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
     if (db === -18 || db === 18) return;
     const y = db2y(db, H);
@@ -3887,7 +3719,6 @@ function drawResponse() {
     const pw = tw + 8 * DPR;
     const ph = 14 * DPR;
 
-    // Crisp protective badge ensuring response curves never obscure the numbers
     c.fillStyle = 'rgba(255, 255, 255, 0.94)';
     c.beginPath();
     c.rect(px, py, pw, ph);
@@ -3896,7 +3727,6 @@ function drawResponse() {
     c.lineWidth   = 1 * DPR;
     c.stroke();
 
-    // High contrast label text on top
     c.fillStyle = db === 0 ? '#2E3440' : '#4C566A';
     c.fillText(txt, px + 4 * DPR, y);
     c.restore();
@@ -3905,9 +3735,6 @@ function drawResponse() {
 
 new ResizeObserver(drawResponse).observe(fCanvas);
 
-// ===========================================================
-// Dynamic EQ Bands UI Builder
-// ===========================================================
 let dragSourceIndex = null;
 let activeGainSliderBand = null;
 let bandSendTimers = {};
@@ -3985,7 +3812,6 @@ function selectBandFilter(i, type) {
     if (!b.order || b.order < 1 || b.order > 4) b.order = 2;
   }
 
-  // Close menus
   document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
     w.classList.remove('open');
   });
@@ -4064,9 +3890,6 @@ function updateBandCardParamStates(i) {
   }
 }
 
-// ===========================================================
-// Bulk Band Selection & Action Card
-// ===========================================================
 let isSelectMode = false;
 let selectedBandIndices = new Set();
 
@@ -4165,7 +3988,6 @@ function deleteSelectedBands() {
     return;
   }
 
-  // Sort descending so splicing doesn't shift earlier indices
   const toDelete = Array.from(selectedBandIndices).sort((a, b) => b - a);
   toDelete.forEach(idx => {
     bands.splice(idx, 1);
@@ -4206,7 +4028,6 @@ function rebuildBandsUI() {
 
     const bandColor = BAND_COLORS[i % BAND_COLORS.length];
     const hsl = hexToHsl(bandColor);
-    // Rich saturated background tint (55-80% saturation, ~88% lightness)
     const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
 
     const card = document.createElement('div');
@@ -4219,7 +4040,6 @@ function rebuildBandsUI() {
       }
     });
 
-    // 1. Draggable Title Bar (Full width, transparent, no border)
     const draggerBar = document.createElement('div');
     draggerBar.className = 'band-dragger-titlebar';
     draggerBar.title = 'Drag to reorder band position';
@@ -4241,7 +4061,6 @@ function rebuildBandsUI() {
 
     card.appendChild(draggerBar);
 
-    // Setup Pointer Events drag on title bar with ghost and indicator
     draggerBar.addEventListener('pointerdown', (e) => {
       if (isSelectMode) return;
       if (e.button !== undefined && e.button !== 0) return;
@@ -4278,7 +4097,6 @@ function rebuildBandsUI() {
         ghost.style.left = (ev.clientX - grabOffsetX) + 'px';
         ghost.style.top = (ev.clientY - grabOffsetY) + 'px';
 
-        // Auto-scroll horizontal container
         const cRect = root.getBoundingClientRect();
         if (ev.clientX < cRect.left + 60) {
           root.scrollLeft -= 10;
@@ -4339,7 +4157,6 @@ function rebuildBandsUI() {
       window.addEventListener('pointercancel', onPointerUp);
     });
 
-    // 2. Centered Band Type 1-Level Dropdown
     const typeRow = document.createElement('div');
     typeRow.className = 'band-type-row';
     const currentLabel = getBandTypeLabel(b.type);
@@ -4360,11 +4177,9 @@ function rebuildBandsUI() {
     `;
     card.appendChild(typeRow);
 
-    // 3. Main Card Controls (Two-Column Layout matching reference image)
     const mainGrid = document.createElement('div');
     mainGrid.className = 'band-card-main-grid';
 
-    // Left Column: Vertical Gain Slider + Badge
     const gainCol = document.createElement('div');
     gainCol.className = 'band-gain-col';
     gainCol.id = `gain-col-${i}`;
@@ -4381,11 +4196,9 @@ function rebuildBandsUI() {
     `;
     mainGrid.appendChild(gainCol);
 
-    // Right Column: Q Knob + Freq Knob (with badges)
     const knobsCol = document.createElement('div');
     knobsCol.className = 'band-knobs-col';
 
-    // Q Unit
     const qUnit = document.createElement('div');
     qUnit.className = 'band-knob-unit';
     qUnit.id = `q-col-${i}`;
@@ -4402,7 +4215,6 @@ function rebuildBandsUI() {
     `;
     knobsCol.appendChild(qUnit);
 
-    // Freq Unit
     const fUnit = document.createElement('div');
     fUnit.className = 'band-knob-unit';
     fUnit.id = `f-col-${i}`;
@@ -4420,7 +4232,6 @@ function rebuildBandsUI() {
     mainGrid.appendChild(knobsCol);
     card.appendChild(mainGrid);
 
-    // 4. Bottom Action Row: Bypass Button (centered to Gain) + Delete Button (centered to Knobs)
     const bottomRow = document.createElement('div');
     bottomRow.className = 'band-card-bottom-row';
     bottomRow.innerHTML = `
@@ -4443,7 +4254,6 @@ function rebuildBandsUI() {
     `;
     card.appendChild(bottomRow);
 
-    // Apply color styling to card and bypass button
     const applyBandCardStyle = () => {
       const bypassBtn = card.querySelector(`#band-bypass-${i}`);
       if (b.enabled) {
@@ -4476,7 +4286,6 @@ function rebuildBandsUI() {
     applyBandCardStyle();
     root.appendChild(card);
 
-    // Frequency Knob
     const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
       min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
       logScale: true, color: bandColor,
@@ -4506,7 +4315,6 @@ function rebuildBandsUI() {
       requestDrawResponse();
     });
 
-    // Q / Slope Knob
     const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
       min: isPass ? 6 : 0.1,
       max: isPass ? 24 : 8.0,
@@ -4557,7 +4365,6 @@ function rebuildBandsUI() {
       requestDrawResponse();
     });
 
-    // Gain Vertical Slider Link
     const gSlider = card.querySelector(`#slider-g-${i}`);
     const gNumInput = card.querySelector(`#num-g-${i}`);
 
@@ -4595,7 +4402,6 @@ function rebuildBandsUI() {
     updateBandCardParamStates(i);
   });
 
-  // 5. Append EQ Actions Card (Add & Select / Delete) to the right end
   const actionCard = document.createElement('div');
   actionCard.className = 'eq-actions-card';
   actionCard.id = 'eq-actions-card';
@@ -4668,7 +4474,6 @@ function syncBandCardUI(i) {
 function addBand() {
   if (bands.length >= MAX_BANDS) return;
 
-  // Pick a musical frequency between 50 Hz and 15000 Hz
   const candidateFreqs = [250, 500, 2000, 4000, 8000, 16000, 63, 125, 315];
   let nextFreq = 1000;
   for (let f of candidateFreqs) {
@@ -4715,9 +4520,6 @@ function removeBand(index) {
   requestDrawResponse();
 }
 
-// ===========================================================
-// Module Bypass Controls
-// ===========================================================
 function updateBypassUI(mod, enabled) {
   const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'subsonic' ? 'subsonic' : (mod === 'comp' ? 'compander' : 'limiter'))}`;
   const box = document.getElementById(boxId);
@@ -4794,9 +4596,6 @@ function toggleLimiterModule(checked) {
   sendLimiter();
 }
 
-// ===========================================================
-// Subsonic Filter UI Binding
-// ===========================================================
 let subSendTimer = null;
 function sendSubsonicThrottled(immediate = false) {
   if (immediate) {
@@ -4814,7 +4613,6 @@ function sendSubsonicThrottled(immediate = false) {
 }
 
 function initSubsonicKnobs() {
-  // 1. Subsonic Frequency (20 to 100 Hz)
   subsonicKnobs.freq = new Knob(document.getElementById('knob-sub-freq'), {
     min: 20, max: 100, value: subsonicParams.freq, defaultVal: 80,
     logScale: true, color: '#88C0D0', decimals: 0,
@@ -4835,7 +4633,6 @@ function initSubsonicKnobs() {
     }
   });
 
-  // 2. Stepped Slope (6, 12, 18, 24 dB)
   subsonicKnobs.order = new Knob(document.getElementById('knob-sub-order'), {
     min: 6, max: 24, step: 6, value: (subsonicParams.order || 2) * 6, defaultVal: 12,
     decimals: 0,
@@ -4859,7 +4656,6 @@ function initSubsonicKnobs() {
     }
   });
 
-  // 3. Balance (-100 to +100, centerZero: true)
   subsonicKnobs.balance = new Knob(document.getElementById('knob-spk-bal'), {
     min: -100, max: 100, step: 1, value: subsonicParams.balance || 0, defaultVal: 0,
     centerZero: true, decimals: 0, color: '#88C0D0',
@@ -4880,7 +4676,6 @@ function initSubsonicKnobs() {
     }
   });
 
-  // 4. Time Shift L (-20.0 to 20.0 ms, step 0.1)
   subsonicKnobs.delayL = new Knob(document.getElementById('knob-spk-delay-l'), {
     min: -20, max: 20, step: 0.1, value: subsonicParams.delayL || 0.0, defaultVal: 0.0,
     centerZero: true, decimals: 1, color: '#81A1C1',
@@ -4901,7 +4696,6 @@ function initSubsonicKnobs() {
     }
   });
 
-  // 5. Time Shift R (-20.0 to 20.0 ms, step 0.1)
   subsonicKnobs.delayR = new Knob(document.getElementById('knob-spk-delay-r'), {
     min: -20, max: 20, step: 0.1, value: subsonicParams.delayR || 0.0, defaultVal: 0.0,
     centerZero: true, decimals: 1, color: '#81A1C1',
@@ -4922,7 +4716,6 @@ function initSubsonicKnobs() {
     }
   });
 
-  // 6. Phase Shift L (-180, -135, -90, -45, 0, 45, 90, 135, 180 deg)
   subsonicKnobs.phaseL = new Knob(document.getElementById('knob-spk-phase-l'), {
     min: -180, max: 180, step: 45, value: subsonicParams.phaseL || 0, defaultVal: 0,
     centerZero: true, decimals: 0, color: '#B48EAD',
@@ -4945,7 +4738,6 @@ function initSubsonicKnobs() {
     }
   });
 
-  // 7. Phase Shift R (-180, -135, -90, -45, 0, 45, 90, 135, 180 deg)
   subsonicKnobs.phaseR = new Knob(document.getElementById('knob-spk-phase-r'), {
     min: -180, max: 180, step: 45, value: subsonicParams.phaseR || 0, defaultVal: 0,
     centerZero: true, decimals: 0, color: '#B48EAD',
@@ -5018,9 +4810,6 @@ function sendSubsonic() {
   });
 }
 
-// ===========================================================
-// Compander & Limiter UI Binding
-// ===========================================================
 let compSendTimer = null;
 function sendCompanderThrottled(immediate = false) {
   if (immediate) {
@@ -5054,7 +4843,6 @@ function sendLimiterThrottled(immediate = false) {
 }
 
 function initCompanderKnobs() {
-  // Threshold (-60 to 0)
   compKnobs.thresh = new Knob(document.getElementById('knob-comp-thresh'), {
     min: -60, max: 0, value: compParams.threshold, defaultVal: -18,
     color: '#81A1C1', decimals: 1,
@@ -5075,7 +4863,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Ratio (1 to 20)
   compKnobs.ratio = new Knob(document.getElementById('knob-comp-ratio'), {
     min: 1, max: 20, value: compParams.ratio, defaultVal: 4,
     color: '#88C0D0', decimals: 1,
@@ -5096,7 +4883,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Attack (0.1 to 200 ms)
   compKnobs.att = new Knob(document.getElementById('knob-comp-att'), {
     min: 0.1, max: 200, value: compParams.attackMs, defaultVal: 5,
     color: '#A3BE8C', decimals: 1,
@@ -5117,7 +4903,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Release (10 to 2000 ms)
   compKnobs.rel = new Knob(document.getElementById('knob-comp-rel'), {
     min: 10, max: 2000, value: compParams.releaseMs, defaultVal: 150,
     color: '#D08770', decimals: 0,
@@ -5138,7 +4923,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Makeup Gain (-12 to +24 dB)
   compKnobs.gain = new Knob(document.getElementById('knob-comp-gain'), {
     min: -12, max: 24, value: compParams.makeup, defaultVal: 0,
     centerZero: true, color: '#B48EAD', decimals: 1,
@@ -5188,7 +4972,6 @@ function sendCompander() {
 }
 
 function initLimiterKnobs() {
-  // Ceiling (-6 to 0 dBFS)
   limKnobs.ceil = new Knob(document.getElementById('knob-lim-ceil'), {
     min: -6, max: 0, value: limParams.ceiling, defaultVal: -0.5,
     color: '#BF616A', decimals: 1,
@@ -5209,7 +4992,6 @@ function initLimiterKnobs() {
     }
   });
 
-  // Knee Width (0 to 6 dB)
   limKnobs.knee = new Knob(document.getElementById('knob-lim-knee'), {
     min: 0, max: 6, value: limParams.knee, defaultVal: 3.0,
     color: '#8FBCBB', decimals: 1,
@@ -5249,9 +5031,6 @@ function sendLimiter() {
   });
 }
 
-// ===========================================================
-// Initialization
-// ===========================================================
 updateInputSourceUI();
 initPreamp();
 renderCustomPresets();
@@ -5262,13 +5041,11 @@ initLimiterKnobs();
 initModuleReordering();
 updateDraggerNumbers();
 
-// Ensure initial module bypassed states are reliably reflected
 updateBypassUI('eq', eqEnabled);
 updateBypassUI('subsonic', subsonicParams.enabled);
 updateBypassUI('comp', compParams.enabled);
 updateBypassUI('lim', limParams.enabled);
 
-// Click anywhere on a badge box to instantly focus and select all numbers
 document.addEventListener('click', (e) => {
   const badge = e.target.closest('.card-val-badge');
   if (badge) {

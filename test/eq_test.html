@@ -5,26 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ESP32-S3-DSP</title>
 <style>
-/* -- Nord Light Theme Palette (High-Contrast Flat & Mono) ---------------- */
 :root {
-  --nord0: #2E3440; /* darkest slate */
-  --nord1: #3B4252;
+  --nord0: #2E3440; --nord1: #3B4252;
   --nord2: #434C5E;
-  --nord3: #4C566A; /* muted slate */
-  --nord4: #D8DEE9; /* light border */
-  --nord5: #E5E9F0; /* subtle surface */
-  --nord6: #ECEFF4; /* app background */
-  --nord7: #8FBCBB; /* teal frost */
-  --nord8: #88C0D0; /* cyan frost */
-  --nord9: #81A1C1; /* soft frost blue */
-  --nord10: #5E81AC; /* deep frost blue */
-  --nord11: #BF616A; /* aurora red */
-  --nord12: #D08770; /* aurora orange */
-  --nord13: #EBCB8B; /* aurora yellow */
-  --nord14: #438728; /* high-contrast green */
-  --nord15: #B48EAD; /* aurora purple */
-
-  --bg: #EDF1F7;
+  --nord3: #4C566A; --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4; --nord7: #8FBCBB; --nord8: #88C0D0; --nord9: #81A1C1; --nord10: #5E81AC; --nord11: #BF616A; --nord12: #D08770; --nord13: #EBCB8B; --nord14: #438728; --nord15: #B48EAD; --bg: #EDF1F7;
   --card-bg: #FFFFFF;
   --card-header: #E5E9F0;
   --border: #CBD5E1;
@@ -58,7 +42,6 @@ html, body {
   overflow-x: hidden;
 }
 
-/* -- App Header ------------------------------------------- */
 header {
   display: flex;
   align-items: center;
@@ -111,7 +94,6 @@ header {
 #ws-dot.ok  { background: var(--active); }
 #ws-dot.err { background: var(--danger); }
 
-/* -- Header Controls (Input Selector & Status Badge) ------ */
 .header-controls {
   display: flex;
   align-items: center;
@@ -179,7 +161,6 @@ header {
   border: 1px solid var(--nord0);
 }
 
-/* -- Container Layout ------------------------------------- */
 main {
   max-width: 1400px;
   margin: 16px auto;
@@ -189,7 +170,6 @@ main {
   gap: 16px;
 }
 
-/* -- Module Cards / Boxes (High Contrast Flat) ------------ */
 .module-box {
   background: var(--card-bg);
   border: 1px solid var(--border-strong);
@@ -252,7 +232,6 @@ main {
   text-transform: uppercase;
 }
 
-/* -- Simple On/Off Toggle Switch (High Contrast) ---------- */
 .switch {
   position: relative;
   display: inline-block;
@@ -298,7 +277,6 @@ main {
   padding: 14px 16px;
 }
 
-/* -- EQ Frequency Response Canvas ------------------------- */
 #canvas-wrap {
   position: relative;
   width: 100%;
@@ -314,7 +292,6 @@ main {
   display: block;
 }
 
-/* -- EQ Toolbar (Presets + Band Controls) ----------------- */
 .eq-toolbar {
   display: flex;
   align-items: center;
@@ -411,7 +388,6 @@ main {
   cursor: not-allowed;
 }
 
-/* -- EQ Main Layout: Preamp on Left, Auto-Fill Bands on Right */
 .eq-body-layout {
   display: flex;
   align-items: stretch;
@@ -481,7 +457,6 @@ main {
   color: var(--muted);
 }
 
-/* -- Dynamic Band Cards (Auto Fill Width) ----------------- */
 #bands-container {
   flex: 1 1 0;
   min-width: 0;
@@ -549,7 +524,6 @@ main {
   border-color: var(--nord0);
 }
 
-/* Band Type Selector */
 .band-type-row {
   width: 100%;
   display: flex;
@@ -597,7 +571,6 @@ main {
   outline: 1px solid var(--accent);
 }
 
-/* -- Parameter Row (Knob + Text Box) ---------------------- */
 .param-unit-col {
   display: flex;
   flex-direction: column;
@@ -622,7 +595,6 @@ canvas.knob {
   touch-action: none;
   user-select: none;
 }
-/* Remove up/down spinner arrows from all number inputs */
 input[type=number]::-webkit-outer-spin-button,
 input[type=number]::-webkit-inner-spin-button {
   -webkit-appearance: none;
@@ -638,8 +610,7 @@ input[type=number] {
   width: 58px;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 400; /* Standard text, not bold */
-  color: var(--text);
+  font-weight: 400; color: var(--text);
   background: #FFFFFF;
   border: 1px solid var(--border-strong);
   border-radius: 2px;
@@ -654,7 +625,6 @@ input[type=number] {
   outline: 1px solid var(--accent);
 }
 
-/* -- Compander & Limiter Controls Grid --------------------- */
 .module-grid-controls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -692,7 +662,6 @@ input[type=number] {
   color: var(--muted);
 }
 
-/* -- Footer ----------------------------------------------- */
 footer {
   text-align: center;
   padding: 16px 0 24px;
@@ -734,9 +703,6 @@ footer {
 </header>
 
 <main>
-  <!-- ======================================================= -->
-  <!-- MODULE 1: PARAMETRIC EQUALIZER                          -->
-  <!-- ======================================================= -->
   <section class="module-box" id="mod-eq">
     <div class="module-header" onclick="toggleModuleCollapse('eq')">
       <div class="module-title-area">
@@ -749,12 +715,10 @@ footer {
       <span class="collapse-icon">v</span>
     </div>
     <div class="module-body">
-      <!-- Frequency response curve -->
       <div id="canvas-wrap">
         <canvas id="freq-canvas"></canvas>
       </div>
 
-      <!-- Action bar with Presets -->
       <div class="eq-toolbar">
         <div class="preset-group">
           <span class="preset-label">Preset:</span>
@@ -772,9 +736,7 @@ footer {
         </div>
       </div>
 
-      <!-- Main EQ Layout: Always present preamp slider on leftmost + Auto-filling bands -->
       <div class="eq-body-layout">
-        <!-- Always Present Preamp Slider Column -->
         <div class="preamp-col" id="eq-preamp-col">
           <span class="preamp-title">PREAMP</span>
           <div class="preamp-slider-wrap">
@@ -793,15 +755,11 @@ footer {
           <span class="preamp-unit">dB</span>
         </div>
 
-        <!-- Dynamic EQ Bands Container (Stretches across remaining width) -->
         <div id="bands-container"></div>
       </div>
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE 2: COMPRESSOR                                    -->
-  <!-- ======================================================= -->
   <section class="module-box" id="mod-compander">
     <div class="module-header" onclick="toggleModuleCollapse('comp')">
       <div class="module-title-area">
@@ -815,7 +773,6 @@ footer {
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
-        <!-- Threshold -->
         <div class="control-pod">
           <span class="control-pod-title">Threshold</span>
           <canvas id="knob-comp-thresh" class="knob" width="60" height="60"></canvas>
@@ -824,7 +781,6 @@ footer {
             <span>dBFS</span>
           </div>
         </div>
-        <!-- Ratio -->
         <div class="control-pod">
           <span class="control-pod-title">Ratio</span>
           <canvas id="knob-comp-ratio" class="knob" width="60" height="60"></canvas>
@@ -833,7 +789,6 @@ footer {
             <span>:1</span>
           </div>
         </div>
-        <!-- Attack -->
         <div class="control-pod">
           <span class="control-pod-title">Attack</span>
           <canvas id="knob-comp-att" class="knob" width="60" height="60"></canvas>
@@ -842,7 +797,6 @@ footer {
             <span>ms</span>
           </div>
         </div>
-        <!-- Release -->
         <div class="control-pod">
           <span class="control-pod-title">Release</span>
           <canvas id="knob-comp-rel" class="knob" width="60" height="60"></canvas>
@@ -851,7 +805,6 @@ footer {
             <span>ms</span>
           </div>
         </div>
-        <!-- Makeup Gain -->
         <div class="control-pod">
           <span class="control-pod-title">Makeup Gain</span>
           <canvas id="knob-comp-gain" class="knob" width="60" height="60"></canvas>
@@ -864,9 +817,6 @@ footer {
     </div>
   </section>
 
-  <!-- ======================================================= -->
-  <!-- MODULE 3: LIMITER                                       -->
-  <!-- ======================================================= -->
   <section class="module-box" id="mod-limiter">
     <div class="module-header" onclick="toggleModuleCollapse('lim')">
       <div class="module-title-area">
@@ -880,7 +830,6 @@ footer {
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
-        <!-- Ceiling -->
         <div class="control-pod">
           <span class="control-pod-title">Ceiling</span>
           <canvas id="knob-lim-ceil" class="knob" width="60" height="60"></canvas>
@@ -889,7 +838,6 @@ footer {
             <span>dBFS</span>
           </div>
         </div>
-        <!-- Knee Width -->
         <div class="control-pod">
           <span class="control-pod-title">Knee Width</span>
           <canvas id="knob-lim-knee" class="knob" width="60" height="60"></canvas>
@@ -908,9 +856,6 @@ footer {
 </footer>
 
 <script>
-// ===========================================================
-// Constants & Color Map (Nord Palette)
-// ===========================================================
 const FS = 48000;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
@@ -919,7 +864,6 @@ const BAND_COLORS = [
   '#BF616A', '#4C566A'
 ];
 
-// Initial default: 5 bands (Low Shelf, 3 Peakings, High Shelf)
 let eqEnabled = true;
 let eqPreamp  = 0.0;
 let currentPreset = 'flat';
@@ -998,7 +942,6 @@ function saveCurrentPreset() {
     }))
   };
 
-  // 1. Save to localStorage custom presets
   let customPresets = [];
   try {
     customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
@@ -1017,7 +960,6 @@ function saveCurrentPreset() {
   const activeBtn = document.querySelector(`[data-custom-preset="${CSS.escape(name.trim())}"]`);
   if (activeBtn) activeBtn.classList.add('active');
 
-  // 2. Download JSON file
   const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1042,7 +984,6 @@ function importPresetFile(event) {
         return;
       }
 
-      // Load preamp if provided
       if (typeof data.preamp === 'number') {
         eqPreamp = Math.max(-18, Math.min(18, data.preamp));
         updatePreampUI();
@@ -1089,7 +1030,6 @@ function importPresetFile(event) {
       rebuildBandsUI();
       drawResponse();
 
-      // Transmit to ESP32
       bands.forEach((_, i) => sendBand(i));
 
       event.target.value = '';
@@ -1194,14 +1134,10 @@ let limParams = {
   enabled: true, ceiling: -0.5, knee: 3.0
 };
 
-// References to UI Knob instances
 let bandKnobs = []; // Array of { freqKnob, gainKnob, qKnob }
 let compKnobs = {};
 let limKnobs  = {};
 
-// ===========================================================
-// WebSocket Client
-// ===========================================================
 let ws = null, wsRetry = null;
 
 function wsConnect() {
@@ -1249,7 +1185,6 @@ function setDot(cls, txt) {
 function handleMsg(d) {
   if (d.t !== 'state') return;
 
-  // 1. EQ State
   if (d.eq) {
     eqEnabled = d.eq.enabled !== undefined ? d.eq.enabled : true;
     updateBypassUI('eq', eqEnabled);
@@ -1279,21 +1214,18 @@ function handleMsg(d) {
     }
   }
 
-  // 2. Compander State
   if (d.compander) {
     Object.assign(compParams, d.compander);
     updateBypassUI('comp', compParams.enabled);
     syncCompanderUI();
   }
 
-  // 3. Limiter State
   if (d.limiter) {
     Object.assign(limParams, d.limiter);
     updateBypassUI('lim', limParams.enabled);
     syncLimiterUI();
   }
 
-  // 4. Input Source State
   if (d.input) {
     if (d.input.source !== undefined) {
       selectedInputSource = parseInt(d.input.source) || 0;
@@ -1307,7 +1239,6 @@ function handleMsg(d) {
   drawResponse();
 }
 
-// -- Input Source Functions ----------------------------------
 let selectedInputSource = 0; // 0: AUTO, 1: AUX, 2: BT, 3: WIFI
 let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
 
@@ -1333,9 +1264,6 @@ function updateInputSourceUI() {
   }
 }
 
-// ===========================================================
-// Rotary Knob Component (Nord Light Style)
-// ===========================================================
 class Knob {
   constructor(canvas, opts) {
     this.cv  = canvas;
@@ -1353,7 +1281,6 @@ class Knob {
       onChange: null
     }, opts);
 
-    // If defaultVal is not supplied, use centerZero or min
     if (this.defaultVal === undefined) {
       this.defaultVal = this.centerZero ? 0 : this.min;
     }
@@ -1364,13 +1291,11 @@ class Knob {
 
     canvas.addEventListener('mousedown',  e => this._md(e.clientY));
     canvas.addEventListener('dblclick',   () => {
-      // RESET TO defaultVal (e.g. Q resets to 0.707!)
       this.set(this.defaultVal, true);
     });
     canvas.addEventListener('wheel', e => {
       e.preventDefault();
       if (this.logScale) {
-        // Less sensitive, proportional step (~2.5% per notch)
         const factor = Math.pow(1.025, -Math.sign(e.deltaY));
         this.set(this.value * factor, true);
       } else {
@@ -1405,7 +1330,6 @@ class Knob {
     if (!this._drag) return;
     const dy = this._y0 - y;
     if (this.logScale) {
-      // Logarithmic scaling for frequency: significantly less sensitive (500px travel; 1500px with shift)
       const sens = fineTune ? 1500 : 500;
       const range = Math.log(this.max / this.min);
       const curT  = Math.log(this._v0 / this.min) / range;
@@ -1438,7 +1362,6 @@ class Knob {
     const cx = W / 2, cy = H / 2;
     const R  = Math.min(W, H) / 2 - 3;
 
-    // 270 degree sweep
     const SA  = Math.PI * 0.75;
     const SWP = Math.PI * 1.5;
 
@@ -1455,7 +1378,6 @@ class Knob {
 
     c.clearRect(0, 0, W, H);
 
-    // Knob outer body
     c.beginPath();
     c.arc(cx, cy, R, 0, Math.PI * 2);
     c.fillStyle = '#E5E9F0'; // Nord 5
@@ -1464,7 +1386,6 @@ class Knob {
     c.lineWidth = 1;
     c.stroke();
 
-    // Background track arc
     c.beginPath();
     c.arc(cx, cy, R - 4, SA, SA + SWP);
     c.strokeStyle = '#D8DEE9';
@@ -1472,7 +1393,6 @@ class Knob {
     c.lineCap = 'round';
     c.stroke();
 
-    // Value active arc
     const arc0 = this.centerZero ? midA : SA;
     const arc1 = vA;
     if (Math.abs(arc1 - arc0) > 0.01) {
@@ -1485,13 +1405,11 @@ class Knob {
       c.stroke();
     }
 
-    // Indicator needle dot
     c.beginPath();
     c.arc(cx + (R - 4) * Math.cos(vA), cy + (R - 4) * Math.sin(vA), 2.5, 0, Math.PI * 2);
     c.fillStyle = '#2E3440';
     c.fill();
 
-    // Center disc
     c.beginPath();
     c.arc(cx, cy, R - 10, 0, Math.PI * 2);
     c.fillStyle = '#FFFFFF';
@@ -1500,7 +1418,6 @@ class Knob {
     c.lineWidth = 1;
     c.stroke();
 
-    // Display value inside knob
     const fs = Math.max(7, Math.floor(W * 0.17));
     c.font = `600 ${fs}px ui-monospace, SFMono-Regular, monospace`;
     c.fillStyle = '#2E3440';
@@ -1517,9 +1434,6 @@ class Knob {
   }
 }
 
-// ===========================================================
-// Frequency Response Canvas (Nord Light)
-// ===========================================================
 const fCanvas = document.getElementById('freq-canvas');
 const fCtx    = fCanvas.getContext('2d');
 const DB_MAX  = 18;
@@ -1533,7 +1447,6 @@ function db2y(db, H) {
   return H * (0.5 - db / (2 * DB_MAX));
 }
 
-// Exact biquad magnitude for all filter types
 function singleBiquadMag(type, freq, gain, q, f) {
   const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
   const safeQ = Math.max(0.05, q);
@@ -1647,7 +1560,6 @@ function bandMagAt(b, f) {
   if (!b.enabled) return 0;
   let type  = b.type || 0;
   let order = b.order || 2;
-  // Backwards compatibility for legacy flat types
   if (type === 5) { type = 3; order = 4; }
   else if (type === 6) { type = 4; order = 4; }
 
@@ -1702,11 +1614,9 @@ function drawResponse() {
 
   c.clearRect(0, 0, W, H);
 
-  // Background
   c.fillStyle = '#FFFFFF';
   c.fillRect(0, 0, W, H);
 
-  // dB horizontal grid
   [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
     const y = db2y(db, H);
     c.beginPath();
@@ -1725,7 +1635,6 @@ function drawResponse() {
     }
   });
 
-  // Frequency vertical grid
   [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(f => {
     const x = f2x(f, W);
     c.beginPath();
@@ -1743,7 +1652,6 @@ function drawResponse() {
     c.fillText(lbl, x, H - 4 * DPR);
   });
 
-  // Individual band curves (crisp, subtle)
   bands.forEach((b, i) => {
     if (!b.enabled) return;
     const isShelfOrPeak = (b.type === 0 || b.type === 1 || b.type === 2 || b.type === undefined);
@@ -1759,14 +1667,12 @@ function drawResponse() {
     c.stroke();
   });
 
-  // Combined curve points
   const pts = [];
   for (let k = 0; k <= NPTS; k++) {
     const f = F0 * Math.pow(F1 / F0, k / NPTS);
     pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
   }
 
-  // High-contrast flat subtle tint (no blurry glow)
   const zY = db2y(0, H);
   c.beginPath();
   c.moveTo(pts[0].x, zY);
@@ -1776,7 +1682,6 @@ function drawResponse() {
   c.fillStyle = eqEnabled ? 'rgba(94, 129, 172, 0.10)' : 'rgba(76, 86, 106, 0.06)';
   c.fill();
 
-  // Primary curve line (solid high contrast)
   c.beginPath();
   pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
   c.strokeStyle = eqEnabled ? '#5E81AC' : '#718096';
@@ -1784,7 +1689,6 @@ function drawResponse() {
   c.lineJoin    = 'round';
   c.stroke();
 
-  // Band center dot markers (solid crisp dots with sharp border)
   bands.forEach((b, i) => {
     const x = f2x(b.freq, W);
     const y = db2y(totalMagAt(b.freq), H);
@@ -1805,9 +1709,6 @@ function drawResponse() {
 
 new ResizeObserver(drawResponse).observe(fCanvas);
 
-// ===========================================================
-// Dynamic EQ Bands UI Builder
-// ===========================================================
 function rebuildBandsUI() {
   const root = document.getElementById('bands-container');
   root.innerHTML = '';
@@ -1826,7 +1727,6 @@ function rebuildBandsUI() {
     card.className = 'band-card';
     card.id = `band-card-${i}`;
 
-    // Header: Band # + Toggle dot + Remove btn
     const hdr = document.createElement('div');
     hdr.className = 'band-card-header';
     hdr.innerHTML = `
@@ -1838,7 +1738,6 @@ function rebuildBandsUI() {
     `;
     card.appendChild(hdr);
 
-    // Toggle band dot event
     hdr.querySelector(`#band-dot-${i}`).addEventListener('click', () => {
       b.enabled = !b.enabled;
       document.getElementById(`band-dot-${i}`).className = 'band-dot ' + (b.enabled ? 'on' : '');
@@ -1846,7 +1745,6 @@ function rebuildBandsUI() {
       drawResponse();
     });
 
-    // Filter Type Dropdown
     const typeRow = document.createElement('div');
     typeRow.className = 'band-type-row';
     typeRow.innerHTML = `
@@ -1860,7 +1758,6 @@ function rebuildBandsUI() {
     `;
     card.appendChild(typeRow);
 
-    // Filter Order Dropdown (shown for Low Pass and High Pass)
     const orderRow = document.createElement('div');
     orderRow.className = 'band-order-row';
     orderRow.id = `order-row-${i}`;
@@ -1875,7 +1772,6 @@ function rebuildBandsUI() {
     `;
     card.appendChild(orderRow);
 
-    // 1. Frequency Control
     const colF = document.createElement('div');
     colF.className = 'param-unit-col';
     colF.innerHTML = `
@@ -1885,7 +1781,6 @@ function rebuildBandsUI() {
     `;
     card.appendChild(colF);
 
-    // 2. Gain Control
     const colG = document.createElement('div');
     colG.className = 'param-unit-col';
     colG.id = `gain-col-${i}`;
@@ -1896,7 +1791,6 @@ function rebuildBandsUI() {
     `;
     card.appendChild(colG);
 
-    // 3. Q Control
     const colQ = document.createElement('div');
     colQ.className = 'param-unit-col';
     colQ.id = `q-col-${i}`;
@@ -1909,7 +1803,6 @@ function rebuildBandsUI() {
 
     root.appendChild(card);
 
-    // Instantiate Frequency Knob
     const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
       min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
       logScale: true, color: BAND_COLORS[i % BAND_COLORS.length],
@@ -1922,7 +1815,6 @@ function rebuildBandsUI() {
       }
     });
 
-    // Frequency Text Input Box Link
     card.querySelector(`#num-f-${i}`).addEventListener('change', e => {
       let v = parseFloat(e.target.value);
       if (isNaN(v)) v = b.freq;
@@ -1934,7 +1826,6 @@ function rebuildBandsUI() {
       drawResponse();
     });
 
-    // Instantiate Gain Knob (resets to 0.0)
     const gKnob = new Knob(card.querySelector(`#knob-g-${i}`), {
       min: -18, max: 18, value: b.gain, defaultVal: 0.0,
       centerZero: true, color: BAND_COLORS[i % BAND_COLORS.length],
@@ -1947,7 +1838,6 @@ function rebuildBandsUI() {
       }
     });
 
-    // Helper to dim/disable gain knob & Q knob for Pass and Flat filter types
     const updateBandParamStates = () => {
       const isPassFilter = (b.type === 3 || b.type === 4);
       const oRow = card.querySelector(`#order-row-${i}`);
@@ -1962,7 +1852,6 @@ function rebuildBandsUI() {
         card.querySelector(`#num-g-${i}`).value = "0.0";
         gKnob.set(0, false);
 
-        // For orders 1, 3, 4: Q is fixed flat (Butterworth). For order 2: Q can be adjusted
         if (b.order === 2) {
           colQ.classList.remove('disabled-param');
           card.querySelector(`#num-q-${i}`).disabled = false;
@@ -1978,7 +1867,6 @@ function rebuildBandsUI() {
       }
     };
 
-    // Filter Type Change Event
     card.querySelector(`#sel-type-${i}`).addEventListener('change', e => {
       b.type = parseInt(e.target.value) || 0;
       updateBandParamStates();
@@ -1986,7 +1874,6 @@ function rebuildBandsUI() {
       drawResponse();
     });
 
-    // Filter Order Change Event
     card.querySelector(`#sel-order-${i}`).addEventListener('change', e => {
       b.order = parseInt(e.target.value) || 2;
       updateBandParamStates();
@@ -1994,10 +1881,8 @@ function rebuildBandsUI() {
       drawResponse();
     });
 
-    // Initialize Gain & Q states based on current type & order
     updateBandParamStates();
 
-    // Gain Text Input Box Link
     card.querySelector(`#num-g-${i}`).addEventListener('change', e => {
       let v = parseFloat(e.target.value);
       if (isNaN(v)) v = b.gain;
@@ -2009,7 +1894,6 @@ function rebuildBandsUI() {
       drawResponse();
     });
 
-    // Instantiate Q Knob (resets to 0.707 on double click!)
     const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
       min: 0.1, max: 8.0, value: b.q, defaultVal: 0.707,
       color: '#81A1C1',
@@ -2022,7 +1906,6 @@ function rebuildBandsUI() {
       }
     });
 
-    // Q Text Input Box Link
     card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
       let v = parseFloat(e.target.value);
       if (isNaN(v)) v = b.q;
@@ -2058,7 +1941,6 @@ function sendBand(i) {
 function addBand() {
   if (bands.length >= MAX_BANDS) return;
 
-  // Pick a musical frequency between 50 Hz and 15000 Hz
   const candidateFreqs = [250, 500, 2000, 4000, 8000, 16000, 63, 125, 315];
   let nextFreq = 1000;
   for (let f of candidateFreqs) {
@@ -2097,9 +1979,6 @@ function removeBand(index) {
   wsTx({ t: 'remove_band', band: index });
 }
 
-// ===========================================================
-// Module Bypass Controls
-// ===========================================================
 function updateBypassUI(mod, enabled) {
   const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'comp' ? 'compander' : 'limiter')}`;
   const box = document.getElementById(boxId);
@@ -2157,11 +2036,7 @@ function toggleLimiterModule(checked) {
   sendLimiter();
 }
 
-// ===========================================================
-// Compander & Limiter UI Binding
-// ===========================================================
 function initCompanderKnobs() {
-  // Threshold (-60 to 0)
   compKnobs.thresh = new Knob(document.getElementById('knob-comp-thresh'), {
     min: -60, max: 0, value: compParams.threshold, defaultVal: -18,
     color: '#81A1C1', decimals: 1,
@@ -2181,7 +2056,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Ratio (1 to 20)
   compKnobs.ratio = new Knob(document.getElementById('knob-comp-ratio'), {
     min: 1, max: 20, value: compParams.ratio, defaultVal: 4,
     color: '#88C0D0', decimals: 1,
@@ -2201,7 +2075,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Attack (0.1 to 200 ms)
   compKnobs.att = new Knob(document.getElementById('knob-comp-att'), {
     min: 0.1, max: 200, value: compParams.attackMs, defaultVal: 5,
     color: '#A3BE8C', decimals: 1,
@@ -2221,7 +2094,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Release (10 to 2000 ms)
   compKnobs.rel = new Knob(document.getElementById('knob-comp-rel'), {
     min: 10, max: 2000, value: compParams.releaseMs, defaultVal: 150,
     color: '#D08770', decimals: 0,
@@ -2241,7 +2113,6 @@ function initCompanderKnobs() {
     }
   });
 
-  // Makeup Gain (-12 to +24 dB)
   compKnobs.gain = new Knob(document.getElementById('knob-comp-gain'), {
     min: -12, max: 24, value: compParams.makeup, defaultVal: 0,
     centerZero: true, color: '#B48EAD', decimals: 1,
@@ -2290,7 +2161,6 @@ function sendCompander() {
 }
 
 function initLimiterKnobs() {
-  // Ceiling (-6 to 0 dBFS)
   limKnobs.ceil = new Knob(document.getElementById('knob-lim-ceil'), {
     min: -6, max: 0, value: limParams.ceiling, defaultVal: -0.5,
     color: '#BF616A', decimals: 1,
@@ -2310,7 +2180,6 @@ function initLimiterKnobs() {
     }
   });
 
-  // Knee Width (0 to 6 dB)
   limKnobs.knee = new Knob(document.getElementById('knob-lim-knee'), {
     min: 0, max: 6, value: limParams.knee, defaultVal: 3.0,
     color: '#8FBCBB', decimals: 1,
@@ -2349,9 +2218,6 @@ function sendLimiter() {
   });
 }
 
-// ===========================================================
-// Initialization
-// ===========================================================
 updateInputSourceUI();
 initPreamp();
 renderCustomPresets();
