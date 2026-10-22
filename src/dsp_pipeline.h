@@ -12,10 +12,12 @@
 #include "compander.h"
 #include "limiter.h"
 #include "speaker_correction.h"
+#include "dsp_module_id.h"
 
 class IDSPModule {
 public:
     virtual ~IDSPModule() = default;
+    virtual DspModuleId moduleId() const = 0;
     virtual const char* id() const = 0;
     virtual const char* name() const = 0;
     virtual void process(float* left, float* right, size_t frames) = 0;
@@ -25,6 +27,7 @@ public:
 
 class EQModule : public IDSPModule {
 public:
+    DspModuleId moduleId() const override { return DspModuleId::Eq; }
     const char* id() const override { return "eq"; }
     const char* name() const override { return "Parametric EQ"; }
 
@@ -69,6 +72,7 @@ private:
 
 class SubsonicModule : public IDSPModule {
 public:
+    DspModuleId moduleId() const override { return DspModuleId::Subsonic; }
     const char* id() const override { return "subsonic"; }
     const char* name() const override { return "Speakers Correction"; }
 
@@ -94,6 +98,7 @@ private:
 
 class CompanderModule : public IDSPModule {
 public:
+    DspModuleId moduleId() const override { return DspModuleId::Compander; }
     const char* id() const override { return "comp"; }
     const char* name() const override { return "Compressor"; }
 
@@ -117,6 +122,7 @@ private:
 
 class LimiterModule : public IDSPModule {
 public:
+    DspModuleId moduleId() const override { return DspModuleId::Limiter; }
     const char* id() const override { return "lim"; }
     const char* name() const override { return "Limiter"; }
 
@@ -187,11 +193,10 @@ private:
         _registeredModules[_registeredCount++] = mod;
     }
 
-    IDSPModule* _findModule(const char* id) {
-        if (!id) return nullptr;
+    IDSPModule* _findModule(DspModuleId id) {
+        if (id == DspModuleId::Unknown) return nullptr;
         for (size_t i = 0; i < _registeredCount; ++i) {
-            if (_registeredModules[i] && (strcmp(_registeredModules[i]->id(), id) == 0 ||
-                (strcmp(id, "sub") == 0 && strcmp(_registeredModules[i]->id(), "subsonic") == 0))) {
+            if (_registeredModules[i] && _registeredModules[i]->moduleId() == id) {
                 return _registeredModules[i];
             }
         }
@@ -212,7 +217,7 @@ private:
             char* end = token + strlen(token) - 1;
             while (end > token && *end == ' ') { *end = '\0'; end--; }
 
-            IDSPModule* m = _findModule(token);
+            IDSPModule* m = _findModule(parseDspModuleId(token));
             if (m) {
                 _activeModules[_activeModuleCount++] = m;
             }

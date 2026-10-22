@@ -76,7 +76,7 @@ struct SetdPacket {
 
 #pragma pack(pop)
 
-SlimprotoClient::SlimprotoClient(ParamStore& params, AudioRingBuffer<16384>& ringBuffer)
+SlimprotoClient::SlimprotoClient(ParamStore& params, AudioRingBuffer<RuntimeTuning::kWiFiRingBufferFrames>& ringBuffer)
     : _params(params), _ringBuffer(ringBuffer)
 {
 }
@@ -266,14 +266,14 @@ bool SlimprotoClient::_discoverServer()
     struct sockaddr_in destAddr;
     memset(&destAddr, 0, sizeof(destAddr));
     destAddr.sin_family      = AF_INET;
-    destAddr.sin_port        = htons(3483);
+    destAddr.sin_port        = htons(RuntimeTuning::kSlimprotoControlPort);
     destAddr.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 
     // Standard discovery packet: 'e' followed by "JSON" \0 "CLIP"
     const char discPacket[] = "eJSON\0CLIP";
     const size_t discPacketLen = 10;
 
-    Serial.println("[SLIMPROTO] Broadcasting UDP discovery on port 3483...");
+    Serial.printf("[SLIMPROTO] Broadcasting UDP discovery on port %u...\n", RuntimeTuning::kSlimprotoControlPort);
     if (sendto(discSock, discPacket, discPacketLen, 0, (struct sockaddr*)&destAddr, sizeof(destAddr)) < 0) {
         Serial.println("[SLIMPROTO] Discovery broadcast send failed");
         close(discSock);
@@ -427,12 +427,12 @@ bool SlimprotoClient::_handleControlPacket()
     if (n != 2) return false;
 
     uint16_t payloadLen = (static_cast<uint16_t>(lenBuf[0]) << 8) | lenBuf[1];
-    if (payloadLen == 0 || payloadLen > 4096) {
+    if (payloadLen == 0 || payloadLen > RuntimeTuning::kSlimprotoMaxControlPacket) {
         Serial.printf("[SLIMPROTO] Invalid packet length: %u\n", payloadLen);
         return false;
     }
 
-    uint8_t payload[4096];
+    uint8_t payload[RuntimeTuning::kSlimprotoMaxControlPacket];
     int bytesRead = 0;
     while (bytesRead < payloadLen) {
         int r = recv(_controlSock, payload + bytesRead, payloadLen - bytesRead, 0);
@@ -502,14 +502,14 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
                 case '0': _sampleRate = 11025; break;
                 case '1': _sampleRate = 22050; break;
                 case '2': _sampleRate = 32000; break;
-                case '3': _sampleRate = 44100; break;
+                case '3': _sampleRate = RuntimeTuning::kSlimprotoDefaultRate; break;
                 case '4': _sampleRate = 48000; break;
                 case '5': _sampleRate = 8000;  break;
                 case '6': _sampleRate = 12000; break;
                 case '7': _sampleRate = 16000; break;
                 case '8': _sampleRate = 24000; break;
                 case '9': _sampleRate = 96000; break;
-                default:  _sampleRate = 44100; break;
+                default:  _sampleRate = RuntimeTuning::kSlimprotoDefaultRate; break;
             }
 
             // '0' = 8 bit, '1' = 16, '2' = 24, '3' = 32
@@ -539,7 +539,7 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
             }
             _streamPort = ntohs(strm->server_port);
             if (_streamPort == 0) {
-                _streamPort = 9000;
+                _streamPort = RuntimeTuning::kSlimprotoDefaultStreamPort;
             }
 
             size_t reqLen = (len > sizeof(StrmPacket)) ? (len - sizeof(StrmPacket)) : 0;
@@ -625,7 +625,7 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     int nodelay = 1;
     setsockopt(_streamSock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
 
-    int rxBufSize = 16384;
+    int rxBufSize = static_cast<int>(RuntimeTuning::kWiFiRingBufferFrames);
     setsockopt(_streamSock, SOL_SOCKET, SO_RCVBUF, &rxBufSize, sizeof(rxBufSize));
 
     struct timeval tv;
@@ -661,7 +661,7 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
         send(_streamSock, defaultGet.c_str(), defaultGet.length(), 0);
     }
 
-    char headerBuf[1024];
+    char headerBuf[RuntimeTuning::kSlimprotoReadChunkBytes];
     int headerPos = 0;
     bool headerEnd = false;
 
@@ -725,8 +725,8 @@ void SlimprotoClient::_readAudioStreamData()
 {
     if (_streamSock < 0 || _paused) return;
 
-    while (_streaming && _streamSock >= 0 && _ringBuffer.space() >= 512) {
-        uint8_t inBuf[1024 + sizeof(_carryBuf)];
+    while (_streaming && _streamSock >= 0 && _ringBuffer.space() >= RuntimeTuning::kSlimprotoMinWriteFrames) {
+        uint8_t inBuf[RuntimeTuning::kSlimprotoReadChunkBytes + sizeof(_carryBuf)];
         size_t totalBytes = _carryLen;
 
         // leftover bytes from the last read go first
@@ -735,7 +735,7 @@ void SlimprotoClient::_readAudioStreamData()
             _carryLen = 0;
         }
 
-        int bytesRead = recv(_streamSock, inBuf + totalBytes, 1024, MSG_DONTWAIT);
+        int bytesRead = recv(_streamSock, inBuf + totalBytes, RuntimeTuning::kSlimprotoReadChunkBytes, MSG_DONTWAIT);
 
         if (bytesRead <= 0) {
             if (bytesRead < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
@@ -784,7 +784,7 @@ void SlimprotoClient::_readAudioStreamData()
                         memmove(inBuf, inBuf + offset, totalBytes - offset);
                         totalBytes -= offset;
                         _headerParsed = true;
-                    } else if (!foundData && totalBytes < 512) {
+                    } else if (!foundData && totalBytes < RuntimeTuning::kSlimprotoMinWriteFrames) {
                         memcpy(_carryBuf, inBuf, totalBytes);
                         _carryLen = totalBytes;
                         break;
@@ -834,7 +834,7 @@ void SlimprotoClient::_readAudioStreamData()
             break;
         }
 
-        if (frameCount > 256) frameCount = 256;
+        if (frameCount > RuntimeTuning::kSlimprotoDecodeFrames) frameCount = RuntimeTuning::kSlimprotoDecodeFrames;
         size_t bytesConsumed = frameCount * bytesPerFrame;
 
         size_t remainder = totalBytes - bytesConsumed;
@@ -845,8 +845,8 @@ void SlimprotoClient::_readAudioStreamData()
             _carryLen = 0;
         }
 
-        float decodedL[256];
-        float decodedR[256];
+        float decodedL[RuntimeTuning::kSlimprotoDecodeFrames];
+        float decodedR[RuntimeTuning::kSlimprotoDecodeFrames];
 
         if (_bitDepth == 16) {
             for (size_t i = 0; i < frameCount; ++i) {
@@ -901,17 +901,18 @@ void SlimprotoClient::_readAudioStreamData()
         }
 
         // 44.1k -> 48k linear interpolation
-        if (_sampleRate == 44100) {
-            float resampledL[384];
-            float resampledR[384];
+        if (_sampleRate == RuntimeTuning::kSlimprotoDefaultRate) {
+            float resampledL[RuntimeTuning::kSlimprotoResampleFrames];
+            float resampledR[RuntimeTuning::kSlimprotoResampleFrames];
             size_t outFrames = 0;
-            const float step = 44100.0f / 48000.0f;
+            const float step = static_cast<float>(RuntimeTuning::kSlimprotoDefaultRate) /
+                               static_cast<float>(RuntimeTuning::kDspOutputSampleRate);
 
             for (size_t i = 0; i < frameCount; ++i) {
                 float curL = decodedL[i];
                 float curR = decodedR[i];
 
-                while (_resampPhase < 1.0f && outFrames < 384) {
+                while (_resampPhase < 1.0f && outFrames < RuntimeTuning::kSlimprotoResampleFrames) {
                     resampledL[outFrames] = _lastSampleL + _resampPhase * (curL - _lastSampleL);
                     resampledR[outFrames] = _lastSampleR + _resampPhase * (curR - _lastSampleR);
                     outFrames++;
@@ -931,7 +932,7 @@ void SlimprotoClient::_readAudioStreamData()
         }
 
         // ~21 ms buffered, tell the server playback started
-        if (!_startedSent && _ringBuffer.available() >= 1024) {
+        if (!_startedSent && _ringBuffer.available() >= RuntimeTuning::kSlimprotoStartedFrames) {
             _startedSent = true;
             _sendStat("STMs");
             _updateMetadata(true, true, false, "Streaming PCM");
@@ -976,4 +977,3 @@ void SlimprotoClient::_updateMetadata(bool connected, bool streaming, bool pause
 
     _params.setWiFiStreamMetadata(meta);
 }
-

@@ -249,21 +249,22 @@ void I2SAudio::_resampleAndWriteBt(size_t frames)
     if (frames == 0) return;
 
     // cap latency at ~85 ms (4096 frames)
-    if (_btRingBuffer.available() > 4096) {
-        float dropL[256], dropR[256];
-        _btRingBuffer.read(dropL, dropR, 256);
+    if (_btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames) {
+        float dropL[RuntimeTuning::kBtLatencyTrimFrames], dropR[RuntimeTuning::kBtLatencyTrimFrames];
+        _btRingBuffer.read(dropL, dropR, RuntimeTuning::kBtLatencyTrimFrames);
     }
 
-    float resampL[512];
-    float resampR[512];
+    float resampL[RuntimeTuning::kBtResampleChunkFrames];
+    float resampR[RuntimeTuning::kBtResampleChunkFrames];
     size_t outCount = 0;
-    constexpr float step = 44100.0f / 48000.0f;
+    constexpr float step = static_cast<float>(RuntimeTuning::kBtInputSampleRate) /
+                           static_cast<float>(RuntimeTuning::kDspOutputSampleRate);
 
     for (size_t i = 0; i < frames; ++i) {
         float curL = static_cast<float>(_rxBufBt[i * 2    ]) * kScale;
         float curR = static_cast<float>(_rxBufBt[i * 2 + 1]) * kScale;
 
-        while (_btResampPhase < 1.0f && outCount < 512) {
+        while (_btResampPhase < 1.0f && outCount < RuntimeTuning::kBtResampleChunkFrames) {
             resampL[outCount] = _btLastL + _btResampPhase * (curL - _btLastL);
             resampR[outCount] = _btLastR + _btResampPhase * (curR - _btLastR);
             outCount++;
@@ -276,7 +277,7 @@ void I2SAudio::_resampleAndWriteBt(size_t frames)
         _btLastL = curL;
         _btLastR = curR;
 
-        if (outCount >= 480) {
+        if (outCount >= (RuntimeTuning::kBtResampleChunkFrames - 32)) {
             _btRingBuffer.write(resampL, resampR, outCount);
             outCount = 0;
         }
