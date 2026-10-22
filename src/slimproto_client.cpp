@@ -665,19 +665,30 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     int headerPos = 0;
     bool headerEnd = false;
 
-    while (!headerEnd && headerPos < sizeof(headerBuf) - 1) {
-        char c;
-        int n = recv(_streamSock, &c, 1, 0);
-        if (n <= 0) break;
-        headerBuf[headerPos++] = c;
-        if (headerPos >= 4 &&
-            headerBuf[headerPos - 4] == '\r' && headerBuf[headerPos - 3] == '\n' &&
-            headerBuf[headerPos - 2] == '\r' && headerBuf[headerPos - 1] == '\n') {
-            headerEnd = true;
-        } else if (headerPos >= 2 &&
-                   headerBuf[headerPos - 2] == '\n' && headerBuf[headerPos - 1] == '\n') {
-            headerEnd = true;
+    while (!headerEnd && headerPos < static_cast<int>(sizeof(headerBuf)) - 1) {
+        int avail = recv(_streamSock, headerBuf + headerPos, sizeof(headerBuf) - 1 - headerPos, MSG_PEEK);
+        if (avail <= 0) break;
+
+        int consume = avail;
+        for (int i = 0; i < avail; ++i) {
+            int pos = headerPos + i + 1;
+            if (pos >= 4 &&
+                headerBuf[pos - 4] == '\r' && headerBuf[pos - 3] == '\n' &&
+                headerBuf[pos - 2] == '\r' && headerBuf[pos - 1] == '\n') {
+                consume = i + 1;
+                headerEnd = true;
+                break;
+            } else if (pos >= 2 &&
+                       headerBuf[pos - 2] == '\n' && headerBuf[pos - 1] == '\n') {
+                consume = i + 1;
+                headerEnd = true;
+                break;
+            }
         }
+
+        int n = recv(_streamSock, headerBuf + headerPos, consume, 0);
+        if (n <= 0) break;
+        headerPos += n;
     }
 
     if (!headerEnd || headerPos == 0) {

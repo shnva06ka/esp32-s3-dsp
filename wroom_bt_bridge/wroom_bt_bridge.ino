@@ -23,7 +23,7 @@ HardwareSerial S3Serial(2); // UART2 (Full-duplex to S3)
 static Preferences g_prefs;
 static uint8_t g_btVolume = 100; // Default volume ~80% (100 / 127) if not yet stored
 static volatile bool g_volDirty = false;
-static unsigned long g_lastVolChangeTime = 0;
+static volatile unsigned long g_lastVolChangeTime = 0;
 static const unsigned long kVolSaveDebounceMs = 2500;
 
 enum BtState {
@@ -33,37 +33,69 @@ enum BtState {
 };
 static volatile BtState g_btState = BT_DISCONNECTED;
 
+static portMUX_TYPE g_metaMux = portMUX_INITIALIZER_UNLOCKED;
 static char g_trackTitle[128]  = "No Track Playing";
 static char g_trackArtist[128] = "Unknown Artist";
 static char g_trackAlbum[128]  = "Unknown Album";
-static uint32_t g_trackDurationMs = 0;
-static uint32_t g_trackPosMs = 0;
+static uint32_t g_trackDurationSec = 0;
+static uint32_t g_trackPosSec = 0;
 static volatile bool g_metadataChanged = false;
+static volatile bool g_trackInfoChanged = false;
+static volatile unsigned long g_lastMetaUpdateMs = 0;
 static unsigned long g_lastMetaBroadcast = 0;
 
 void broadcast_metadata() {
+    char title[128];
+    char artist[128];
+    char album[128];
+    uint32_t durationSec;
+    uint32_t posSec;
+    BtState state;
+    bool logBroadcast;
+
+    portENTER_CRITICAL(&g_metaMux);
+    memcpy(title,  g_trackTitle,  sizeof(title));
+    memcpy(artist, g_trackArtist, sizeof(artist));
+    memcpy(album,  g_trackAlbum,  sizeof(album));
+    durationSec  = g_trackDurationSec;
+    posSec       = g_trackPosSec;
+    state        = g_btState;
+    logBroadcast = g_trackInfoChanged;
+    g_metadataChanged  = false;
+    g_trackInfoChanged = false;
+    portEXIT_CRITICAL(&g_metaMux);
+
     StaticJsonDocument<384> doc;
     doc["t"]         = "bt_meta";
-    doc["title"]     = g_trackTitle;
-    doc["artist"]    = g_trackArtist;
-    doc["album"]     = g_trackAlbum;
-    doc["connected"] = (g_btState != BT_DISCONNECTED);
-    doc["playing"]   = (g_btState == BT_PLAYING);
-    doc["duration"]  = g_trackDurationMs / 1000; // in seconds
-    doc["pos"]       = g_trackPosMs / 1000;      // in seconds
+    doc["title"]     = title;
+    doc["artist"]    = artist;
+    doc["album"]     = album;
+    doc["connected"] = (state != BT_DISCONNECTED);
+    doc["playing"]   = (state == BT_PLAYING);
+    doc["duration"]  = durationSec;
+    doc["pos"]       = posSec;
 
-    String line;
-    serializeJson(doc, line);
-    S3Serial.println(line);
-    Serial.printf("[META] Broadcasted -> S3: %s\n", line.c_str());
-    g_metadataChanged = false;
+    char line[384];
+    size_t len = serializeJson(doc, line, sizeof(line) - 2);
+    line[len] = '\n';
+    line[len + 1] = '\0';
+    S3Serial.write(reinterpret_cast<const uint8_t*>(line), len + 1);
+
+    if (logBroadcast) {
+        line[len] = '\0';
+        Serial.printf("[META] Broadcasted -> S3: %s\n", line);
+    }
     g_lastMetaBroadcast = millis();
 }
 
 void avrc_play_pos_callback(uint32_t play_pos) {
-    g_trackPosMs = play_pos;
-    g_metadataChanged = true;
-    Serial.printf("[AVRC] Play pos: %u ms\n", play_pos);
+    uint32_t sec = play_pos / 1000;
+    portENTER_CRITICAL(&g_metaMux);
+    if (sec != g_trackPosSec) {
+        g_trackPosSec = sec;
+        g_metadataChanged = true;
+    }
+    portEXIT_CRITICAL(&g_metaMux);
 }
 
 void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
@@ -71,33 +103,44 @@ void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
     const char* str = reinterpret_cast<const char*>(text);
     Serial.printf("[AVRC] Attr 0x%02X: %s\n", id, str);
 
+    portENTER_CRITICAL(&g_metaMux);
     if (id == ESP_AVRC_MD_ATTR_TITLE) {
         strncpy(g_trackTitle, str, sizeof(g_trackTitle) - 1);
         g_trackTitle[sizeof(g_trackTitle) - 1] = '\0';
         g_metadataChanged = true;
+        g_trackInfoChanged = true;
+        g_lastMetaUpdateMs = millis();
     } else if (id == ESP_AVRC_MD_ATTR_ARTIST) {
         strncpy(g_trackArtist, str, sizeof(g_trackArtist) - 1);
         g_trackArtist[sizeof(g_trackArtist) - 1] = '\0';
         g_metadataChanged = true;
+        g_trackInfoChanged = true;
+        g_lastMetaUpdateMs = millis();
     } else if (id == ESP_AVRC_MD_ATTR_ALBUM) {
         strncpy(g_trackAlbum, str, sizeof(g_trackAlbum) - 1);
         g_trackAlbum[sizeof(g_trackAlbum) - 1] = '\0';
         g_metadataChanged = true;
+        g_trackInfoChanged = true;
+        g_lastMetaUpdateMs = millis();
     } else if (id == ESP_AVRC_MD_ATTR_PLAYING_TIME) {
-        g_trackDurationMs = strtoul(str, nullptr, 10);
+        uint32_t ms = strtoul(str, nullptr, 10);
+        g_trackDurationSec = ms / 1000;
         g_metadataChanged = true;
-        Serial.printf("[AVRC] Track duration: %u ms\n", g_trackDurationMs);
+        g_trackInfoChanged = true;
+        g_lastMetaUpdateMs = millis();
     }
+    portEXIT_CRITICAL(&g_metaMux);
 }
 
 void save_volume_to_nvs() {
     if (!g_volDirty) return;
     g_volDirty = false;
+    uint8_t vol = g_btVolume;
     if (g_prefs.begin("bt_cfg", false)) {
-        g_prefs.putUChar("vol", g_btVolume);
+        g_prefs.putUChar("vol", vol);
         g_prefs.end();
         Serial.printf("[NVS] Persisted Bluetooth volume %d / 127 (%d%%) to flash.\n",
-                      g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+                      vol, (uint32_t)vol * 100 / 127);
     }
 }
 
@@ -106,8 +149,8 @@ void avrc_volume_change_callback(int vol) {
     if (vol > 127) vol = 127;
     if (static_cast<uint8_t>(vol) != g_btVolume) {
         g_btVolume = static_cast<uint8_t>(vol);
-        g_volDirty = true;
         g_lastVolChangeTime = millis();
+        g_volDirty = true;
         Serial.printf("[AVRC] Volume updated by host: %d / 127 (%d%%) [pending NVS save]\n",
                       g_btVolume, (uint32_t)g_btVolume * 100 / 127);
     }
@@ -117,23 +160,33 @@ void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
     switch (state) {
         case ESP_A2D_CONNECTION_STATE_DISCONNECTED:
             Serial.println("[BT] Device disconnected. Ready for pairing...");
-            save_volume_to_nvs(); // Immediately commit pending volume to flash on disconnect
+            if (g_volDirty) {
+                g_lastVolChangeTime = 0; // trigger immediate NVS save on loopTask
+            }
+            portENTER_CRITICAL(&g_metaMux);
             g_btState = BT_DISCONNECTED;
             strncpy(g_trackTitle, "No Track Playing", sizeof(g_trackTitle) - 1);
             strncpy(g_trackArtist, "Unknown Artist", sizeof(g_trackArtist) - 1);
             strncpy(g_trackAlbum, "Unknown Album", sizeof(g_trackAlbum) - 1);
+            g_trackDurationSec = 0;
+            g_trackPosSec = 0;
             g_metadataChanged = true;
+            g_trackInfoChanged = true;
+            portEXIT_CRITICAL(&g_metaMux);
             break;
         case ESP_A2D_CONNECTION_STATE_CONNECTING:
             Serial.println("[BT] Connecting to Bluetooth source...");
             break;
         case ESP_A2D_CONNECTION_STATE_CONNECTED:
             Serial.println("[BT] Connected to Bluetooth source!");
+            portENTER_CRITICAL(&g_metaMux);
             g_btState = BT_CONNECTED_IDLE;
+            g_metadataChanged = true;
+            g_trackInfoChanged = true;
+            portEXIT_CRITICAL(&g_metaMux);
             a2dp_sink.set_volume(g_btVolume); // Enforce remembered volume on connection
             Serial.printf("[BT] Enforced remembered volume: %d / 127 (%d%%)\n",
                           g_btVolume, (uint32_t)g_btVolume * 100 / 127);
-            g_metadataChanged = true;
             break;
         case ESP_A2D_CONNECTION_STATE_DISCONNECTING:
             Serial.println("[BT] Disconnecting...");
@@ -146,13 +199,19 @@ void audio_state_changed(esp_a2d_audio_state_t state, void *ptr) {
         case ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND:
         case ESP_A2D_AUDIO_STATE_STOPPED:
             Serial.println("[BT] Audio stopped/paused");
+            portENTER_CRITICAL(&g_metaMux);
             if (g_btState != BT_DISCONNECTED) g_btState = BT_CONNECTED_IDLE;
             g_metadataChanged = true;
+            g_trackInfoChanged = true;
+            portEXIT_CRITICAL(&g_metaMux);
             break;
         case ESP_A2D_AUDIO_STATE_STARTED:
             Serial.println("[BT] Audio streaming active -> transmitting I2S to S3");
+            portENTER_CRITICAL(&g_metaMux);
             g_btState = BT_PLAYING;
             g_metadataChanged = true;
+            g_trackInfoChanged = true;
+            portEXIT_CRITICAL(&g_metaMux);
             break;
     }
 }
@@ -223,59 +282,80 @@ void setup() {
     Serial.printf("[INIT] Bluetooth A2DP Sink started successfully. Initial volume: %d / 127.\n", g_btVolume);
     Serial.println("[INIT] Connect your phone/PC to 'ESP32-DSP-BT'.");
 
+    g_trackInfoChanged = true;
     broadcast_metadata();
 }
 
-void handle_s3_command(const String& cmd) {
-    Serial.printf("[AVRC-CMD] Received from S3: '%s'\n", cmd.c_str());
-    if (cmd.equalsIgnoreCase("play")) {
+void handle_s3_command(const char* cmd) {
+    Serial.printf("[AVRC-CMD] Received from S3: '%s'\n", cmd);
+    if (strcasecmp(cmd, "play") == 0) {
         a2dp_sink.play();
+        portENTER_CRITICAL(&g_metaMux);
         g_btState = BT_PLAYING;
         g_metadataChanged = true;
+        g_trackInfoChanged = true;
+        portEXIT_CRITICAL(&g_metaMux);
         Serial.println("[AVRC-CMD] Executed -> PLAY");
-    } else if (cmd.equalsIgnoreCase("pause")) {
+    } else if (strcasecmp(cmd, "pause") == 0) {
         a2dp_sink.pause();
+        portENTER_CRITICAL(&g_metaMux);
         if (g_btState != BT_DISCONNECTED) g_btState = BT_CONNECTED_IDLE;
         g_metadataChanged = true;
+        g_trackInfoChanged = true;
+        portEXIT_CRITICAL(&g_metaMux);
         Serial.println("[AVRC-CMD] Executed -> PAUSE");
-    } else if (cmd.equalsIgnoreCase("next")) {
+    } else if (strcasecmp(cmd, "next") == 0) {
         a2dp_sink.next();
         Serial.println("[AVRC-CMD] Executed -> NEXT");
-    } else if (cmd.equalsIgnoreCase("prev") || cmd.equalsIgnoreCase("previous")) {
+    } else if (strcasecmp(cmd, "prev") == 0 || strcasecmp(cmd, "previous") == 0) {
         a2dp_sink.previous();
         Serial.println("[AVRC-CMD] Executed -> PREVIOUS");
-    } else if (cmd.equalsIgnoreCase("play_pause")) {
+    } else if (strcasecmp(cmd, "play_pause") == 0) {
         if (g_btState == BT_PLAYING) {
             a2dp_sink.pause();
+            portENTER_CRITICAL(&g_metaMux);
             if (g_btState != BT_DISCONNECTED) g_btState = BT_CONNECTED_IDLE;
+            g_metadataChanged = true;
+            g_trackInfoChanged = true;
+            portEXIT_CRITICAL(&g_metaMux);
             Serial.println("[AVRC-CMD] Executed -> PAUSE (toggle)");
         } else {
             a2dp_sink.play();
+            portENTER_CRITICAL(&g_metaMux);
             g_btState = BT_PLAYING;
+            g_metadataChanged = true;
+            g_trackInfoChanged = true;
+            portEXIT_CRITICAL(&g_metaMux);
             Serial.println("[AVRC-CMD] Executed -> PLAY (toggle)");
         }
-        g_metadataChanged = true;
     }
     broadcast_metadata();
 }
 
 void loop() {
-    static String rxLine = "";
+    static char rxLine[64];
+    static size_t rxLen = 0;
+
     while (S3Serial.available()) {
         char c = static_cast<char>(S3Serial.read());
         if (c == '\n') {
-            rxLine.trim();
-            if (rxLine.length() > 0) {
-                handle_s3_command(rxLine);
+            while (rxLen > 0 && (rxLine[rxLen - 1] == ' ' || rxLine[rxLen - 1] == '\t')) {
+                rxLen--;
             }
-            rxLine = "";
-        } else if (c != '\r' && rxLine.length() < 64) {
-            rxLine += c;
+            rxLine[rxLen] = '\0';
+            char* start = rxLine;
+            while (*start == ' ' || *start == '\t') start++;
+            if (*start != '\0') {
+                handle_s3_command(start);
+            }
+            rxLen = 0;
+        } else if (c != '\r' && rxLen < sizeof(rxLine) - 1) {
+            rxLine[rxLen++] = c;
         }
     }
 
     unsigned long now = millis();
-    if (g_metadataChanged && (now - g_lastMetaBroadcast >= 100)) {
+    if (g_metadataChanged && (now - g_lastMetaBroadcast >= 100) && (now - g_lastMetaUpdateMs >= 40)) {
         broadcast_metadata();
     }
 
@@ -300,7 +380,10 @@ void loop() {
             break;
 
         case BT_PLAYING:
-            digitalWrite(LED_PIN, HIGH); // Solid ON when streaming audio
+            if (!ledState) {
+                ledState = true;
+                digitalWrite(LED_PIN, HIGH);
+            }
             break;
     }
 

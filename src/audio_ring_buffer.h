@@ -52,11 +52,17 @@ public:
         if (toWrite == 0) return 0;
 
         size_t w = _writeIdx.load(std::memory_order_relaxed);
-        for (size_t i = 0; i < toWrite; ++i) {
-            size_t idx = (w + i) % CapacityFrames;
-            _left[idx]  = left[i];
-            _right[idx] = right[i];
+        size_t firstChunk = CapacityFrames - w;
+        if (firstChunk > toWrite) firstChunk = toWrite;
+        size_t secondChunk = toWrite - firstChunk;
+
+        memcpy(_left  + w, left,  firstChunk * sizeof(float));
+        memcpy(_right + w, right, firstChunk * sizeof(float));
+        if (secondChunk > 0) {
+            memcpy(_left,  left  + firstChunk, secondChunk * sizeof(float));
+            memcpy(_right, right + firstChunk, secondChunk * sizeof(float));
         }
+
         _writeIdx.store((w + toWrite) % CapacityFrames, std::memory_order_release);
         return toWrite;
     }
@@ -66,10 +72,8 @@ public:
         if (!left || !right) return 0;
 
         if (!_left || !_right) {
-            for (size_t i = 0; i < frames; ++i) {
-                left[i]  = 0.0f;
-                right[i] = 0.0f;
-            }
+            memset(left,  0, frames * sizeof(float));
+            memset(right, 0, frames * sizeof(float));
             return 0;
         }
 
@@ -78,19 +82,26 @@ public:
         if (toRead > avail) toRead = avail;
 
         size_t r = _readIdx.load(std::memory_order_relaxed);
-        for (size_t i = 0; i < toRead; ++i) {
-            size_t idx = (r + i) % CapacityFrames;
-            left[i]  = _left[idx];
-            right[i] = _right[idx];
-        }
-        for (size_t i = toRead; i < frames; ++i) {
-            left[i]  = 0.0f;
-            right[i] = 0.0f;
-        }
-
         if (toRead > 0) {
+            size_t firstChunk = CapacityFrames - r;
+            if (firstChunk > toRead) firstChunk = toRead;
+            size_t secondChunk = toRead - firstChunk;
+
+            memcpy(left,  _left  + r, firstChunk * sizeof(float));
+            memcpy(right, _right + r, firstChunk * sizeof(float));
+            if (secondChunk > 0) {
+                memcpy(left  + firstChunk, _left,  secondChunk * sizeof(float));
+                memcpy(right + firstChunk, _right, secondChunk * sizeof(float));
+            }
             _readIdx.store((r + toRead) % CapacityFrames, std::memory_order_release);
         }
+
+        if (toRead < frames) {
+            size_t pad = frames - toRead;
+            memset(left  + toRead, 0, pad * sizeof(float));
+            memset(right + toRead, 0, pad * sizeof(float));
+        }
+
         return toRead;
     }
 

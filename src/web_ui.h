@@ -66,27 +66,36 @@ public:
         InputSourceMode mode;
         ActiveInputSource active;
         if (_params.getInputStateIfChanged(mode, active, _lastInputVersion)) {
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
+        }
+
+        if (_stateBroadcastPending.exchange(false, std::memory_order_acq_rel)) {
+            if (_ws.count() > 0) {
+                _ws.textAll(_buildStateJson());
+            }
         }
 
         BluetoothMetadata bt;
         if (_params.getBluetoothMetadataIfChanged(bt, _lastBtMetaVersion)) {
-            _ws.textAll(_buildBtMetaJson(bt));
+            if (_ws.count() > 0) {
+                _ws.textAll(_buildBtMetaJson(bt));
+            }
         }
 
         WiFiStreamMetadata wifiMeta;
         if (_params.getWiFiStreamMetadataIfChanged(wifiMeta, _lastWifiMetaVersion)) {
-            _ws.textAll(_buildWiFiMetaJson(wifiMeta));
+            if (_ws.count() > 0) {
+                _ws.textAll(_buildWiFiMetaJson(wifiMeta));
+            }
         }
 
-        // print the IP every 5 s
         unsigned long now = millis();
-        if (now - _lastIpPrint >= 5000) {
+        if (now - _lastIpPrint >= 30000) {
             _lastIpPrint = now;
-            String ipStr = (WiFi.getMode() & WIFI_MODE_STA && WiFi.status() == WL_CONNECTED)
-                             ? WiFi.localIP().toString()
-                             : WiFi.softAPIP().toString();
-            Serial.printf("[NET] Web UI accessible at: http://%s\n", ipStr.c_str());
+            IPAddress ip = (WiFi.getMode() & WIFI_MODE_STA && WiFi.status() == WL_CONNECTED)
+                             ? WiFi.localIP()
+                             : WiFi.softAPIP();
+            Serial.printf("[NET] Web UI accessible at: http://%u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
         }
 
         // save to flash 1 s after the last change
@@ -105,15 +114,16 @@ public:
     }
 
 private:
-    ParamStore&    _params;
-    AsyncWebServer _server;
-    AsyncWebSocket _ws;
-    unsigned long  _lastIpPrint{0};
-    unsigned long  _lastSysBroadcast{0};
-    uint32_t       _lastInputVersion{1};
-    uint32_t       _lastBtMetaVersion{1};
-    uint32_t       _lastWifiMetaVersion{1};
-    String         _uartLine{""};
+    ParamStore&       _params;
+    AsyncWebServer    _server;
+    AsyncWebSocket    _ws;
+    unsigned long     _lastIpPrint{0};
+    unsigned long     _lastSysBroadcast{0};
+    uint32_t          _lastInputVersion{1};
+    uint32_t          _lastBtMetaVersion{1};
+    uint32_t          _lastWifiMetaVersion{1};
+    std::atomic<bool> _stateBroadcastPending{false};
+    String            _uartLine{""};
 
     void _startWiFi() {
         bool hasCredentials = (strlen(WIFI_SSID) > 0 && strcmp(WIFI_SSID, "YourSSID") != 0);
@@ -197,24 +207,24 @@ private:
 
         if (strcmp(t, "eq") == 0 || strcmp(t, "eq_band") == 0) {
             _handleEQMsg(doc);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "eq_toggle") == 0 || strcmp(t, "eq_module") == 0) {
             if (doc.containsKey("enabled")) {
                 _params.setEQEnabled(doc["enabled"].as<bool>());
             }
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "eq_preamp") == 0) {
             if (doc.containsKey("preamp")) {
                 _params.setPreamp(doc["preamp"].as<float>());
             }
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "eq_preset") == 0) {
             const char* preset = doc["preset"] | doc["name"] | "flat";
             _params.applyPreset(preset);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "add_band") == 0) {
             float f = doc["freq"] | 1000.0f;
@@ -223,24 +233,24 @@ private:
             uint8_t type = doc["type"] | 0;
             uint8_t order = doc["order"] | 2;
             _params.addEQBand(f, g, q, type, order);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "remove_band") == 0) {
             int b = doc["band"] | -1;
             _params.removeEQBand(b);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "subsonic") == 0) {
             _handleSubsonicMsg(doc);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "compander") == 0) {
             _handleCompanderMsg(doc);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "limiter") == 0) {
             _handleLimiterMsg(doc);
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "input_source") == 0 || strcmp(t, "input") == 0) {
             if (doc.containsKey("source")) {
@@ -249,7 +259,7 @@ private:
                     _params.setInputMode(static_cast<InputSourceMode>(src));
                 }
             }
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "bt_cmd") == 0) {
             const char* cmd = doc["cmd"] | "";
@@ -266,7 +276,6 @@ private:
             meta.connected = true;
             meta.playing = true;
             _params.setBluetoothMetadata(meta);
-            _ws.textAll(_buildBtMetaJson(meta));
         }
         else if (strcmp(t, "boot_defaults") == 0) {
             bool custom   = doc.containsKey("custom") ? doc["custom"].as<bool>() : false;
@@ -275,8 +284,7 @@ private:
             bool comp     = doc.containsKey("comp") ? doc["comp"].as<bool>() : false;
             bool lim      = doc.containsKey("lim") ? doc["lim"].as<bool>() : false;
             _params.setBootDefaults(custom, eq, comp, lim, subsonic);
-            _params.save();
-            _ws.textAll(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "module_order") == 0) {
             String orderStr = "";
@@ -294,8 +302,7 @@ private:
             }
             if (orderStr.length() > 0) {
                 _params.setModuleOrder(orderStr.c_str());
-                _params.save();
-                _ws.textAll(_buildStateJson());
+                _stateBroadcastPending.store(true, std::memory_order_relaxed);
             }
         }
         else if (strcmp(t, "getState") == 0) {
@@ -374,7 +381,7 @@ private:
     }
 
     String _buildStateJson() {
-        DynamicJsonDocument doc(4096);
+        StaticJsonDocument<4096> doc;
         doc["t"] = "state";
 
         JsonObject inObj = doc.createNestedObject("input");

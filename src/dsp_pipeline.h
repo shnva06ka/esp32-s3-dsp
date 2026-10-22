@@ -3,6 +3,10 @@
 
 #include <cmath>
 #include <cstring>
+#if __has_include(<esp_dsp.h>)
+#include <esp_dsp.h>
+#define HAVE_ESP_DSP 1
+#endif
 #include "param_store.h"
 #include "biquad_eq.h"
 #include "compander.h"
@@ -37,10 +41,15 @@ public:
     void process(float* left, float* right, size_t frames) override {
         if (!_localEqEnabled || frames == 0) return;
         if (fabsf(_localPreampGain - 1.0f) > 0.001f) {
+#if defined(HAVE_ESP_DSP)
+            dsps_mulc_f32(left,  left,  static_cast<int>(frames), _localPreampGain, 1, 1);
+            dsps_mulc_f32(right, right, static_cast<int>(frames), _localPreampGain, 1, 1);
+#else
             for (size_t i = 0; i < frames; ++i) {
                 left[i]  *= _localPreampGain;
                 right[i] *= _localPreampGain;
             }
+#endif
         }
         _eq.process(left, right, frames, _localEqCount);
     }

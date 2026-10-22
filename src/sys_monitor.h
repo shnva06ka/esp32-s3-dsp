@@ -13,6 +13,10 @@ private:
         unsigned long     lastSampleTime{0};
         float             cpu0Usage{0.0f};
         float             cpu1Usage{0.0f};
+        uint32_t          heapTotal{0};
+        uint32_t          psramTotal{0};
+        uint32_t          flashUsed{0};
+        uint32_t          flashTotal{0};
     };
 
     static State& _s() {
@@ -49,20 +53,26 @@ public:
     static void begin() {
         esp_register_freertos_idle_hook_for_cpu(_idleHook0, 0);
         esp_register_freertos_idle_hook_for_cpu(_idleHook1, 1);
-        _s().lastSampleTime = millis();
+        auto& st = _s();
+        st.lastSampleTime = millis();
+        st.heapTotal      = ESP.getHeapSize();
+        st.psramTotal     = psramFound() ? ESP.getPsramSize() : 0;
+        st.flashUsed      = ESP.getSketchSize();
+        st.flashTotal     = ESP.getFlashChipSize();
     }
 
     static Stats getStats() {
         update();
+        auto& st = _s();
         Stats s;
-        s.cpu0 = _s().cpu0Usage;
-        s.cpu1 = _s().cpu1Usage;
-        s.heapTotal  = ESP.getHeapSize();
-        s.heapUsed   = s.heapTotal - ESP.getFreeHeap();
-        s.psramTotal = psramFound() ? ESP.getPsramSize() : 0;
-        s.psramUsed  = psramFound() ? (s.psramTotal - ESP.getFreePsram()) : 0;
-        s.flashUsed  = ESP.getSketchSize();
-        s.flashTotal = ESP.getFlashChipSize();
+        s.cpu0       = st.cpu0Usage;
+        s.cpu1       = st.cpu1Usage;
+        s.heapTotal  = st.heapTotal;
+        s.heapUsed   = st.heapTotal - ESP.getFreeHeap();
+        s.psramTotal = st.psramTotal;
+        s.psramUsed  = (st.psramTotal > 0) ? (st.psramTotal - ESP.getFreePsram()) : 0;
+        s.flashUsed  = st.flashUsed;
+        s.flashTotal = st.flashTotal;
         return s;
     }
 

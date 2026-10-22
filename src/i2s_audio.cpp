@@ -4,6 +4,10 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#if __has_include(<esp_dsp.h>)
+#include <esp_dsp.h>
+#define HAVE_ESP_DSP 1
+#endif
 
 I2SAudio::I2SAudio(ParamStore& params)
     : _params(params)
@@ -126,18 +130,27 @@ void I2SAudio::process(const AudioCallback& cb)
     const float targetGainBt   = (targetSource == INPUT_MODE_BT)   ? 1.0f : 0.0f;
     const float targetGainWifi = (targetSource == INPUT_MODE_WIFI) ? 1.0f : 0.0f;
 
-    for (size_t i = 0; i < kBufferFrames; ++i) {
-        if (_gainAux < targetGainAux) _gainAux = std::min(targetGainAux, _gainAux + kFadeStep);
-        else if (_gainAux > targetGainAux) _gainAux = std::max(targetGainAux, _gainAux - kFadeStep);
+    if (_gainAux == targetGainAux && _gainBt == targetGainBt && _gainWifi == targetGainWifi) {
+        const float* srcL = (targetSource == INPUT_MODE_BT)   ? _leftBt   :
+                            (targetSource == INPUT_MODE_WIFI) ? _leftWifi : _leftAux;
+        const float* srcR = (targetSource == INPUT_MODE_BT)   ? _rightBt   :
+                            (targetSource == INPUT_MODE_WIFI) ? _rightWifi : _rightAux;
+        memcpy(_leftMix,  srcL, kBufferFrames * sizeof(float));
+        memcpy(_rightMix, srcR, kBufferFrames * sizeof(float));
+    } else {
+        for (size_t i = 0; i < kBufferFrames; ++i) {
+            if (_gainAux < targetGainAux) _gainAux = std::min(targetGainAux, _gainAux + kFadeStep);
+            else if (_gainAux > targetGainAux) _gainAux = std::max(targetGainAux, _gainAux - kFadeStep);
 
-        if (_gainBt < targetGainBt) _gainBt = std::min(targetGainBt, _gainBt + kFadeStep);
-        else if (_gainBt > targetGainBt) _gainBt = std::max(targetGainBt, _gainBt - kFadeStep);
+            if (_gainBt < targetGainBt) _gainBt = std::min(targetGainBt, _gainBt + kFadeStep);
+            else if (_gainBt > targetGainBt) _gainBt = std::max(targetGainBt, _gainBt - kFadeStep);
 
-        if (_gainWifi < targetGainWifi) _gainWifi = std::min(targetGainWifi, _gainWifi + kFadeStep);
-        else if (_gainWifi > targetGainWifi) _gainWifi = std::max(targetGainWifi, _gainWifi - kFadeStep);
+            if (_gainWifi < targetGainWifi) _gainWifi = std::min(targetGainWifi, _gainWifi + kFadeStep);
+            else if (_gainWifi > targetGainWifi) _gainWifi = std::max(targetGainWifi, _gainWifi - kFadeStep);
 
-        _leftMix[i]  = _gainAux * _leftAux[i]  + _gainBt * _leftBt[i]  + _gainWifi * _leftWifi[i];
-        _rightMix[i] = _gainAux * _rightAux[i] + _gainBt * _rightBt[i] + _gainWifi * _rightWifi[i];
+            _leftMix[i]  = _gainAux * _leftAux[i]  + _gainBt * _leftBt[i]  + _gainWifi * _leftWifi[i];
+            _rightMix[i] = _gainAux * _rightAux[i] + _gainBt * _rightBt[i] + _gainWifi * _rightWifi[i];
+        }
     }
 
     ActiveInputSource currentActive = (targetSource == INPUT_MODE_BT)   ? ACTIVE_SRC_BT :
@@ -156,16 +169,11 @@ void I2SAudio::process(const AudioCallback& cb)
     _rmsOutL = _calcRMS(_leftMix,  kBufferFrames);
     _rmsOutR = _calcRMS(_rightMix, kBufferFrames);
 
-    auto toI32 = [](float s) -> int32_t {
-        if (s > 1.0f) s = 1.0f;
-        else if (s < -1.0f) s = -1.0f;
-        return (s >= 0.0f) ? static_cast<int32_t>(s * 2147483392.0f)
-                           : static_cast<int32_t>(s * 2147483648.0f);
-    };
-
     for (size_t i = 0; i < kBufferFrames; ++i) {
-        _txBuf[i * 2    ] = toI32(_leftMix[i]);
-        _txBuf[i * 2 + 1] = toI32(_rightMix[i]);
+        float sL = fminf(fmaxf(_leftMix[i],  -1.0f), 1.0f);
+        float sR = fminf(fmaxf(_rightMix[i], -1.0f), 1.0f);
+        _txBuf[i * 2    ] = static_cast<int32_t>(sL * 2147483392.0f);
+        _txBuf[i * 2 + 1] = static_cast<int32_t>(sR * 2147483392.0f);
     }
 
     size_t bytesWritten = 0;
@@ -188,7 +196,8 @@ void I2SAudio::_allocBuffers()
     const size_t floatBufBytes = kBufferFrames * sizeof(float);
 
     auto dramAlloc = [](size_t sz) -> void* {
-        void* p = heap_caps_malloc(sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        void* p = heap_caps_aligned_alloc(16, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!p) p = heap_caps_malloc(sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
         if (!p) p = malloc(sz);
         return p;
     };
@@ -225,9 +234,14 @@ void I2SAudio::_freeBuffers()
 
 float I2SAudio::_calcRMS(const float* buf, size_t n) const
 {
+    if (n == 0) return 0.0f;
     float sum = 0.0f;
+#if defined(HAVE_ESP_DSP)
+    dsps_dotprod_f32(buf, buf, &sum, static_cast<int>(n));
+#else
     for (size_t i = 0; i < n; ++i) sum += buf[i] * buf[i];
-    return (n > 0) ? sqrtf(sum / static_cast<float>(n)) : 0.0f;
+#endif
+    return sqrtf(sum / static_cast<float>(n));
 }
 
 void I2SAudio::_resampleAndWriteBt(size_t frames)

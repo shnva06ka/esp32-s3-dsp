@@ -4,6 +4,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <Preferences.h>
+#include <atomic>
+#include <cstring>
 #include "audio_config.h"
 
 enum EQFilterType : uint8_t {
@@ -117,8 +119,8 @@ public:
                 prefs.getBytes("subsonic", &_subsonic, sizeof(_subsonic));
                 prefs.getBytes("comp", &_comp, sizeof(_comp));
                 prefs.getBytes("lim", &_lim, sizeof(_lim));
-                _inputMode = static_cast<InputSourceMode>(prefs.getUChar("input", 1));
-                _activeSource = static_cast<ActiveInputSource>(_inputMode);
+                _inputMode.store(static_cast<InputSourceMode>(prefs.getUChar("input", 1)), std::memory_order_relaxed);
+                _activeSource.store(static_cast<ActiveInputSource>(_inputMode.load(std::memory_order_relaxed)), std::memory_order_relaxed);
 
                 _bootCustomDefaults = prefs.getBool("boot_custom", false);
                 _bootEQ             = prefs.getBool("boot_eq", false);
@@ -140,13 +142,12 @@ public:
                     strncpy(_moduleOrder, savedOrder.c_str(), sizeof(_moduleOrder) - 1);
                     _moduleOrder[sizeof(_moduleOrder) - 1] = '\0';
                 }
-                _orderVersion++;
-
-                _eqVersion++;
-                _subsonicVersion++;
-                _compVersion++;
-                _limVersion++;
-                _inputVersion++;
+                _orderVersion.fetch_add(1, std::memory_order_release);
+                _eqVersion.fetch_add(1, std::memory_order_release);
+                _subsonicVersion.fetch_add(1, std::memory_order_release);
+                _compVersion.fetch_add(1, std::memory_order_release);
+                _limVersion.fetch_add(1, std::memory_order_release);
+                _inputVersion.fetch_add(1, std::memory_order_release);
                 xSemaphoreGive(_mutex);
                 Serial.println("[NVS] Loaded all DSP parameters and states from flash.");
             } else {
@@ -157,30 +158,47 @@ public:
     }
 
     void save() {
+        // snapshot under mutex so NVS flash writes don't stall Core 1
         xSemaphoreTake(_mutex, portMAX_DELAY);
+        bool           eqEnabled = _eqEnabled;
+        int            eqCount   = _eqCount;
+        float          preampDb  = _preampDb;
+        EQBandParams   eq[kEQBands];
+        memcpy(eq, _eq, sizeof(eq));
+        SubsonicParams  subsonic = _subsonic;
+        CompanderParams comp     = _comp;
+        LimiterParams   lim      = _lim;
+        uint8_t         input    = static_cast<uint8_t>(_inputMode.load(std::memory_order_relaxed));
+        bool            bCustom  = _bootCustomDefaults;
+        bool            bEQ      = _bootEQ;
+        bool            bSub     = _bootSubsonic;
+        bool            bComp    = _bootComp;
+        bool            bLim     = _bootLim;
+        char            modOrder[64];
+        memcpy(modOrder, _moduleOrder, sizeof(modOrder));
+        _dirty = false;
+        xSemaphoreGive(_mutex);
+
         Preferences prefs;
         if (!prefs.begin("dsp_cfg", false)) {
-            xSemaphoreGive(_mutex);
             return;
         }
         prefs.putBool("init", true);
-        prefs.putBool("eq_en", _eqEnabled);
-        prefs.putInt("eq_cnt", _eqCount);
-        prefs.putFloat("preamp", _preampDb);
-        prefs.putBytes("eq_bands", _eq, sizeof(_eq));
-        prefs.putBytes("subsonic", &_subsonic, sizeof(_subsonic));
-        prefs.putBytes("comp", &_comp, sizeof(_comp));
-        prefs.putBytes("lim", &_lim, sizeof(_lim));
-        prefs.putUChar("input", static_cast<uint8_t>(_inputMode));
-        prefs.putBool("boot_custom", _bootCustomDefaults);
-        prefs.putBool("boot_eq", _bootEQ);
-        prefs.putBool("boot_sub", _bootSubsonic);
-        prefs.putBool("boot_comp", _bootComp);
-        prefs.putBool("boot_lim", _bootLim);
-        prefs.putString("mod_order", _moduleOrder);
+        prefs.putBool("eq_en", eqEnabled);
+        prefs.putInt("eq_cnt", eqCount);
+        prefs.putFloat("preamp", preampDb);
+        prefs.putBytes("eq_bands", eq, sizeof(eq));
+        prefs.putBytes("subsonic", &subsonic, sizeof(subsonic));
+        prefs.putBytes("comp", &comp, sizeof(comp));
+        prefs.putBytes("lim", &lim, sizeof(lim));
+        prefs.putUChar("input", input);
+        prefs.putBool("boot_custom", bCustom);
+        prefs.putBool("boot_eq", bEQ);
+        prefs.putBool("boot_sub", bSub);
+        prefs.putBool("boot_comp", bComp);
+        prefs.putBool("boot_lim", bLim);
+        prefs.putString("mod_order", modOrder);
         prefs.end();
-        _dirty = false;
-        xSemaphoreGive(_mutex);
         Serial.println("[NVS] Saved all DSP parameters and states to flash.");
     }
 
@@ -245,14 +263,11 @@ public:
 
     bool getModuleOrderIfChanged(char* dest, size_t maxLen, uint32_t& localVersion) const {
         if (!dest || maxLen == 0) return false;
+        if (_orderVersion.load(std::memory_order_acquire) == localVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (localVersion == _orderVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         strncpy(dest, _moduleOrder, maxLen - 1);
         dest[maxLen - 1] = '\0';
-        localVersion = _orderVersion;
+        localVersion = _orderVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
@@ -262,7 +277,7 @@ public:
         xSemaphoreTake(_mutex, portMAX_DELAY);
         strncpy(_moduleOrder, order, sizeof(_moduleOrder) - 1);
         _moduleOrder[sizeof(_moduleOrder) - 1] = '\0';
-        _orderVersion++;
+        _orderVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
@@ -278,7 +293,7 @@ public:
     void setEQEnabled(bool en) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _eqEnabled = en;
-        _eqVersion++;
+        _eqVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
@@ -299,7 +314,7 @@ public:
         }
         _eq[_eqCount] = { freq, gain, q, true, type, order };
         _eqCount++;
-        _eqVersion++;
+        _eqVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
@@ -316,7 +331,7 @@ public:
             _eq[i] = _eq[i + 1];
         }
         _eqCount--;
-        _eqVersion++;
+        _eqVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
@@ -335,7 +350,7 @@ public:
         if (band >= 0 && band < kEQBands) {
             _eq[band] = p;
             if (band >= _eqCount) _eqCount = band + 1;
-            _eqVersion++;
+            _eqVersion.fetch_add(1, std::memory_order_release);
             _dirty = true;
             _lastDirtyTime = millis();
         }
@@ -354,25 +369,22 @@ public:
         if (db < -18.0f) db = -18.0f;
         if (db >  18.0f) db =  18.0f;
         _preampDb = db;
-        _eqVersion++;
+        _eqVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
     }
 
     bool getEQStateIfChanged(EQBandParams* outBands, int& outCount, bool& outEnabled, float& outPreamp, uint32_t& lastVersion) const {
+        if (_eqVersion.load(std::memory_order_acquire) == lastVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_eqVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         outCount   = _eqCount;
         outEnabled = _eqEnabled;
         outPreamp  = _preampDb;
         for (int b = 0; b < _eqCount; ++b) {
             outBands[b] = _eq[b];
         }
-        lastVersion = _eqVersion;
+        lastVersion = _eqVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
@@ -417,7 +429,7 @@ public:
             _eq[3] = { 4000.0f,  0.0f, 0.707f, true, EQ_FILTER_PEAK,       2 };
             _eq[4] = { 10000.0f, 0.0f, 0.707f, true, EQ_FILTER_HIGH_SHELF, 2 };
         }
-        _eqVersion++;
+        _eqVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
@@ -433,20 +445,17 @@ public:
     void setSubsonic(const SubsonicParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _subsonic = p;
-        _subsonicVersion++;
+        _subsonicVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
     }
 
     bool getSubsonicIfChanged(SubsonicParams& out, uint32_t& lastVersion) const {
+        if (_subsonicVersion.load(std::memory_order_acquire) == lastVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_subsonicVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         out = _subsonic;
-        lastVersion = _subsonicVersion;
+        lastVersion = _subsonicVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
@@ -461,20 +470,17 @@ public:
     void setCompander(const CompanderParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _comp = p;
-        _compVersion++;
+        _compVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
     }
 
     bool getCompanderIfChanged(CompanderParams& out, uint32_t& lastVersion) const {
+        if (_compVersion.load(std::memory_order_acquire) == lastVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_compVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         out = _comp;
-        lastVersion = _compVersion;
+        lastVersion = _compVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
@@ -489,66 +495,51 @@ public:
     void setLimiter(const LimiterParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _lim = p;
-        _limVersion++;
+        _limVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
     }
 
     bool getLimiterIfChanged(LimiterParams& out, uint32_t& lastVersion) const {
+        if (_limVersion.load(std::memory_order_acquire) == lastVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_limVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         out = _lim;
-        lastVersion = _limVersion;
+        lastVersion = _limVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
 
     InputSourceMode getInputMode() const {
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        auto m = _inputMode;
-        xSemaphoreGive(_mutex);
-        return m;
+        return _inputMode.load(std::memory_order_relaxed);
     }
 
     void setInputMode(InputSourceMode m) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        _inputMode = m;
-        _inputVersion++;
+        _inputMode.store(m, std::memory_order_relaxed);
+        _inputVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
         xSemaphoreGive(_mutex);
     }
 
     ActiveInputSource getActiveSource() const {
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        auto s = _activeSource;
-        xSemaphoreGive(_mutex);
-        return s;
+        return _activeSource.load(std::memory_order_relaxed);
     }
 
     void setActiveSource(ActiveInputSource s) {
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_activeSource != s) {
-            _activeSource = s;
-            _inputVersion++;
+        if (_activeSource.load(std::memory_order_relaxed) != s) {
+            _activeSource.store(s, std::memory_order_relaxed);
+            _inputVersion.fetch_add(1, std::memory_order_release);
         }
-        xSemaphoreGive(_mutex);
     }
 
     bool getInputStateIfChanged(InputSourceMode& mode, ActiveInputSource& active, uint32_t& lastVersion) const {
-        xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_inputVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
-        mode = _inputMode;
-        active = _activeSource;
-        lastVersion = _inputVersion;
-        xSemaphoreGive(_mutex);
+        uint32_t v = _inputVersion.load(std::memory_order_acquire);
+        if (v == lastVersion) return false;
+        mode   = _inputMode.load(std::memory_order_relaxed);
+        active = _activeSource.load(std::memory_order_relaxed);
+        lastVersion = v;
         return true;
     }
 
@@ -562,18 +553,15 @@ public:
     void setBluetoothMetadata(const BluetoothMetadata& m) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _btMeta = m;
-        _btMetaVersion++;
+        _btMetaVersion.fetch_add(1, std::memory_order_release);
         xSemaphoreGive(_mutex);
     }
 
     bool getBluetoothMetadataIfChanged(BluetoothMetadata& out, uint32_t& lastVersion) const {
+        if (_btMetaVersion.load(std::memory_order_acquire) == lastVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_btMetaVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         out = _btMeta;
-        lastVersion = _btMetaVersion;
+        lastVersion = _btMetaVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
@@ -588,59 +576,56 @@ public:
     void setWiFiStreamMetadata(const WiFiStreamMetadata& m) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _wifiMeta = m;
-        _wifiMetaVersion++;
+        _wifiMetaVersion.fetch_add(1, std::memory_order_release);
         xSemaphoreGive(_mutex);
     }
 
     bool getWiFiStreamMetadataIfChanged(WiFiStreamMetadata& out, uint32_t& lastVersion) const {
+        if (_wifiMetaVersion.load(std::memory_order_acquire) == lastVersion) return false;
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        if (_wifiMetaVersion == lastVersion) {
-            xSemaphoreGive(_mutex);
-            return false;
-        }
         out = _wifiMeta;
-        lastVersion = _wifiMetaVersion;
+        lastVersion = _wifiMetaVersion.load(std::memory_order_relaxed);
         xSemaphoreGive(_mutex);
         return true;
     }
 
 private:
-    mutable SemaphoreHandle_t _mutex;
-    EQBandParams              _eq[kEQBands];
-    int                       _eqCount{5};
-    bool                      _eqEnabled{false};
-    float                     _preampDb{0.0f};
-    SubsonicParams            _subsonic;
-    CompanderParams           _comp;
-    LimiterParams             _lim;
-    InputSourceMode           _inputMode{INPUT_MODE_AUX};
-    ActiveInputSource         _activeSource{ACTIVE_SRC_AUX};
-    BluetoothMetadata         _btMeta;
-    WiFiStreamMetadata        _wifiMeta;
-    bool                      _bootCustomDefaults{false};
-    bool                      _bootEQ{false};
-    bool                      _bootSubsonic{false};
-    bool                      _bootComp{false};
-    bool                      _bootLim{false};
-    bool                      _dirty{false};
-    unsigned long             _lastDirtyTime{0};
-    uint32_t                  _eqVersion{1};
-    uint32_t                  _subsonicVersion{1};
-    uint32_t                  _compVersion{1};
-    uint32_t                  _limVersion{1};
-    uint32_t                  _inputVersion{1};
-    uint32_t                  _btMetaVersion{1};
-    uint32_t                  _wifiMetaVersion{1};
-    char                      _moduleOrder[64]{"eq,subsonic,comp,lim"};
-    uint32_t                  _orderVersion{1};
+    mutable SemaphoreHandle_t      _mutex;
+    EQBandParams                   _eq[kEQBands];
+    int                            _eqCount{5};
+    bool                           _eqEnabled{false};
+    float                          _preampDb{0.0f};
+    SubsonicParams                 _subsonic;
+    CompanderParams                _comp;
+    LimiterParams                  _lim;
+    std::atomic<InputSourceMode>   _inputMode{INPUT_MODE_AUX};
+    std::atomic<ActiveInputSource> _activeSource{ACTIVE_SRC_AUX};
+    BluetoothMetadata              _btMeta;
+    WiFiStreamMetadata             _wifiMeta;
+    bool                           _bootCustomDefaults{false};
+    bool                           _bootEQ{false};
+    bool                           _bootSubsonic{false};
+    bool                           _bootComp{false};
+    bool                           _bootLim{false};
+    bool                           _dirty{false};
+    unsigned long                  _lastDirtyTime{0};
+    std::atomic<uint32_t>          _eqVersion{1};
+    std::atomic<uint32_t>          _subsonicVersion{1};
+    std::atomic<uint32_t>          _compVersion{1};
+    std::atomic<uint32_t>          _limVersion{1};
+    std::atomic<uint32_t>          _inputVersion{1};
+    std::atomic<uint32_t>          _btMetaVersion{1};
+    std::atomic<uint32_t>          _wifiMetaVersion{1};
+    char                           _moduleOrder[64]{"eq,subsonic,comp,lim"};
+    std::atomic<uint32_t>          _orderVersion{1};
 
     void _loadDefaults() {
         // Default 5 initial bands: Low Shelf (100 Hz), 3 Peaking (500, 1000, 4000 Hz), High Shelf (10000 Hz)
         _eqCount   = 5;
         _eqEnabled = false;
         _preampDb  = 0.0f;
-        _inputMode    = INPUT_MODE_AUX;
-        _activeSource = ACTIVE_SRC_AUX;
+        _inputMode.store(INPUT_MODE_AUX, std::memory_order_relaxed);
+        _activeSource.store(ACTIVE_SRC_AUX, std::memory_order_relaxed);
 
         _eq[0] = { 100.0f,   0.0f, 0.707f, true, EQ_FILTER_LOW_SHELF,  2 };
         _eq[1] = { 500.0f,   0.0f, 0.707f, true, EQ_FILTER_PEAK,       2 };

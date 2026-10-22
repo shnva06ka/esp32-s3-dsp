@@ -3,6 +3,10 @@
 
 #include <cmath>
 #include <cstring>
+#if __has_include(<esp_dsp.h>)
+#include <esp_dsp.h>
+#define HAVE_ESP_DSP 1
+#endif
 #include "audio_config.h"
 #include "param_store.h"
 #include "subsonic.h"
@@ -69,38 +73,53 @@ public:
 
         _subsonic.process(left, right, frames);
 
+#if defined(HAVE_ESP_DSP)
+        if (fabsf(_gainL - 1.0f) > 1e-4f) {
+            dsps_mulc_f32(left,  left,  static_cast<int>(frames), _gainL, 1, 1);
+        }
+        if (fabsf(_gainR - 1.0f) > 1e-4f) {
+            dsps_mulc_f32(right, right, static_cast<int>(frames), _gainR, 1, 1);
+        }
+#else
+        for (size_t i = 0; i < frames; ++i) {
+            left[i]  *= _gainL;
+            right[i] *= _gainR;
+        }
+#endif
+
         const bool needDelayL = (_delaySamplesL > 0.01f);
         const bool needDelayR = (_delaySamplesR > 0.01f);
+
+        const size_t delayIntL = static_cast<size_t>(_delaySamplesL);
+        const float  fracL     = _delaySamplesL - static_cast<float>(delayIntL);
+        const float  invFracL  = 1.0f - fracL;
+
+        const size_t delayIntR = static_cast<size_t>(_delaySamplesR);
+        const float  fracR     = _delaySamplesR - static_cast<float>(delayIntR);
+        const float  invFracR  = 1.0f - fracR;
+
+        constexpr size_t kMask = kDelayBufSize - 1;
 
         for (size_t i = 0; i < frames; ++i) {
             float sL = left[i];
             float sR = right[i];
 
-            sL *= _gainL;
-            sR *= _gainR;
-
             _delayBufL[_delayWriteIdx] = sL;
             _delayBufR[_delayWriteIdx] = sR;
 
             if (needDelayL) {
-                float rPos = static_cast<float>(_delayWriteIdx) - _delaySamplesL;
-                while (rPos < 0.0f) rPos += static_cast<float>(kDelayBufSize);
-                int idx0 = static_cast<int>(rPos) & (kDelayBufSize - 1);
-                int idx1 = (idx0 + 1) & (kDelayBufSize - 1);
-                float frac = rPos - floorf(rPos);
-                sL = _delayBufL[idx0] * (1.0f - frac) + _delayBufL[idx1] * frac;
+                size_t idxA = (_delayWriteIdx - delayIntL) & kMask;
+                size_t idxB = (idxA - 1) & kMask;
+                sL = _delayBufL[idxA] * invFracL + _delayBufL[idxB] * fracL;
             }
 
             if (needDelayR) {
-                float rPos = static_cast<float>(_delayWriteIdx) - _delaySamplesR;
-                while (rPos < 0.0f) rPos += static_cast<float>(kDelayBufSize);
-                int idx0 = static_cast<int>(rPos) & (kDelayBufSize - 1);
-                int idx1 = (idx0 + 1) & (kDelayBufSize - 1);
-                float frac = rPos - floorf(rPos);
-                sR = _delayBufR[idx0] * (1.0f - frac) + _delayBufR[idx1] * frac;
+                size_t idxA = (_delayWriteIdx - delayIntR) & kMask;
+                size_t idxB = (idxA - 1) & kMask;
+                sR = _delayBufR[idxA] * invFracR + _delayBufR[idxB] * fracR;
             }
 
-            _delayWriteIdx = (_delayWriteIdx + 1) & (kDelayBufSize - 1);
+            _delayWriteIdx = (_delayWriteIdx + 1) & kMask;
 
             left[i]  = _applyPhase(sL, _phaseDegL, _hStateL);
             right[i] = _applyPhase(sR, _phaseDegR, _hStateR);

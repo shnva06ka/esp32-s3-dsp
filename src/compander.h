@@ -2,6 +2,10 @@
 #pragma once
 
 #include <cmath>
+#if __has_include(<esp_dsp.h>)
+#include <esp_dsp.h>
+#define HAVE_ESP_DSP 1
+#endif
 #include "audio_config.h"
 #include "param_store.h"
 
@@ -15,11 +19,16 @@ public:
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
-        float sumL = 0, sumR = 0;
+        float sumL = 0.0f, sumR = 0.0f;
+#if defined(HAVE_ESP_DSP)
+        dsps_dotprod_f32(left,  left,  &sumL, static_cast<int>(frames));
+        dsps_dotprod_f32(right, right, &sumR, static_cast<int>(frames));
+#else
         for (size_t i = 0; i < frames; ++i) {
             sumL += left[i]  * left[i];
             sumR += right[i] * right[i];
         }
+#endif
         const float rmsL = sqrtf(sumL / frames);
         const float rmsR = sqrtf(sumR / frames);
         const float rms  = (rmsL > rmsR) ? rmsL : rmsR;
@@ -35,11 +44,26 @@ public:
         gainDb += _makeupGainDb;
 
         const float targetGain = powf(10.0f, gainDb / 20.0f);
-        const float gainStep   = (targetGain - _currentGain) / static_cast<float>(frames);
-        for (size_t i = 0; i < frames; ++i) {
-            _currentGain += gainStep;
-            left[i]  *= _currentGain;
-            right[i] *= _currentGain;
+        if (fabsf(targetGain - _currentGain) < 1e-5f) {
+            _currentGain = targetGain;
+            if (fabsf(_currentGain - 1.0f) > 1e-4f) {
+#if defined(HAVE_ESP_DSP)
+                dsps_mulc_f32(left,  left,  static_cast<int>(frames), _currentGain, 1, 1);
+                dsps_mulc_f32(right, right, static_cast<int>(frames), _currentGain, 1, 1);
+#else
+                for (size_t i = 0; i < frames; ++i) {
+                    left[i]  *= _currentGain;
+                    right[i] *= _currentGain;
+                }
+#endif
+            }
+        } else {
+            const float gainStep = (targetGain - _currentGain) / static_cast<float>(frames);
+            for (size_t i = 0; i < frames; ++i) {
+                _currentGain += gainStep;
+                left[i]  *= _currentGain;
+                right[i] *= _currentGain;
+            }
         }
     }
 
