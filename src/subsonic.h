@@ -1,14 +1,4 @@
-/**
- * @file subsonic.h
- * @brief Subsonic / Infrasonic High Pass Filter Module.
- *
- * Provides a stereo high pass filter with selectable 1st to 4th order slopes
- * to cut subsonic rumble and prevent speaker driver unloading:
- * - 1st order: 6 dB/oct
- * - 2nd order: 12 dB/oct (Butterworth Q=0.707)
- * - 3rd order: 18 dB/oct (1st order + 2nd order Q=1.0)
- * - 4th order: 24 dB/oct (cascaded Butterworth stages)
- */
+// Subsonic high-pass, 1st to 4th order Butterworth. Keeps the sub from unloading below its tuning.
 #pragma once
 
 #include <cmath>
@@ -36,12 +26,6 @@ public:
         _update(p);
     }
 
-    /**
-     * @brief Process stereo audio through subsonic high pass filter in-place.
-     * @param left   Left channel float buffer [-1, +1]
-     * @param right  Right channel float buffer [-1, +1]
-     * @param frames Number of sample frames
-     */
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
@@ -80,7 +64,6 @@ private:
     float _freq{80.0f};
     uint8_t _order{2};
 
-    // esp-dsp biquad: coeffs[2][5] = {b0, b1, b2, a1, a2}
     float _coeffs[2][5]{};
     float _zL[2][2]{};
     float _zR[2][2]{};
@@ -100,7 +83,6 @@ private:
         _hasSecondStage = false;
 
         if (_order == 1) {
-            // 1st order HP (6 dB/oct)
             const float b0 = 1.0f / (1.0f + tan0);
             const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
             _coeffs[0][0] = b0;
@@ -109,7 +91,6 @@ private:
             _coeffs[0][3] = a1;
             _coeffs[0][4] = 0.0f;
         } else if (_order == 3) {
-            // 3rd order HP (18 dB/oct: 1st order + 2nd order Q=1.0)
             const float b0 = 1.0f / (1.0f + tan0);
             const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
             _coeffs[0][0] = b0;
@@ -128,7 +109,6 @@ private:
             _coeffs[1][4] = (1.0f - alpha) * invA0;
             _hasSecondStage = true;
         } else if (_order == 4) {
-            // 4th order HP (24 dB/oct: cascaded Butterworth stages)
             constexpr float Q_stages[2] = { 1.30656296f, 0.5411961f };
             for (int s = 0; s < 2; ++s) {
                 const float alpha = sin0 / (2.0f * Q_stages[s]);
@@ -142,7 +122,6 @@ private:
             }
             _hasSecondStage = true;
         } else {
-            // 2nd order HP (12 dB/oct Butterworth Q=0.707)
             const float alpha = sin0 / (2.0f * 0.70710678f);
             const float a0_s  = 1.0f + alpha;
             const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;

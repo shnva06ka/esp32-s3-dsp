@@ -1,31 +1,11 @@
-/**
- * @file wroom_bt_bridge.ino / wroom_bt_bridge.cpp
- * @brief Standalone Bluetooth A2DP I2S Master Transmitter with AVRCP Metadata Pass-through.
- *
- * PURPOSE:
- * 1. Bridges smartphone Bluetooth audio (A2DP) into standard digital I2S audio
- *    and sends it to the ESP32-S3 DSP board via I2S_NUM_1 slave receiver.
- * 2. Captures AVRCP Bluetooth metadata (Track Title, Artist, Album, Playback State)
- *    and transmits it as JSON over UART (GPIO 19 -> ESP32-S3 GPIO 44).
- *
- * HARDWARE WIRING (30-pin ESP32 DevKit V1 -> ESP32-S3):
- * ┌───────────────────────────┬──────────────────────┬──────────────────────────────┐
- * │ ESP32 DevKit V1 (30-pin)  │ ESP32-S3 (YD-ESP32)  │ Signal Description           │
- * ├───────────────────────────┼──────────────────────┼──────────────────────────────┤
- * │ GPIO 22 (I2S BCK Out)     │ GPIO 16 (I2S1 BCK In)│ I2S Bit Clock                │
- * │ GPIO 21 (I2S WS Out)      │ GPIO 17 (I2S1 WS In) │ I2S Word Select (Left/Right) │
- * │ GPIO 23 (I2S DOUT)        │ GPIO 18 (I2S1 DIN)   │ I2S Serial Audio Data        │
- * │ GPIO 19 (UART TX Out)     │ GPIO 44 (UART1 RX In)│ Metadata JSON Pass-through   │
- * │ GND                       │ GND                  │ Common Ground (CRITICAL!)    │
- * └───────────────────────────┴──────────────────────┴──────────────────────────────┘
- */
+// Bluetooth A2DP sink for the ESP32-WROOM. Audio goes to the S3 over I2S (S3 is the slave), track info goes as JSON over UART.
+// Wiring is in the README.
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include "BluetoothA2DPSink.h"
 
-// ── Pin Configuration (30-pin ESP32 DevKit V1) ─────────────────
 #define I2S_BCK_PIN    22   // Bit Clock to ESP32-S3 GPIO 16
 #define I2S_WS_PIN     21   // Word Select to ESP32-S3 GPIO 17
 #define I2S_DOUT_PIN   23   // Audio Data Out to ESP32-S3 GPIO 18
@@ -33,21 +13,19 @@
 #define S3_UART_RX_PIN 18   // UART RX from ESP32-S3 GPIO 43 (TX)
 #define LED_PIN         2   // Standard built-in blue LED on DevKit V1
 
-// ── Audio Configuration ──────────────────────────────────────
-#define SAMPLE_RATE   48000 // 48 kHz matching the S3 DSP pipeline
+#define SAMPLE_RATE   48000 // has to match the S3
 #define BT_DEV_NAME   "ESP32-DSP-BT"
 
 BluetoothA2DPSink a2dp_sink;
 HardwareSerial S3Serial(2); // UART2 (Full-duplex to S3)
 
-// Persistent Volume Storage (with 2.5s debounce to protect flash wear)
+// volume goes to NVS 2.5 s after the last change (flash wear)
 static Preferences g_prefs;
 static uint8_t g_btVolume = 100; // Default volume ~80% (100 / 127) if not yet stored
 static volatile bool g_volDirty = false;
 static unsigned long g_lastVolChangeTime = 0;
-static const unsigned long kVolSaveDebounceMs = 2500; // 2.5s debounce
+static const unsigned long kVolSaveDebounceMs = 2500;
 
-// State tracking for onboard status LED and metadata
 enum BtState {
     BT_DISCONNECTED,
     BT_CONNECTED_IDLE,
@@ -63,7 +41,6 @@ static uint32_t g_trackPosMs = 0;
 static volatile bool g_metadataChanged = false;
 static unsigned long g_lastMetaBroadcast = 0;
 
-// ── Broadcast Metadata to ESP32-S3 ───────────────────────────
 void broadcast_metadata() {
     StaticJsonDocument<384> doc;
     doc["t"]         = "bt_meta";
@@ -83,14 +60,12 @@ void broadcast_metadata() {
     g_lastMetaBroadcast = millis();
 }
 
-// ── AVRCP Position Callback ──────────────────────────────────
 void avrc_play_pos_callback(uint32_t play_pos) {
     g_trackPosMs = play_pos;
     g_metadataChanged = true;
     Serial.printf("[AVRC] Play pos: %u ms\n", play_pos);
 }
 
-// ── AVRCP Metadata Callback ──────────────────────────────────
 void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
     if (!text) return;
     const char* str = reinterpret_cast<const char*>(text);
@@ -115,7 +90,6 @@ void avrc_metadata_callback(uint8_t id, const uint8_t *text) {
     }
 }
 
-// ── NVS Volume Persistence Helper ────────────────────────────
 void save_volume_to_nvs() {
     if (!g_volDirty) return;
     g_volDirty = false;
@@ -127,7 +101,6 @@ void save_volume_to_nvs() {
     }
 }
 
-// ── Callbacks for state and volume monitoring ────────────────
 void avrc_volume_change_callback(int vol) {
     if (vol < 0) vol = 0;
     if (vol > 127) vol = 127;
@@ -184,7 +157,6 @@ void audio_state_changed(esp_a2d_audio_state_t state, void *ptr) {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
 void setup() {
     Serial.begin(115200);
     // UART2 to S3: RX on GPIO 18 (from S3 TX GPIO 43), TX on GPIO 19 (to S3 RX GPIO 44)
@@ -204,20 +176,19 @@ void setup() {
     Serial.printf("[INIT] S3 UART TX Pin     : GPIO %d -> S3 GPIO 44 (RX)\n", S3_UART_TX_PIN);
     Serial.printf("[INIT] Bluetooth Device   : '%s'\n", BT_DEV_NAME);
 
-    // 1. I2S Master Pin configuration
     i2s_pin_config_t pin_config = {
         .mck_io_num   = I2S_PIN_NO_CHANGE, // No MCLK needed for slave S3
-        .bck_io_num   = I2S_BCK_PIN,       // GPIO 22 -> S3 GPIO 16
-        .ws_io_num    = I2S_WS_PIN,        // GPIO 21 -> S3 GPIO 17
-        .data_out_num = I2S_DOUT_PIN,      // GPIO 23 -> S3 GPIO 18
+        .bck_io_num   = I2S_BCK_PIN,
+        .ws_io_num    = I2S_WS_PIN,
+        .data_out_num = I2S_DOUT_PIN,
         .data_in_num  = I2S_PIN_NO_CHANGE
     };
 
-    // 2. I2S Master Audio configuration (32-bit slot matching S3)
+    // 32-bit slots to match the S3
     i2s_config_t i2s_config = {
         .mode                 = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
         .sample_rate          = SAMPLE_RATE,
-        .bits_per_sample      = I2S_BITS_PER_SAMPLE_32BIT, // 32-bit slot
+        .bits_per_sample      = I2S_BITS_PER_SAMPLE_32BIT,
         .channel_format       = I2S_CHANNEL_FMT_RIGHT_LEFT,
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags     = 0,
@@ -231,14 +202,12 @@ void setup() {
     a2dp_sink.set_pin_config(pin_config);
     a2dp_sink.set_i2s_config(i2s_config);
 
-    // Load persisted Bluetooth volume from NVS (default 100 / 127 ~= 79%)
     g_prefs.begin("bt_cfg", false);
     g_btVolume = g_prefs.getUChar("vol", 100);
     g_prefs.end();
     Serial.printf("[INIT] Loaded Bluetooth volume from NVS: %d / 127 (%d%%)\n",
                   g_btVolume, (uint32_t)g_btVolume * 100 / 127);
 
-    // Register callbacks and request attributes
     a2dp_sink.set_avrc_metadata_attribute_mask(
         ESP_AVRC_MD_ATTR_TITLE | ESP_AVRC_MD_ATTR_ARTIST |
         ESP_AVRC_MD_ATTR_ALBUM | ESP_AVRC_MD_ATTR_PLAYING_TIME
@@ -249,17 +218,14 @@ void setup() {
     a2dp_sink.set_on_audio_state_changed(audio_state_changed);
     a2dp_sink.set_on_volumechange(avrc_volume_change_callback);
 
-    // Start Bluetooth A2DP Sink
     a2dp_sink.start(BT_DEV_NAME);
     a2dp_sink.set_volume(g_btVolume);
     Serial.printf("[INIT] Bluetooth A2DP Sink started successfully. Initial volume: %d / 127.\n", g_btVolume);
     Serial.println("[INIT] Connect your phone/PC to 'ESP32-DSP-BT'.");
 
-    // Send initial metadata snapshot
     broadcast_metadata();
 }
 
-// ─────────────────────────────────────────────────────────────
 void handle_s3_command(const String& cmd) {
     Serial.printf("[AVRC-CMD] Received from S3: '%s'\n", cmd.c_str());
     if (cmd.equalsIgnoreCase("play")) {
@@ -290,13 +256,10 @@ void handle_s3_command(const String& cmd) {
         }
         g_metadataChanged = true;
     }
-    // Immediately echo back updated state to S3
     broadcast_metadata();
 }
 
-// ─────────────────────────────────────────────────────────────
 void loop() {
-    // 1. Process incoming commands from ESP32-S3 via UART2
     static String rxLine = "";
     while (S3Serial.available()) {
         char c = static_cast<char>(S3Serial.read());
@@ -311,13 +274,11 @@ void loop() {
         }
     }
 
-    // 2. Process metadata updates
     unsigned long now = millis();
     if (g_metadataChanged && (now - g_lastMetaBroadcast >= 100)) {
         broadcast_metadata();
     }
 
-    // 3. Visual LED status indicator
     static unsigned long lastLedUpdate = 0;
     static bool ledState = false;
 
@@ -343,7 +304,6 @@ void loop() {
             break;
     }
 
-    // 4. Debounced NVS flash persistence for volume
     if (g_volDirty && (now - g_lastVolChangeTime >= kVolSaveDebounceMs)) {
         save_volume_to_nvs();
     }

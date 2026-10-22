@@ -1,14 +1,6 @@
-/**
- * @file slimproto_client.h
- * @brief Squeezelite-compatible SlimProto and HTTP streaming client for LMS and Roon.
- *
- * Implements Squeezebox SlimProto client protocol:
- * - UDP discovery on port 3483 (finds Logitech Media Server, Lyrion, or Roon Core)
- * - Persistent TCP control connection on port 3483 (HELO, STAT keepalive, strm, audg)
- * - Secondary TCP HTTP connection to stream lossless uncompressed PCM audio
- * - Real-time linear interpolation resampler from 44.1 kHz to 48.0 kHz
- * - Writes stereo float frames [-1.0f, +1.0f] into the shared AudioRingBuffer
- */
+// SlimProto (Squeezelite style) client for LMS / Roon.
+// UDP discovery + TCP control on 3483, PCM pulled over HTTP, decoded to float, resampled 44.1k -> 48k
+// and pushed into the Wi-Fi ring buffer.
 #pragma once
 
 #include <Arduino.h>
@@ -23,19 +15,14 @@ public:
     SlimprotoClient(ParamStore& params, AudioRingBuffer<16384>& ringBuffer);
     ~SlimprotoClient();
 
-    /** @brief Start background FreeRTOS networking and streaming task on Core 0. */
     bool begin();
 
-    /** @brief Stop streaming client and disconnect. */
     void stop();
 
-    /** @brief Check if connected to LMS / Roon server. */
     bool isConnected() const { return _connected; }
 
-    /** @brief Check if currently streaming audio. */
     bool isStreaming() const { return _streaming; }
 
-    /** @brief Send playback control commands (toggle pause, stop, etc.) */
     void sendPause();
     void sendResume();
     void sendStop();
@@ -70,7 +57,6 @@ private:
     uint8_t                  _carryBuf[8]{0};
     size_t                   _carryLen{0};
 
-    // Resampler state (44.1kHz -> 48kHz)
     float                    _resampPhase{0.0f};
     float                    _lastSampleL{0.0f};
     float                    _lastSampleR{0.0f};

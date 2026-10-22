@@ -1,28 +1,14 @@
-/**
- * @file web_ui.h
- * @brief Async Web UI server (Core 0) - PROGMEM page + WebSocket control.
- *
- * Architecture
- * ------------
- *  ESPAsyncWebServer (port 80)
- *  |-- GET /            -> send EQ_HTML from PROGMEM (no SPIFFS needed)
- *  |-- GET /api/params  -> JSON snapshot of all params (REST fallback)
- *  \-- WS  /ws          -> bidirectional real-time channel
- *
- * Thread safety
- * -------------
- *  All param reads/writes go through ParamStore's mutex.
- */
+// Web UI server (core 0). Serves the gzipped page from flash, /ws for live control, /api/params for a JSON dump.
 #pragma once
 
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
-#include "eq_html.h"        // PROGMEM EQ_HTML[]
+#include "eq_html.h"
 #include "param_store.h"
 #include "sys_monitor.h"
 
-// -- Wi-Fi credentials (reads private wifi_credentials.h if present) -
+// wifi_credentials.h is optional and gitignored
 #if __has_include("wifi_credentials.h")
 #  include "wifi_credentials.h"
 #endif
@@ -49,7 +35,6 @@ public:
           _ws("/ws")
     {}
 
-    // -- Public API ------------------------------------------
     void begin() {
         Serial1.begin(115200, SERIAL_8N1, BT_UART_RX_PIN, BT_UART_TX_PIN);
         Serial.printf("[WEB] Inter-board Bluetooth metadata UART listener on RX GPIO %d\n", BT_UART_RX_PIN);
@@ -60,15 +45,11 @@ public:
         Serial.println("[WEB] HTTP & WebSocket server started");
     }
 
-    /**
-     * @brief Call from the web task loop on Core 0.
-     * Cleans up stale WS clients, checks for active input updates,
-     * reads incoming metadata from ESP32-WROOM, and periodically prints IP.
-     */
+    // call from the web task loop
     void loop() {
         _ws.cleanupClients();
 
-        // 1. Read incoming metadata lines from ESP32-WROOM via UART
+        // BT track info from the WROOM over UART
         while (Serial1.available()) {
             char c = static_cast<char>(Serial1.read());
             if (c == '\n') {
@@ -82,26 +63,23 @@ public:
             }
         }
 
-        // 2. Broadcast active source changes
         InputSourceMode mode;
         ActiveInputSource active;
         if (_params.getInputStateIfChanged(mode, active, _lastInputVersion)) {
             _ws.textAll(_buildStateJson());
         }
 
-        // 3. Broadcast Bluetooth metadata updates
         BluetoothMetadata bt;
         if (_params.getBluetoothMetadataIfChanged(bt, _lastBtMetaVersion)) {
             _ws.textAll(_buildBtMetaJson(bt));
         }
 
-        // 3b. Broadcast Wi-Fi streaming metadata updates
         WiFiStreamMetadata wifiMeta;
         if (_params.getWiFiStreamMetadataIfChanged(wifiMeta, _lastWifiMetaVersion)) {
             _ws.textAll(_buildWiFiMetaJson(wifiMeta));
         }
 
-        // 4. Print IP address every 5 seconds during operation
+        // print the IP every 5 s
         unsigned long now = millis();
         if (now - _lastIpPrint >= 5000) {
             _lastIpPrint = now;
@@ -111,14 +89,13 @@ public:
             Serial.printf("[NET] Web UI accessible at: http://%s\n", ipStr.c_str());
         }
 
-        // 5. Automatic debounced flash persistence
+        // save to flash 1 s after the last change
         if (_params.isDirty()) {
             if (now - _params.getLastDirtyTime() >= 1000) {
                 _params.save();
             }
         }
 
-        // 6. Broadcast real-time system stats (CPU, Flash, RAM) to connected WebSockets
         if (now - _lastSysBroadcast >= 1000) {
             _lastSysBroadcast = now;
             if (_ws.count() > 0) {
@@ -138,7 +115,6 @@ private:
     uint32_t       _lastWifiMetaVersion{1};
     String         _uartLine{""};
 
-    // -- Wi-Fi / AP setup ------------------------------------
     void _startWiFi() {
         bool hasCredentials = (strlen(WIFI_SSID) > 0 && strcmp(WIFI_SSID, "YourSSID") != 0);
 
@@ -157,7 +133,6 @@ private:
             Serial.println("\n[WEB] Wi-Fi connection timed out");
         }
 
-        // Start fallback SoftAP named "ESP32-S3-DSP"
         Serial.println("[WEB] Starting fallback AP 'ESP32-S3-DSP'...");
         WiFi.mode(WIFI_AP);
         WiFi.softAP("ESP32-S3-DSP");
@@ -166,7 +141,6 @@ private:
         Serial.printf("[NET] Web UI accessible at: http://%s\n", WiFi.softAPIP().toString().c_str());
     }
 
-    // -- Route setup -----------------------------------------
     void _setupRoutes() {
         _ws.onEvent([this](AsyncWebSocket* s, AsyncWebSocketClient* c,
                            AwsEventType type, void* arg, uint8_t* data, size_t len) {
@@ -189,7 +163,6 @@ private:
         });
     }
 
-    // -- WebSocket event handler ------------------------------
     void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                     AwsEventType type, void* arg, uint8_t* data, size_t len) {
         switch (type) {
@@ -216,7 +189,6 @@ private:
         }
     }
 
-    // -- Inbound WS message dispatcher ------------------------
     void _handleWsMessage(AsyncWebSocketClient* client, const char* json, size_t len) {
         StaticJsonDocument<512> doc;
         if (deserializeJson(doc, json, len) != DeserializationError::Ok) return;
@@ -331,7 +303,6 @@ private:
         }
     }
 
-    // -- EQ message handler -----------------------------------
     void _handleEQMsg(const JsonDocument& doc) {
         const int band = doc["band"] | -1;
         if (band < 0 || band >= kEQBands) return;
@@ -361,7 +332,6 @@ private:
         _params.setEQBand(band, p);
     }
 
-    // -- Speakers correction (Subsonic + Channel correction) message handler --
     void _handleSubsonicMsg(const JsonDocument& doc) {
         SubsonicParams p = _params.getSubsonic();
         if (doc.containsKey("freq"))    p.freq     = doc["freq"].as<float>();
@@ -384,7 +354,6 @@ private:
         _params.setSubsonic(p);
     }
 
-    // -- Compander message handler ----------------------------
     void _handleCompanderMsg(const JsonDocument& doc) {
         CompanderParams p = _params.getCompander();
         if (doc.containsKey("threshold")) p.threshold  = doc["threshold"].as<float>();
@@ -396,7 +365,6 @@ private:
         _params.setCompander(p);
     }
 
-    // -- Limiter message handler ------------------------------
     void _handleLimiterMsg(const JsonDocument& doc) {
         LimiterParams p = _params.getLimiter();
         if (doc.containsKey("ceiling")) p.ceilingDb = doc["ceiling"].as<float>();
@@ -405,17 +373,14 @@ private:
         _params.setLimiter(p);
     }
 
-    // -- JSON builder -----------------------------------------
     String _buildStateJson() {
         DynamicJsonDocument doc(4096);
         doc["t"] = "state";
 
-        // Input Source Module
         JsonObject inObj = doc.createNestedObject("input");
         inObj["source"] = static_cast<uint8_t>(_params.getInputMode());
         inObj["active"] = static_cast<uint8_t>(_params.getActiveSource());
 
-        // EQ Module
         JsonObject eqObj = doc.createNestedObject("eq");
         eqObj["enabled"] = _params.getEQEnabled();
         eqObj["preamp"]  = roundf(_params.getPreamp() * 100.0f) / 100.0f;
@@ -434,7 +399,6 @@ private:
             o["enabled"] = p.enabled;
         }
 
-        // Speakers Correction Module
         auto sub = _params.getSubsonic();
         JsonObject subObj = doc.createNestedObject("subsonic");
         subObj["enabled"] = sub.enabled;
@@ -446,7 +410,6 @@ private:
         subObj["phaseL"]  = sub.phaseL;
         subObj["phaseR"]  = sub.phaseR;
 
-        // Compander Module
         auto comp = _params.getCompander();
         JsonObject cObj = doc.createNestedObject("compander");
         cObj["enabled"]   = comp.enabled;
@@ -456,14 +419,12 @@ private:
         cObj["releaseMs"] = roundf(comp.releaseMs * 10.0f) / 10.0f;
         cObj["makeup"]    = roundf(comp.makeupGain * 10.0f) / 10.0f;
 
-        // Limiter Module
         auto lim = _params.getLimiter();
         JsonObject lObj = doc.createNestedObject("limiter");
         lObj["enabled"] = lim.enabled;
         lObj["ceiling"] = roundf(lim.ceilingDb * 10.0f) / 10.0f;
         lObj["knee"]    = roundf(lim.kneeDb * 10.0f) / 10.0f;
 
-        // Boot Defaults Configuration
         bool bCustom, bEQ, bComp, bLim, bSub;
         _params.getBootDefaults(bCustom, bEQ, bComp, bLim, bSub);
         JsonObject bootObj = doc.createNestedObject("boot_defaults");
@@ -474,7 +435,6 @@ private:
         bootObj["comp"]     = bComp;
         bootObj["lim"]      = bLim;
 
-        // Module Execution Order
         String orderStr = _params.getModuleOrder();
         JsonArray orderArr = doc.createNestedArray("module_order");
         int startIdx = 0;
@@ -487,7 +447,6 @@ private:
             startIdx = comma + 1;
         }
 
-        // Bluetooth Metadata Module
         auto bt = _params.getBluetoothMetadata();
         JsonObject btObj = doc.createNestedObject("bt");
         btObj["title"]     = bt.title;
@@ -498,7 +457,6 @@ private:
         btObj["duration"]  = bt.duration;
         btObj["pos"]       = bt.pos;
 
-        // Wi-Fi Stream Metadata Module (LMS / Roon)
         auto wf = _params.getWiFiStreamMetadata();
         JsonObject wfObj = doc.createNestedObject("wifi_stream");
         wfObj["server"]    = wf.serverName;
@@ -513,7 +471,6 @@ private:
         wfObj["rate"]      = wf.sampleRate;
         wfObj["bits"]      = wf.bitDepth;
 
-        // System Telemetry (CPU 0/1, RAM, Flash)
         auto s = SystemMonitor::getStats();
         JsonObject sysObj = doc.createNestedObject("sys");
         sysObj["cpu0"]    = roundf(s.cpu0 * 10.0f) / 10.0f;
@@ -603,7 +560,6 @@ private:
                 meta.pos       = doc["pos"]       | 0;
                 _params.setBluetoothMetadata(meta);
 
-                // Broadcast directly to connected WebSockets
                 _ws.textAll(line);
                 Serial.printf("[WEB] BT Track: %s - %s (%s)\n", meta.title, meta.artist, meta.album);
             }

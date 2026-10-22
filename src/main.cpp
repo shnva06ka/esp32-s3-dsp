@@ -1,11 +1,4 @@
-/**
- * @file main.cpp
- * @brief ESP32-S3-DSP  -  Entry Point & Task Scheduler
- *
- * Architecture:
- *   Core 0  -  Wi-Fi / Fallback AP + Async Web UI & WebSockets
- *   Core 1  -  Real-time Dual-I2S audio engine + DSP pipeline
- */
+// ESP32-S3-DSP entry point. Core 1 runs audio + DSP, core 0 runs WebUI, Wi-Fi and SlimProto.
 
 #include <Arduino.h>
 #include "audio_config.h"
@@ -15,15 +8,12 @@
 #include "sys_monitor.h"
 #include "slimproto_client.h"
 
-// -- Forward declarations -------------------------------------
 static void audioTask(void* pvParameters);
 static void webTask(void* pvParameters);
 
-// -- Shared parameter store & audio driver --------------------
 ParamStore g_params;
 I2SAudio   g_audio(g_params);
 
-// -------------------------------------------------------------
 void setup()
 {
     Serial.begin(115200);
@@ -47,42 +37,36 @@ void setup()
     }
     Serial.printf("[BOOT] Free Internal DRAM: %u bytes\n", ESP.getFreeHeap());
 
-    // Initialise system monitor idle hooks for CPU core monitoring
     SystemMonitor::begin();
 
-    // Initialise parameter store (loads defaults / NVS)
     g_params.begin();
 
-    // -- Core 1: Real-time Audio Task (Highest Priority) ------
     xTaskCreatePinnedToCore(
         audioTask,
         "AudioTask",
-        16384,         // 16 KB stack
+        16384,
         nullptr,
         configMAX_PRIORITIES - 1,
         nullptr,
-        1              // Core 1
+        1
     );
 
-    // -- Core 0: Web UI & Networking Task ---------------------
     xTaskCreatePinnedToCore(
         webTask,
         "WebTask",
-        16384,         // 16 KB stack
+        16384,
         nullptr,
         2,
         nullptr,
-        0              // Core 0
+        0
     );
 }
 
 void loop()
 {
-    // All work is handled by FreeRTOS tasks; loop() yields permanently.
     vTaskDelay(portMAX_DELAY);
 }
 
-// -------------------------------------------------------------
 static void audioTask(void* /*pvParameters*/)
 {
     Serial.println("[AUDIO] Initialising Dual-I2S Audio Driver...");

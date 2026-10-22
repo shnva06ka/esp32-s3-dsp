@@ -1,6 +1,6 @@
 """
 test/verify_biquad.py
-Verifies browser-side bandMagAt() formula matches C++ _calcCoeffs().
+Checks the browser bandMagAt() math against the C++ _calcCoeffs().
 Run:  py -3 test/verify_biquad.py
 """
 import math, sys
@@ -52,7 +52,7 @@ def band_mag_at(freq, gain, q, test_f, b_type=0, enabled=True, order=2):
     if not enabled:
         return 0.0
 
-    # Backwards compatibility for legacy flat types
+    # types 5/6 are old names for 4th order LP/HP
     if b_type == 5:
         b_type = 3; order = 4
     elif b_type == 6:
@@ -181,7 +181,6 @@ def near(a, b, tol, label):
         failures += 1
     print(f"{sym}  {label}:  got={a:.4f}  expected~{b:.4f} ±{tol}")
 
-# ── 1. Centre-frequency gain accuracy ───────────────────────────────────────
 print("\n=== 1. Centre-frequency gain ===")
 for freq, gain, q in [
     (1000, +6,  0.707),
@@ -193,14 +192,12 @@ for freq, gain, q in [
     got = band_mag_at(freq, gain, q, freq)
     near(got, gain, 0.05, f"f={freq}Hz  gain={gain:+}dB  Q={q}")
 
-# ── 2. Flat EQ (all 0 dB) -> 0 dB everywhere ────────────────────────────────
 print("\n=== 2. Flat EQ -> 0 dB everywhere ===")
 ISO_FREQS = [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000]
 for tf in [31, 100, 500, 1000, 5000, 16000]:
     total = sum(band_mag_at(f, 0, 0.707, tf) for f in ISO_FREQS)
     near(total, 0.0, 0.01, f"flat EQ at {tf} Hz")
 
-# ── 3. 1 kHz band isolated at +6 dB ────────────────────────────────────────
 print("\n=== 3. 1 kHz band at +6 dB ===")
 gains = [0.0] * 10;  gains[5] = 6.0   # band index 5 = 1 kHz
 
@@ -211,11 +208,9 @@ near(total_mag(gains, 1000),  +6.0, 0.05, "peak at 1 kHz = +6 dB")
 near(total_mag(gains,   31),   0.0, 0.50, "31 Hz ~ 0 dB")
 near(total_mag(gains, 16000),  0.0, 0.50, "16 kHz ~ 0 dB")
 
-# ── 4. Disabled band passes through ─────────────────────────────────────────
 print("\n=== 4. Disabled band ===")
 near(band_mag_at(1000, 12, 0.707, 1000, enabled=False), 0.0, 0.001, "disabled band = 0 dB")
 
-# ── 5. Q narrows the peak ────────────────────────────────────────────────────
 print("\n=== 5. High-Q narrower than Low-Q ===")
 narrow = band_mag_at(1000, 6, 8.0, 2000)
 wide   = band_mag_at(1000, 6, 0.3, 2000)
@@ -224,45 +219,34 @@ sym = "[PASS]" if ok else "[FAIL]"
 if not ok: failures += 1
 print(f"{sym}  High-Q at 2kHz={narrow:.3f} dB  Low-Q at 2kHz={wide:.3f} dB  (narrow < wide)")
 
-# ── 6. Canvas curve sanity: 10-band all bands +6 dB ─────────────────────────
 print("\n=== 6. All bands +6 dB - multi-band interaction ===")
 gains_all6 = [6.0] * 10
 for tf in [63, 500, 2000, 8000]:
     got = total_mag(gains_all6, tf)
-    # Each band contributes only at its own frequency; at test points between
-    # adjacent bands the combined response should be positive but varies.
     ok = got > 0
     sym = "[PASS]" if ok else "[FAIL]"
     if not ok: failures += 1
     print(f"{sym}  All bands +6dB at {tf} Hz -> {got:.2f} dB (expect > 0)")
 
-# ── 7. Low Shelf filter ──────────────────────────────────────────────────────
 print("\n=== 7. Low Shelf filter ===")
-# Low shelf at 250 Hz, +6 dB
 near(band_mag_at(250, 6.0, 0.707, 30, b_type=1), 6.0, 0.25, "Low shelf low-freq passband (+6 dB)")
 near(band_mag_at(250, 6.0, 0.707, 250, b_type=1), 3.0, 0.25, "Low shelf corner frequency (+3 dB = half gain)")
 near(band_mag_at(250, 6.0, 0.707, 5000, b_type=1), 0.0, 0.25, "Low shelf high-freq stopband (0 dB)")
 
-# ── 8. High Shelf filter ─────────────────────────────────────────────────────
 print("\n=== 8. High Shelf filter ===")
-# High shelf at 2000 Hz, +6 dB
 near(band_mag_at(2000, 6.0, 0.707, 100, b_type=2), 0.0, 0.25, "High shelf low-freq stopband (0 dB)")
 near(band_mag_at(2000, 6.0, 0.707, 2000, b_type=2), 3.0, 0.25, "High shelf corner frequency (+3 dB = half gain)")
 near(band_mag_at(2000, 6.0, 0.707, 10000, b_type=2), 6.0, 0.25, "High shelf high-freq passband (+6 dB)")
 
-# ── 9. Low Pass filter: Orders 1, 2, 3, 4 ──────────────────────────────────
 print("\n=== 9. Low Pass filter: 1st, 2nd, 3rd, 4th order ===")
-# 1st order LP (6 dB/oct)
 near(band_mag_at(1000, 0, 0.707, 50, b_type=3, order=1), 0.0, 0.05, "1st order LP DC (0 dB)")
 near(band_mag_at(1000, 0, 0.707, 1000, b_type=3, order=1), -3.01, 0.15, "1st order LP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.707, 2000, b_type=3, order=1), -7.0, 0.5, "1st order LP 1 oct (~ -7 dB)")
 
-# 2nd order LP (12 dB/oct standard Butterworth Q=0.7071)
 near(band_mag_at(1000, 0, 0.7071, 50, b_type=3, order=2), 0.0, 0.05, "2nd order LP DC (0 dB)")
 near(band_mag_at(1000, 0, 0.7071, 1000, b_type=3, order=2), -3.01, 0.15, "2nd order LP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.7071, 2000, b_type=3, order=2), -12.3, 0.5, "2nd order LP 1 oct (-12 dB/oct)")
 
-# 3rd order LP (18 dB/oct Butterworth)
 near(band_mag_at(1000, 0, 0.707, 50, b_type=3, order=3), 0.0, 0.05, "3rd order LP DC (0 dB)")
 near(band_mag_at(1000, 0, 0.707, 1000, b_type=3, order=3), -3.01, 0.15, "3rd order LP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.707, 2000, b_type=3, order=3), -18.2, 0.6, "3rd order LP 1 oct (-18 dB/oct)")
@@ -272,7 +256,6 @@ sym = "[PASS]" if ok else "[FAIL]"
 if not ok: failures += 1
 print(f"{sym}  3rd order LP max gain check: {max_lp_3:.4f} dB <= 0.0 dB (no volume boost)")
 
-# 4th order LP (24 dB/oct Butterworth)
 near(band_mag_at(1000, 0, 0.707, 50, b_type=3, order=4), 0.0, 0.05, "4th order LP DC (0 dB)")
 near(band_mag_at(1000, 0, 0.707, 1000, b_type=3, order=4), -3.01, 0.15, "4th order LP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.707, 2000, b_type=3, order=4), -24.2, 0.8, "4th order LP 1 oct (-24 dB/oct)")
@@ -282,19 +265,15 @@ sym = "[PASS]" if ok else "[FAIL]"
 if not ok: failures += 1
 print(f"{sym}  4th order LP max gain check: {max_lp_4:.4f} dB <= 0.0 dB (no volume boost)")
 
-# ── 10. High Pass filter: Orders 1, 2, 3, 4 ─────────────────────────────────
 print("\n=== 10. High Pass filter: 1st, 2nd, 3rd, 4th order ===")
-# 1st order HP (6 dB/oct)
 near(band_mag_at(1000, 0, 0.707, 15000, b_type=4, order=1), 0.0, 0.05, "1st order HP high-freq (0 dB)")
 near(band_mag_at(1000, 0, 0.707, 1000, b_type=4, order=1), -3.01, 0.15, "1st order HP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.707, 500, b_type=4, order=1), -7.0, 0.5, "1st order HP 1 oct below (~ -7 dB)")
 
-# 2nd order HP (12 dB/oct standard Butterworth Q=0.7071)
 near(band_mag_at(1000, 0, 0.7071, 15000, b_type=4, order=2), 0.0, 0.05, "2nd order HP high-freq (0 dB)")
 near(band_mag_at(1000, 0, 0.7071, 1000, b_type=4, order=2), -3.01, 0.15, "2nd order HP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.7071, 500, b_type=4, order=2), -12.3, 0.5, "2nd order HP 1 oct below (-12 dB/oct)")
 
-# 3rd order HP (18 dB/oct Butterworth)
 near(band_mag_at(1000, 0, 0.707, 15000, b_type=4, order=3), 0.0, 0.05, "3rd order HP high-freq (0 dB)")
 near(band_mag_at(1000, 0, 0.707, 1000, b_type=4, order=3), -3.01, 0.15, "3rd order HP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.707, 500, b_type=4, order=3), -18.2, 0.6, "3rd order HP 1 oct below (-18 dB/oct)")
@@ -304,7 +283,6 @@ sym = "[PASS]" if ok else "[FAIL]"
 if not ok: failures += 1
 print(f"{sym}  3rd order HP max gain check: {max_hp_3:.4f} dB <= 0.0 dB (no volume boost)")
 
-# 4th order HP (24 dB/oct Butterworth)
 near(band_mag_at(1000, 0, 0.707, 15000, b_type=4, order=4), 0.0, 0.05, "4th order HP high-freq (0 dB)")
 near(band_mag_at(1000, 0, 0.707, 1000, b_type=4, order=4), -3.01, 0.15, "4th order HP cutoff (-3 dB)")
 near(band_mag_at(1000, 0, 0.707, 500, b_type=4, order=4), -24.2, 0.8, "4th order HP 1 oct below (-24 dB/oct)")
@@ -314,14 +292,12 @@ sym = "[PASS]" if ok else "[FAIL]"
 if not ok: failures += 1
 print(f"{sym}  4th order HP max gain check: {max_hp_4:.4f} dB <= 0.0 dB (no volume boost)")
 
-# ── 11. Legacy Flat Type Compatibility (types 5 & 6) ─────────────────────────
 print("\n=== 11. Legacy Flat Type Compatibility ===")
 near(band_mag_at(1000, 0, 0, 1000, b_type=5), -3.01, 0.15, "Legacy Flat LP (b_type=5) maps to 4th order (-3 dB)")
 near(band_mag_at(1000, 0, 0, 2000, b_type=5), -24.2, 0.8, "Legacy Flat LP 1 oct (-24 dB/oct)")
 near(band_mag_at(1000, 0, 0, 1000, b_type=6), -3.01, 0.15, "Legacy Flat HP (b_type=6) maps to 4th order (-3 dB)")
 near(band_mag_at(1000, 0, 0, 500, b_type=6), -24.2, 0.8, "Legacy Flat HP 1 oct below (-24 dB/oct)")
 
-# ─────────────────────────────────────────────────────────────────────────────
 print()
 if failures == 0:
     print("All tests PASSED")

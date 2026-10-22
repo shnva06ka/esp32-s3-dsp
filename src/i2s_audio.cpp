@@ -1,8 +1,3 @@
-/**
- * @file i2s_audio.cpp
- * @brief Dual-I2S driver and auto-switching input manager implementation.
- */
-
 #include "i2s_audio.h"
 #include <Arduino.h>
 #include <esp_heap_caps.h>
@@ -15,12 +10,10 @@ I2SAudio::I2SAudio(ParamStore& params)
 {
 }
 
-// -------------------------------------------------------------
 bool I2SAudio::begin()
 {
     _allocBuffers();
 
-    // -- 1. I2S_NUM_0: Full-Duplex Master (PCM1808 ADC + PCM5102A DAC) --
     const i2s_config_t cfg_master = {
         .mode                 = static_cast<i2s_mode_t>(
                                     I2S_MODE_MASTER |
@@ -56,7 +49,6 @@ bool I2SAudio::begin()
     }
     i2s_zero_dma_buffer(kI2SPortMaster);
 
-    // -- 2. I2S_NUM_1: Slave Receiver (External ESP32-WROOM Bluetooth A2DP) --
     const i2s_config_t cfg_slave = {
         .mode                 = static_cast<i2s_mode_t>(
                                     I2S_MODE_SLAVE |
@@ -67,7 +59,7 @@ bool I2SAudio::begin()
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
         .intr_alloc_flags     = ESP_INTR_FLAG_LEVEL1,
         .dma_buf_count        = 16,
-        .dma_buf_len          = 64,  // Smaller DMA blocks (1.33ms) so descriptors finish frequently and never starve
+        .dma_buf_len          = 64,  // small blocks so descriptors keep finishing
         .use_apll             = false,
         .tx_desc_auto_clear   = false,
         .fixed_mclk           = 0,
@@ -97,14 +89,12 @@ bool I2SAudio::begin()
     return true;
 }
 
-// -------------------------------------------------------------
 void I2SAudio::process(const AudioCallback& cb)
 {
     if (!_running) return;
 
     const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
 
-    // -- 1. Read AUX from I2S_NUM_0 (Master ADC) --------------
     size_t bytesReadAux = 0;
     esp_err_t errAux = i2s_read(kI2SPortMaster, _rxBufAux, byteCount, &bytesReadAux, pdMS_TO_TICKS(20));
     if (errAux != ESP_OK || bytesReadAux == 0) {
@@ -118,30 +108,24 @@ void I2SAudio::process(const AudioCallback& cb)
     _rmsAuxL = _calcRMS(_leftAux,  kBufferFrames);
     _rmsAuxR = _calcRMS(_rightAux, kBufferFrames);
 
-    // -- 2. Read Bluetooth from I2S_NUM_1 (Slave RX) into Ring Buffer --
-    // Drain incoming 44.1kHz / 32-bit DMA frames, resample to 48.0kHz, and store in _btRingBuffer
     size_t bytesReadBt = 0;
     while (i2s_read(kI2SPortSlave, _rxBufBt, byteCount, &bytesReadBt, 0) == ESP_OK && bytesReadBt > 0) {
         size_t frames = bytesReadBt / (kChannels * sizeof(int32_t));
         _resampleAndWriteBt(frames);
     }
 
-    // Read 256 resampled 48.0kHz frames for DSP pipeline
     _btRingBuffer.read(_leftBt, _rightBt, kBufferFrames);
     _rmsBtL = _calcRMS(_leftBt, kBufferFrames);
     _rmsBtR = _calcRMS(_rightBt, kBufferFrames);
 
-    // -- 3. Read Wi-Fi Stream stub from Ring Buffer ------------
     _wifiRingBuffer.read(_leftWifi, _rightWifi, kBufferFrames);
 
-    // -- 4. Manual Input Selector Crossfade Logic --------------
     const InputSourceMode targetSource = _params.getInputMode();
 
     const float targetGainAux  = (targetSource == INPUT_MODE_AUX)  ? 1.0f : 0.0f;
     const float targetGainBt   = (targetSource == INPUT_MODE_BT)   ? 1.0f : 0.0f;
     const float targetGainWifi = (targetSource == INPUT_MODE_WIFI) ? 1.0f : 0.0f;
 
-    // Per-sample smooth linear crossfading
     for (size_t i = 0; i < kBufferFrames; ++i) {
         if (_gainAux < targetGainAux) _gainAux = std::min(targetGainAux, _gainAux + kFadeStep);
         else if (_gainAux > targetGainAux) _gainAux = std::max(targetGainAux, _gainAux - kFadeStep);
@@ -156,7 +140,6 @@ void I2SAudio::process(const AudioCallback& cb)
         _rightMix[i] = _gainAux * _rightAux[i] + _gainBt * _rightBt[i] + _gainWifi * _rightWifi[i];
     }
 
-    // Determine and broadcast active source changes
     ActiveInputSource currentActive = (targetSource == INPUT_MODE_BT)   ? ACTIVE_SRC_BT :
                                       (targetSource == INPUT_MODE_WIFI) ? ACTIVE_SRC_WIFI : ACTIVE_SRC_AUX;
 
@@ -168,13 +151,11 @@ void I2SAudio::process(const AudioCallback& cb)
         Serial.printf("[AUDIO] Active input switched to: %s\n", name);
     }
 
-    // -- 5. Run DSP Pipeline Callback --------------------------
     cb(_leftMix, _rightMix, kBufferFrames);
 
     _rmsOutL = _calcRMS(_leftMix,  kBufferFrames);
     _rmsOutR = _calcRMS(_rightMix, kBufferFrames);
 
-    // -- 6. Interleave float -> int32 and write to DAC ---------
     auto toI32 = [](float s) -> int32_t {
         if (s > 1.0f) s = 1.0f;
         else if (s < -1.0f) s = -1.0f;
@@ -191,7 +172,6 @@ void I2SAudio::process(const AudioCallback& cb)
     i2s_write(kI2SPortMaster, _txBuf, byteCount, &bytesWritten, pdMS_TO_TICKS(20));
 }
 
-// -------------------------------------------------------------
 void I2SAudio::end()
 {
     if (_running) {
@@ -202,11 +182,10 @@ void I2SAudio::end()
     _freeBuffers();
 }
 
-// -------------------------------------------------------------
 void I2SAudio::_allocBuffers()
 {
-    const size_t intBufBytes   = kBufferFrames * kChannels * sizeof(int32_t); // 2048 bytes
-    const size_t floatBufBytes = kBufferFrames * sizeof(float);               // 1024 bytes
+    const size_t intBufBytes   = kBufferFrames * kChannels * sizeof(int32_t);
+    const size_t floatBufBytes = kBufferFrames * sizeof(float);
 
     auto dramAlloc = [](size_t sz) -> void* {
         void* p = heap_caps_malloc(sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -255,7 +234,7 @@ void I2SAudio::_resampleAndWriteBt(size_t frames)
 {
     if (frames == 0) return;
 
-    // Prevent buffer latency growth beyond ~85ms (4096 frames)
+    // cap latency at ~85 ms (4096 frames)
     if (_btRingBuffer.available() > 4096) {
         float dropL[256], dropR[256];
         _btRingBuffer.read(dropL, dropR, 256);
@@ -264,7 +243,7 @@ void I2SAudio::_resampleAndWriteBt(size_t frames)
     float resampL[512];
     float resampR[512];
     size_t outCount = 0;
-    constexpr float step = 44100.0f / 48000.0f; // 0.91875f
+    constexpr float step = 44100.0f / 48000.0f;
 
     for (size_t i = 0; i < frames; ++i) {
         float curL = static_cast<float>(_rxBufBt[i * 2    ]) * kScale;

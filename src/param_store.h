@@ -1,11 +1,4 @@
-/**
- * @file param_store.h
- * @brief Thread-safe shared parameter store (EQ + Subsonic + Compander + Limiter).
- *
- * Reads/writes use a FreeRTOS mutex so the audio task (Core 1) and
- * the web task (Core 0) can exchange parameters without data races.
- * Automatically saves state changes to NVS flash.
- */
+// Settings shared between the audio task (core 1) and the web task (core 0). Mutex protected, saved to NVS.
 #pragma once
 
 #include <freertos/FreeRTOS.h>
@@ -13,7 +6,6 @@
 #include <Preferences.h>
 #include "audio_config.h"
 
-// -- EQ Filter Types ------------------------------------------
 enum EQFilterType : uint8_t {
     EQ_FILTER_PEAK           = 0,
     EQ_FILTER_LOW_SHELF      = 1,
@@ -24,7 +16,6 @@ enum EQFilterType : uint8_t {
     EQ_FILTER_FLAT_HIGH_PASS = 6  // Legacy alias -> High Pass (order=4)
 };
 
-// -- Per-band EQ parameters -----------------------------------
 struct EQBandParams {
     float   freq{1000.0f};       // Hz        (20 - 20000)
     float   gain{0.0f};          // dB        (-18 to +18)
@@ -38,14 +29,11 @@ struct EQBandParams {
         : freq(f), gain(g), q(q_), enabled(en), type(t), order(ord) {}
 };
 
-// -- Speakers correction (Subsonic + Channel correction) parameters -----
 struct SubsonicParams {
-    // Submodule 1: Subsonic filter
     float   freq{80.0f};       // Hz (20 - 100)
     uint8_t order{2};          // 1, 2, 3, 4
     bool    enabled{false};    // Master module bypass
 
-    // Submodule 2: Channel correction
     float   balance{0.0f};     // -100 to +100 (-100 = L louder, +100 = R louder, 0 = center)
     float   delayMsL{0.0f};    // ms (-20.0 to +20.0)
     float   delayMsR{0.0f};    // ms (-20.0 to +20.0)
@@ -57,7 +45,6 @@ struct SubsonicParams {
         : freq(f), order(ord), enabled(en) {}
 };
 
-// -- Compander parameters -------------------------------------
 struct CompanderParams {
     float threshold;  // dBFS  (-60 to 0)
     float ratio;      // N:1   (1 - 20)
@@ -67,14 +54,12 @@ struct CompanderParams {
     bool  enabled;
 };
 
-// -- Soft-limiter parameters ----------------------------------
 struct LimiterParams {
     float ceilingDb;  // dBFS  (-6 to 0)
     float kneeDb;     // dB    (0 to 6) soft-knee width
     bool  enabled;
 };
 
-// -- Input Source Modes and Active Sources --------------------
 enum InputSourceMode : uint8_t {
     INPUT_MODE_AUX  = 1,
     INPUT_MODE_BT   = 2,
@@ -87,7 +72,6 @@ enum ActiveInputSource : uint8_t {
     ACTIVE_SRC_WIFI = 3
 };
 
-// -- Bluetooth Metadata Structure -----------------------------
 struct BluetoothMetadata {
     char title[128]{"No Track Playing"};
     char artist[128]{"Unknown Artist"};
@@ -98,7 +82,6 @@ struct BluetoothMetadata {
     uint32_t pos{0};      // seconds
 };
 
-// -- Wi-Fi Streaming (LMS / Roon) Metadata Structure ----------
 struct WiFiStreamMetadata {
     char serverName[64]{"None"};
     char serverIp[32]{""};
@@ -115,14 +98,12 @@ struct WiFiStreamMetadata {
     uint32_t pos{0};
 };
 
-// -------------------------------------------------------------
 class ParamStore {
 public:
     ParamStore()
         : _mutex(xSemaphoreCreateMutex())
     {}
 
-    // -- Lifecycle --------------------------------------------
     void begin() {
         _loadDefaults();
 
@@ -247,7 +228,6 @@ public:
         xSemaphoreGive(_mutex);
     }
 
-    // -- Module Execution Order -------------------------------
     String getModuleOrder() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         String s = _moduleOrder;
@@ -288,7 +268,6 @@ public:
         xSemaphoreGive(_mutex);
     }
 
-    // -- EQ ---------------------------------------------------
     bool getEQEnabled() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         bool en = _eqEnabled;
@@ -444,7 +423,6 @@ public:
         xSemaphoreGive(_mutex);
     }
 
-    // -- Subsonic Filter --------------------------------------
     SubsonicParams getSubsonic() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         auto p = _subsonic;
@@ -473,7 +451,6 @@ public:
         return true;
     }
 
-    // -- Compander --------------------------------------------
     CompanderParams getCompander() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         auto p = _comp;
@@ -502,7 +479,6 @@ public:
         return true;
     }
 
-    // -- Limiter ----------------------------------------------
     LimiterParams getLimiter() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         auto p = _lim;
@@ -531,7 +507,6 @@ public:
         return true;
     }
 
-    // -- Input Source -----------------------------------------
     InputSourceMode getInputMode() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         auto m = _inputMode;
@@ -577,7 +552,6 @@ public:
         return true;
     }
 
-    // -- Bluetooth Metadata -----------------------------------
     BluetoothMetadata getBluetoothMetadata() const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         BluetoothMetadata m = _btMeta;
@@ -633,9 +607,9 @@ public:
 private:
     mutable SemaphoreHandle_t _mutex;
     EQBandParams              _eq[kEQBands];
-    int                       _eqCount{5};        // Starts with 5 bands by default
-    bool                      _eqEnabled{false};  // OFF by default
-    float                     _preampDb{0.0f};    // EQ preamp gain (-18 to +18 dB)
+    int                       _eqCount{5};
+    bool                      _eqEnabled{false};
+    float                     _preampDb{0.0f};
     SubsonicParams            _subsonic;
     CompanderParams           _comp;
     LimiterParams             _lim;
@@ -663,7 +637,7 @@ private:
     void _loadDefaults() {
         // Default 5 initial bands: Low Shelf (100 Hz), 3 Peaking (500, 1000, 4000 Hz), High Shelf (10000 Hz)
         _eqCount   = 5;
-        _eqEnabled = false; // OFF by default
+        _eqEnabled = false;
         _preampDb  = 0.0f;
         _inputMode    = INPUT_MODE_AUX;
         _activeSource = ACTIVE_SRC_AUX;
@@ -674,15 +648,14 @@ private:
         _eq[3] = { 4000.0f,  0.0f, 0.707f, true, EQ_FILTER_PEAK,       2 };
         _eq[4] = { 10000.0f, 0.0f, 0.707f, true, EQ_FILTER_HIGH_SHELF, 2 };
 
-        // Remaining backup bands
         constexpr float reserveFreqs[5] = { 250.0f, 2000.0f, 8000.0f, 16000.0f, 50.0f };
         for (int i = 5; i < kEQBands; ++i) {
             _eq[i] = { reserveFreqs[i - 5], 0.0f, 0.707f, true, EQ_FILTER_PEAK, 2 };
         }
 
-        _subsonic = { 80.0f, 2, false };                      // OFF by default
-        _comp     = { -18.0f, 4.0f, 5.0f, 150.0f, 0.0f, false }; // OFF by default
-        _lim      = { -0.5f, 3.0f, false };                       // OFF by default
+        _subsonic = { 80.0f, 2, false };
+        _comp     = { -18.0f, 4.0f, 5.0f, 150.0f, 0.0f, false };
+        _lim      = { -0.5f, 3.0f, false };
 
         _bootCustomDefaults = false;
         _bootEQ             = false;

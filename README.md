@@ -21,14 +21,13 @@ Phone / PC ----->|  AVRCP Metadata and Transport |
 AUX Line In ---->|  Input Selector:              |
  (PCM1808 ADC)   |   1. AUX Line In (PCM1808)    |
 Wi-Fi Stream --->|   2. Bluetooth A2DP           |
-                 |   3. Wi-Fi Lossless (SlimProto|
+                 |   3. Wi-Fi (SlimProto)        |
                  +-------------------------------+
                  |  Core 1: DSP Pipeline         |
-                 |   - Preamp Gain Stage         |
-                 |   - Parametric Biquad EQ      |
-                 |   - Subsonic High-Pass Filter |
-                 |   - Stereo RMS Compressor     |
-                 |   - Soft-Knee Peak Limiter    |
+                 |   - Parametric EQ + Preamp    |
+                 |   - Speakers Correction       |
+                 |   - RMS Compressor            |
+                 |   - Soft-Knee Limiter         |
                  +-------------------------------+
                  |  Core 0: Network and WebUI    |
                  |   - AsyncWebServer (PROGMEM)  |
@@ -45,8 +44,8 @@ Wi-Fi Stream --->|   2. Bluetooth A2DP           |
 
 ### Core Allocation (ESP32-S3)
 
-- **Core 1 (Audio Engine)**: FreeRTOS priority 24, DMA transfers at 48 kHz stereo 32-bit, zero-latency DSP in-place processing.
-- **Core 0 (Network and Control)**: AsyncWebServer on port 80, WebSocket `/ws`, UART bridge to ESP32-WROOM, Wi-Fi Station and SoftAP fallback.
+- **Core 1 (Audio Engine)**: FreeRTOS priority 24, DMA at 48 kHz stereo 32-bit, DSP runs in place on 256 frame buffers (~5.3 ms).
+- **Core 0 (Network and Control)**: AsyncWebServer on port 80, WebSocket `/ws`, UART bridge to ESP32-WROOM, SlimProto client (Roon / LMS), Wi-Fi Station and SoftAP fallback.
 
 ---
 
@@ -85,13 +84,14 @@ ESP32-S3 interfaces with external audio converters via I2S0 master mode.
 Audio executes on Core 1 at 48 kHz (256 samples/buffer):
 
 ```
-Input (AUX / BT / Wi-Fi) -> Preamp -> Parametric EQ -> Subsonic Filter -> Compressor -> Limiter -> Output
+Input (AUX / BT / Wi-Fi) -> EQ (with Preamp) -> Speakers Correction -> Compressor -> Limiter -> Output
 ```
 
-- **Preamp**: -18 dB to +18 dB gain.
-- **Parametric EQ**: Up to 10 biquad filters (Peaking, Low/High Shelf, Low/High Pass).
-- **Subsonic Filter**: High-pass biquad (20 to 100 Hz, 1st to 4th order: 6, 12, 18, 24 dB/oct slopes) to protect subwoofer drivers.
-- **Compressor**: RMS dynamic range compander with threshold, ratio, attack, release, and makeup gain.
+That's the default order. Modules are independent and the order can be changed in the WebUI. Everything starts OFF on a fresh board, settings are saved to flash.
+
+- **Parametric EQ**: Up to 10 biquad filters (Peaking, Low/High Shelf, Low/High Pass with 1st to 4th order slopes) and a -18 dB to +18 dB preamp.
+- **Speakers Correction**: Subsonic high-pass (20 to 100 Hz, 1st to 4th order: 6, 12, 18, 24 dB/oct) to protect subwoofer drivers, plus L/R balance, per channel delay (0 to 20 ms) and phase shift (0 to 180 deg, 45 deg steps).
+- **Compressor**: RMS compressor with threshold, ratio, attack, release, and makeup gain.
 - **Limiter**: Soft-knee peak ceiling limiter to prevent digital clipping.
 
 ---
@@ -115,7 +115,7 @@ pio device monitor -e yd_esp32s3_n16r8
 
 ## Wi-Fi Configuration
 
-Configure Wi-Fi credentials in `src/wifi_credentials.h`:
+Configure Wi-Fi credentials in `src/wifi_credentials.h` (copy `src/wifi_credentials.example.h`, it's gitignored):
 
 ```cpp
 #pragma once
@@ -123,7 +123,7 @@ Configure Wi-Fi credentials in `src/wifi_credentials.h`:
 #define WIFI_PASS "YourNetworkPassword"
 ```
 
-If unconnected, the board starts a fallback SoftAP:
-- **SSID**: `ESP32-DSP`
-- **Password**: `dspcontrol`
+If it can't connect (or there are no credentials), the board starts a fallback SoftAP:
+- **SSID**: `ESP32-S3-DSP`
+- **Password**: none (open network)
 - **URL**: `http://192.168.4.1`

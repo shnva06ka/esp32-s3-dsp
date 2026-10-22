@@ -1,14 +1,4 @@
-/**
- * test/verify_biquad.js  — run with:  node verify_biquad.js
- *
- * Verifies that the browser-side bandMagAt() formula produces results
- * consistent with the C++ _calcCoeffs() / dsps_biquad_f32 implementation:
- *
- *   • At the band centre frequency, gain should equal the set gain (dB)
- *   • At DC (0 Hz) and Nyquist, a peaking filter returns 0 dB
- *   • 10 bands at 0 dB gain → combined response is 0 dB everywhere
- *   • 1 kHz band at +6 dB → peak is near +6 dB at 1 kHz
- */
+// Checks the browser bandMagAt() math against the C++ peaking filter. Run: node verify_biquad.js
 
 'use strict';
 
@@ -28,7 +18,7 @@ function near(a, b, tol = 0.1, msg = '') {
     assert(ok, `${msg}  got=${a.toFixed(4)} expected≈${b.toFixed(4)} ±${tol}`);
 }
 
-// ── Mirror of browser bandMagAt() ───────────────────────────
+// copy of the browser bandMagAt()
 function bandMagAt(b, f) {
     if (!b.enabled || b.gain === 0) return 0;
     const A   = Math.pow(10, b.gain / 40);
@@ -58,8 +48,6 @@ function bandMagAt(b, f) {
 function totalMagAt(bands, f) {
     return bands.reduce((s, b) => s + bandMagAt(b, f), 0);
 }
-
-// ── Tests ─────────────────────────────────────────────────────
 
 console.log('\n═══ Band centre-frequency gain ═══');
 [
@@ -95,14 +83,13 @@ const disabledB = { freq:1000, gain:12, q:0.707, enabled:false };
 near(bandMagAt(disabledB, 1000), 0, 0.001, 'disabled band = 0 dB');
 
 console.log('\n═══ Shelf-like Q interactions ═══');
-// High Q → narrower peak; magnitude at 2× band freq should be much less
+// high Q is narrower, so less gain at 2x the band freq
 const narrowB  = { freq:1000, gain:6, q:8,     enabled:true };
 const wideB    = { freq:1000, gain:6, q:0.3,   enabled:true };
 const atDouble = 2000;
 assert(bandMagAt(narrowB, atDouble) < bandMagAt(wideB, atDouble),
     'High-Q peak narrower than low-Q at 2× freq');
 
-// ─────────────────────────────────────────────────────────────
 console.log('\n' + (failures === 0
     ? '\x1b[32mAll tests passed ✔\x1b[0m'
     : `\x1b[31m${failures} test(s) FAILED\x1b[0m`));

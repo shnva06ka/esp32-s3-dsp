@@ -1,11 +1,4 @@
-/**
- * @file dsp_pipeline.h
- * @brief Independent & Dynamic Modular DSP pipeline.
- *
- * Runs on Core 1. Modules are completely decoupled, implement IDSPModule,
- * and can be dynamically reordered at runtime. If any module is omitted,
- * disabled, or removed, the remaining modules continue to process audio seamlessly.
- */
+// DSP chain. Modules are independent (IDSPModule) and the order can change at runtime.
 #pragma once
 
 #include <cmath>
@@ -16,7 +9,6 @@
 #include "limiter.h"
 #include "speaker_correction.h"
 
-// -- Base interface for independent DSP processing blocks -----
 class IDSPModule {
 public:
     virtual ~IDSPModule() = default;
@@ -27,7 +19,6 @@ public:
     virtual void reset() {}
 };
 
-// -- 1. Parametric Equalizer Module ---------------------------
 class EQModule : public IDSPModule {
 public:
     const char* id() const override { return "eq"; }
@@ -67,7 +58,6 @@ private:
     float    _localPreampGain{1.0f};
 };
 
-// -- 2. Speakers Correction Module (Subsonic, Balance, Delay, Phase)
 class SubsonicModule : public IDSPModule {
 public:
     const char* id() const override { return "subsonic"; }
@@ -93,7 +83,6 @@ private:
     uint32_t          _localSubVersion{0};
 };
 
-// -- 3. Compander / Compressor Module -------------------------
 class CompanderModule : public IDSPModule {
 public:
     const char* id() const override { return "comp"; }
@@ -110,16 +99,13 @@ public:
         _comp.process(left, right, frames);
     }
 
-    void reset() override {
-        // Compander reset
-    }
+    void reset() override {}
 
 private:
     Compander _comp;
     uint32_t  _localCompVersion{0};
 };
 
-// -- 4. Soft Limiter Module -----------------------------------
 class LimiterModule : public IDSPModule {
 public:
     const char* id() const override { return "lim"; }
@@ -136,16 +122,13 @@ public:
         _limiter.process(left, right, frames);
     }
 
-    void reset() override {
-        // SoftLimiter is instantaneous soft knee curve, no state history to reset
-    }
+    void reset() override {}
 
 private:
     SoftLimiter _limiter;
     uint32_t    _localLimVersion{0};
 };
 
-// -- Main Dynamic Pipeline Manager ----------------------------
 class DSPPipeline {
 public:
     static constexpr size_t kMaxModules = 8;
@@ -153,26 +136,15 @@ public:
     explicit DSPPipeline(ParamStore& params)
         : _params(params)
     {
-        // Register available modules
         _registerModule(&_eqModule);
         _registerModule(&_subsonicModule);
         _registerModule(&_compModule);
         _registerModule(&_limiterModule);
 
-        // Initial default order
         _updateOrder("eq,subsonic,comp,lim");
     }
 
-    /**
-     * @brief Run the full dynamic DSP chain on one buffer of stereo audio.
-     *
-     * Called from I2SAudio::process() on Core 1.
-     * Modifies left[] and right[] in-place according to active module order.
-     *
-     * @param left   Left-channel samples  [-1, +1]
-     * @param right  Right-channel samples [-1, +1]
-     * @param frames Number of frames in the buffer
-     */
+    // runs on core 1, processes in place
     void process(float* left, float* right, size_t frames) {
         _syncParams();
 
@@ -186,23 +158,20 @@ public:
 private:
     ParamStore&       _params;
 
-    // Independent module instances
     EQModule          _eqModule;
     SubsonicModule    _subsonicModule;
     CompanderModule   _compModule;
     LimiterModule     _limiterModule;
 
-    // Registered modules catalog
     IDSPModule*       _registeredModules[kMaxModules]{nullptr};
     size_t            _registeredCount{0};
 
-    // Active execution list in user-configured order
     IDSPModule*       _activeModules[kMaxModules]{nullptr};
     size_t            _activeModuleCount{0};
 
     uint32_t          _localOrderVersion{0};
     uint32_t          _syncCounter{0};
-    static constexpr uint32_t kSyncInterval = 4; // Check every 4 buffers (~21 ms)
+    static constexpr uint32_t kSyncInterval = 4; // params checked every 4 buffers (~21 ms)
 
     void _registerModule(IDSPModule* mod) {
         if (!mod || _registeredCount >= kMaxModules) return;
@@ -241,7 +210,7 @@ private:
             token = strtok(nullptr, ",");
         }
 
-        // Fallback: if no valid module matched, register all available modules in default order
+        // nothing valid in the string, run everything
         if (_activeModuleCount == 0) {
             for (size_t i = 0; i < _registeredCount && i < kMaxModules; ++i) {
                 _activeModules[i] = _registeredModules[i];
@@ -254,14 +223,12 @@ private:
         if (++_syncCounter < kSyncInterval) return;
         _syncCounter = 0;
 
-        // Check if execution order changed
         char orderBuf[64];
         if (_params.getModuleOrderIfChanged(orderBuf, sizeof(orderBuf), _localOrderVersion)) {
             _updateOrder(orderBuf);
             Serial.printf("[DSP] Updated signal processing order: %s\n", orderBuf);
         }
 
-        // Sync parameters for all registered modules
         for (size_t i = 0; i < _registeredCount; ++i) {
             if (_registeredModules[i]) {
                 _registeredModules[i]->syncParams(_params);

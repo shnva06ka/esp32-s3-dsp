@@ -1,7 +1,4 @@
-/**
- * @file audio_ring_buffer.h
- * @brief Thread-safe lock-free circular ring buffer for audio streaming stubs.
- */
+// Lock-free single producer / single consumer stereo float ring buffer.
 #pragma once
 
 #include <cstddef>
@@ -33,10 +30,8 @@ public:
         _right = nullptr;
     }
 
-    /** @brief Buffer capacity in stereo frames. */
     size_t capacity() const { return CapacityFrames; }
 
-    /** @brief Number of stereo frames available to read. */
     size_t available() const {
         size_t w = _writeIdx.load(std::memory_order_acquire);
         size_t r = _readIdx.load(std::memory_order_relaxed);
@@ -44,15 +39,10 @@ public:
         return CapacityFrames - (r - w);
     }
 
-    /** @brief Number of stereo frames space available to write. */
     size_t space() const {
         return (CapacityFrames - 1) - available();
     }
 
-    /**
-     * @brief Write stereo float samples into the ring buffer.
-     * @return Number of frames actually written.
-     */
     size_t write(const float* left, const float* right, size_t frames) {
         if (!_left || !_right || !left || !right) return 0;
 
@@ -71,11 +61,7 @@ public:
         return toWrite;
     }
 
-    /**
-     * @brief Read stereo float samples from the ring buffer.
-     * If fewer frames are available than requested, remaining frames are zero-padded.
-     * @return Number of valid frames read before zero padding.
-     */
+    // pads with silence when there isn't enough data
     size_t read(float* left, float* right, size_t frames) {
         if (!left || !right) return 0;
 
@@ -97,7 +83,6 @@ public:
             left[i]  = _left[idx];
             right[i] = _right[idx];
         }
-        // Fill remaining with silence
         for (size_t i = toRead; i < frames; ++i) {
             left[i]  = 0.0f;
             right[i] = 0.0f;
@@ -109,7 +94,6 @@ public:
         return toRead;
     }
 
-    /** @brief Reset the buffer to empty. */
     void clear() {
         _readIdx.store(0, std::memory_order_relaxed);
         _writeIdx.store(0, std::memory_order_relaxed);

@@ -1,14 +1,4 @@
-/**
- * @file speaker_correction.h
- * @brief Speakers Correction Module (Subsonic Filter + Channel Correction).
- *
- * Runs as the final step of the DSP pipeline.
- * Submodule 1: Subsonic Filter (1st to 4th order high-pass, 20-100 Hz).
- * Submodule 2: Channel Correction:
- *   - Balance (L/R -100 to +100%: left louder on negative, right louder on positive, center 0 neutral)
- *   - Time Shift (per-channel delay in ms, 0 to 20 ms, sub-millisecond interpolated)
- *   - Phase Shift (per-channel 0, 45, 90, 135, 180 degrees via wideband Hilbert all-pass network)
- */
+// Speakers correction: subsonic high-pass, balance, per-channel delay and phase shift.
 #pragma once
 
 #include <cmath>
@@ -19,7 +9,7 @@
 
 class SpeakerCorrection {
 public:
-    static constexpr size_t kDelayBufSize = 2048; // Max 20ms @ 48kHz = 960 samples
+    static constexpr size_t kDelayBufSize = 2048; // power of 2, 20 ms is 960 samples
 
     SpeakerCorrection() {
         reset();
@@ -40,32 +30,28 @@ public:
         _enabled = p.enabled;
         _subsonic.setParams(p);
 
-        // 1. Balance: -100 to +100
-        // "to the left makes L louder, to the right makes R louder, in middle does nothing."
+        // balance: louder side up to +6 dB, other side down to -24 dB
         float bal = p.balance;
         if (bal < -100.0f) bal = -100.0f;
         if (bal >  100.0f) bal =  100.0f;
 
         if (bal <= 0.0f) {
-            // Turning left: Left gets louder (up to +6 dB at -100), Right attenuates (down to -24 dB at -100)
             float lDb = (-bal / 100.0f) * 6.0f;
             float rDb = (bal / 100.0f) * 24.0f;
             _gainL = powf(10.0f, lDb / 20.0f);
             _gainR = powf(10.0f, rDb / 20.0f);
         } else {
-            // Turning right: Right gets louder (up to +6 dB at +100), Left attenuates (down to -24 dB at +100)
             float rDb = (bal / 100.0f) * 6.0f;
             float lDb = (-bal / 100.0f) * 24.0f;
             _gainL = powf(10.0f, lDb / 20.0f);
             _gainR = powf(10.0f, rDb / 20.0f);
         }
 
-        // 2. Time delay: support -20.0 to +20.0 ms
         constexpr float Fs = static_cast<float>(kSampleRate);
         float dMsL = (p.delayMsL < -20.0f) ? -20.0f : ((p.delayMsL > 20.0f) ? 20.0f : p.delayMsL);
         float dMsR = (p.delayMsR < -20.0f) ? -20.0f : ((p.delayMsR > 20.0f) ? 20.0f : p.delayMsR);
 
-        // Relative delay normalization: negative delay on one channel advances it by delaying the other channel
+        // negative delay = delay the other channel instead
         float minD = (dMsL < dMsR) ? dMsL : dMsR;
         float effL = (minD < 0.0f) ? (dMsL - minD) : dMsL;
         float effR = (minD < 0.0f) ? (dMsR - minD) : dMsR;
@@ -73,7 +59,7 @@ public:
         _delaySamplesL = effL * (Fs / 1000.0f);
         _delaySamplesR = effR * (Fs / 1000.0f);
 
-        // 3. Phase shift (quantized to -180, -135, -90, -45, 0, 45, 90, 135, 180 degrees)
+        // phase snaps to 45 degree steps
         _phaseDegL = _quantizePhase(p.phaseL);
         _phaseDegR = _quantizePhase(p.phaseR);
     }
@@ -81,10 +67,8 @@ public:
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
-        // Submodule 1: Subsonic Filter
         _subsonic.process(left, right, frames);
 
-        // Submodule 2: Channel Correction
         const bool needDelayL = (_delaySamplesL > 0.01f);
         const bool needDelayR = (_delaySamplesR > 0.01f);
 
@@ -92,11 +76,9 @@ public:
             float sL = left[i];
             float sR = right[i];
 
-            // A. Balance
             sL *= _gainL;
             sR *= _gainR;
 
-            // B. Time Delay Buffer
             _delayBufL[_delayWriteIdx] = sL;
             _delayBufR[_delayWriteIdx] = sR;
 
@@ -120,7 +102,6 @@ public:
 
             _delayWriteIdx = (_delayWriteIdx + 1) & (kDelayBufSize - 1);
 
-            // C. Phase Shift (-180 to +180)
             left[i]  = _applyPhase(sL, _phaseDegL, _hStateL);
             right[i] = _applyPhase(sR, _phaseDegR, _hStateR);
         }
@@ -136,12 +117,11 @@ private:
     int16_t        _phaseDegL{0};
     int16_t        _phaseDegR{0};
 
-    // Circular delay buffer
     float          _delayBufL[kDelayBufSize]{};
     float          _delayBufR[kDelayBufSize]{};
     size_t         _delayWriteIdx{0};
 
-    // Hilbert 4-pole all-pass filter state [s0, s1, s2, s3] per channel
+    // allpass state for the phase shifter
     float          _hStateL[4]{};
     float          _hStateR[4]{};
 
@@ -167,10 +147,9 @@ private:
         if (deg == 0) return x;
         if (deg == 180 || deg == -180) return -x;
 
-        // Path I (2-pole allpass cascade): c0 = 0.161758, c1 = 0.733029
+        // I and Q paths are allpass pairs about 90 degrees apart
         float xI = _ap1(_ap1(x, 0.161758f, state[0]), 0.733029f, state[1]);
 
-        // Path Q (2-pole allpass cascade, 90 deg relative to I): c2 = 0.460144, c3 = 0.902267
         float xQ = _ap1(_ap1(x, 0.460144f, state[2]), 0.902267f, state[3]);
 
         if (deg == 90)   return -xQ;

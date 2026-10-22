@@ -1,21 +1,4 @@
-/**
- * @file limiter.h
- * @brief Stereo Soft-Knee Look-Ahead Limiter.
- *
- * The limiter uses a soft-knee transfer function so gain reduction
- * begins gradually below the ceiling, avoiding hard clipping artefacts.
- *
- * Transfer function (dB domain, knee width W):
- *   if  x < ceiling - W/2       -> output = x          (no gain reduction)
- *   if  x > ceiling + W/2       -> output = ceiling     (hard limit)
- *   else                         -> soft curve           (quadratic interpolation)
- *
- * Look-ahead: a short fixed delay aligns the gain signal with the signal
- * peak, eliminating overshoot on fast transients.
- *
- * Gain is applied identically to both channels (stereo-linked) to
- * preserve the stereo image.
- */
+// Stereo soft-knee limiter. Gain reduction starts a bit below the ceiling (quadratic knee) and is the same on both channels. No look-ahead.
 #pragma once
 
 #include <cmath>
@@ -31,34 +14,24 @@ public:
 
     void setParams(const LimiterParams& p) { _update(p); }
 
-    /**
-     * @brief Apply soft-limiting in-place to both channels.
-     *
-     * @param left   Left-channel float buffer  [-1, +1]
-     * @param right  Right-channel float buffer [-1, +1]
-     * @param frames Number of sample frames
-     */
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
         for (size_t i = 0; i < frames; ++i) {
-            // Peak level (stereo-linked)
             const float peakL = fabsf(left[i]);
             const float peakR = fabsf(right[i]);
             const float peak  = (peakL > peakR) ? peakL : peakR;
 
-            // Fast path: if peak is below the knee threshold, no gain reduction needed
+            // below the knee, nothing to do
             if (peak <= _lowerLin) continue;
 
             const float peakDb = 20.0f * log10f(peak + 1e-9f);
             float gainDb = 0.0f;
 
             if (peakDb >= _upperDb) {
-                // Above knee  -  hard ceiling
                 gainDb = _ceilingDb - peakDb;
             } else if (peakDb > _lowerDb) {
-                // Inside knee  -  quadratic blend
-                const float t = (peakDb - _lowerDb) / _kneeDb;  // 0..1
+                const float t = (peakDb - _lowerDb) / _kneeDb;
                 gainDb = -0.5f * _kneeDb * t * t;
             }
 
@@ -68,7 +41,6 @@ public:
         }
     }
 
-    /** @brief Current gain-reduction ceiling in linear scale. */
     float ceilingLinear() const { return _ceilingLin; }
 
 private:

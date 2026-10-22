@@ -1,10 +1,5 @@
-/**
- * @file slimproto_client.cpp
- * @brief Squeezelite-compatible SlimProto and HTTP streaming client for LMS and Roon.
- */
 #include "slimproto_client.h"
 
-// -- Slimproto Packet Formats ---------------------------------
 #pragma pack(push, 1)
 
 struct HeloPacket {
@@ -81,7 +76,6 @@ struct SetdPacket {
 
 #pragma pack(pop)
 
-// -------------------------------------------------------------
 SlimprotoClient::SlimprotoClient(ParamStore& params, AudioRingBuffer<16384>& ringBuffer)
     : _params(params), _ringBuffer(ringBuffer)
 {
@@ -92,7 +86,6 @@ SlimprotoClient::~SlimprotoClient()
     stop();
 }
 
-// -------------------------------------------------------------
 bool SlimprotoClient::begin()
 {
     if (_running) return true;
@@ -105,13 +98,12 @@ bool SlimprotoClient::begin()
         this,
         2,
         &_taskHandle,
-        0 // Core 0 (Network and System core)
+        0
     );
 
     return (ret == pdPASS);
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::stop()
 {
     _running = false;
@@ -132,7 +124,6 @@ void SlimprotoClient::stop()
     }
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::sendPause()
 {
     if (!_connected || !_streaming) return;
@@ -157,14 +148,12 @@ void SlimprotoClient::sendStop()
     _updateMetadata(true, false, false, "Connected (Idle)");
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_taskTrampoline(void* arg)
 {
     SlimprotoClient* self = static_cast<SlimprotoClient*>(arg);
     self->_runTask();
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_runTask()
 {
     Serial.println("[SLIMPROTO] SlimProto / Squeezelite client task started on Core 0");
@@ -172,7 +161,6 @@ void SlimprotoClient::_runTask()
     uint32_t lastStatTime = 0;
 
     while (_running) {
-        // Wait until Wi-Fi is connected in station mode
         if (WiFi.status() != WL_CONNECTED || (WiFi.getMode() & WIFI_MODE_STA) == 0) {
             if (_connected) {
                 _connected = false;
@@ -187,7 +175,6 @@ void SlimprotoClient::_runTask()
             continue;
         }
 
-        // If not connected to LMS / Roon, run discovery and connect
         if (!_connected) {
             _updateMetadata(false, false, false, "Searching for server...");
             if (_discoverServer()) {
@@ -205,7 +192,6 @@ void SlimprotoClient::_runTask()
             continue;
         }
 
-        // Handle control socket events
         fd_set readFds;
         FD_ZERO(&readFds);
         int maxFd = _controlSock;
@@ -218,7 +204,7 @@ void SlimprotoClient::_runTask()
 
         struct timeval tv;
         tv.tv_sec  = 0;
-        tv.tv_usec = 25000; // 25 ms timeout
+        tv.tv_usec = 25000;
 
         int sel = select(maxFd + 1, &readFds, nullptr, nullptr, &tv);
 
@@ -253,7 +239,6 @@ void SlimprotoClient::_runTask()
             }
         }
 
-        // Periodic STAT heartbeat every 1000 ms
         uint32_t now = millis();
         if (_connected && (now - lastStatTime >= 1000)) {
             lastStatTime = now;
@@ -262,7 +247,6 @@ void SlimprotoClient::_runTask()
     }
 }
 
-// -------------------------------------------------------------
 bool SlimprotoClient::_discoverServer()
 {
     int discSock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -276,7 +260,7 @@ bool SlimprotoClient::_discoverServer()
 
     struct timeval tv;
     tv.tv_sec  = 1;
-    tv.tv_usec = 500000; // 1.5 seconds timeout
+    tv.tv_usec = 500000;
     setsockopt(discSock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
     struct sockaddr_in destAddr;
@@ -314,7 +298,6 @@ bool SlimprotoClient::_discoverServer()
     return false;
 }
 
-// -------------------------------------------------------------
 bool SlimprotoClient::_connectControl()
 {
     if (_controlSock >= 0) {
@@ -357,12 +340,10 @@ bool SlimprotoClient::_connectControl()
     return true;
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_sendHelo()
 {
     if (_controlSock < 0) return;
 
-    // Capabilities announcement: identify as Squeezelite player named ESP32-S3-DSP
     const char* baseCap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=v1.0";
     const char* customCap = ",ModelName=ESP32-S3-DSP,MaxSampleRate=48000,pcm,raw,wav";
 
@@ -392,7 +373,6 @@ void SlimprotoClient::_sendHelo()
                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_sendStat(const char* eventCode, uint32_t serverTimestamp)
 {
     if (_controlSock < 0) return;
@@ -421,7 +401,6 @@ void SlimprotoClient::_sendStat(const char* eventCode, uint32_t serverTimestamp)
     send(_controlSock, &pkt, sizeof(pkt), 0);
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_sendResp(const char* header, size_t len)
 {
     if (_controlSock < 0 || !header || len == 0) return;
@@ -440,7 +419,6 @@ void SlimprotoClient::_sendResp(const char* header, size_t len)
     Serial.printf("[SLIMPROTO] Relayed HTTP response headers to server via RESP (%u bytes)\n", (unsigned)len);
 }
 
-// -------------------------------------------------------------
 bool SlimprotoClient::_handleControlPacket()
 {
     // Server packets start with a 16-bit big-endian length prefix
@@ -481,7 +459,6 @@ bool SlimprotoClient::_handleControlPacket()
     return true;
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
 {
     if (len < sizeof(StrmPacket)) return;
@@ -521,7 +498,6 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
             _bytesReceived = 0;
             _streamStartTime = millis();
 
-            // Decode stream sample rate
             switch (strm->pcm_sample_rate) {
                 case '0': _sampleRate = 11025; break;
                 case '1': _sampleRate = 22050; break;
@@ -536,7 +512,7 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
                 default:  _sampleRate = 44100; break;
             }
 
-            // Decode bit depth (In Slimproto: '0'=1 byte (8-bit), '1'=2 bytes (16-bit), '2'=3 bytes (24-bit), '3'=4 bytes (32-bit))
+            // '0' = 8 bit, '1' = 16, '2' = 24, '3' = 32
             switch (strm->pcm_sample_size) {
                 case '1': _bitDepth = 16; break;
                 case '2': _bitDepth = 24; break;
@@ -546,7 +522,7 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
             }
 
             _channels  = (strm->pcm_channels == '1') ? 1 : 2;
-            // In Slimproto: '0'=Big-endian, '1'=Little-endian
+            // '0' = big endian, '1' = little endian
             _bigEndian = (strm->pcm_endianness == '0');
 
             _carryLen = 0;
@@ -577,18 +553,16 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
                           _sampleRate, _bitDepth, _channels, _bigEndian ? "big" : "little");
             Serial.printf("[SLIMPROTO] Stream target: %s:%d\n", _serverIp.toString().c_str(), _streamPort);
 
-            // Acknowledge stream flush
             _sendStat("STMf");
 
-            // Automatically switch active input mode to Wi-Fi so user hears the music
+            // jump to the Wi-Fi input
             _params.setInputMode(INPUT_MODE_WIFI);
 
-            // Connect audio stream, receive HTTP response headers, and relay RESP
             if (_startAudioStream(httpRequest)) {
                 _streaming = true;
                 _paused = false;
-                _sendStat("STMc"); // Stream connected
-                // STMs is sent upon buffering the first batch of frames in _readAudioStreamData
+                _sendStat("STMc");
+                // STMs goes out once the first frames are buffered
                 _updateMetadata(true, true, false, "Buffering...");
             } else {
                 _sendStat("STMu");
@@ -601,7 +575,6 @@ void SlimprotoClient::_processStrm(const uint8_t* payload, size_t len)
     }
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_processAudg(const uint8_t* payload, size_t len)
 {
     if (len < sizeof(AudgPacket)) return;
@@ -617,7 +590,6 @@ void SlimprotoClient::_processAudg(const uint8_t* payload, size_t len)
     Serial.printf("[SLIMPROTO] AUDG volume update: gainL=%u (%.1f dB)\n", gainL, db);
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_processSetd(const uint8_t* payload, size_t len)
 {
     if (len < 5) return;
@@ -640,7 +612,6 @@ void SlimprotoClient::_processSetd(const uint8_t* payload, size_t len)
     }
 }
 
-// -------------------------------------------------------------
 bool SlimprotoClient::_startAudioStream(const String& httpRequest)
 {
     _stopAudioStream();
@@ -654,7 +625,6 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     int nodelay = 1;
     setsockopt(_streamSock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
 
-    // Increase socket receive buffer to 16 KB for network burst absorption
     int rxBufSize = 16384;
     setsockopt(_streamSock, SOL_SOCKET, SO_RCVBUF, &rxBufSize, sizeof(rxBufSize));
 
@@ -677,10 +647,8 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
         return false;
     }
 
-    // Send HTTP GET request
     if (httpRequest.length() > 0) {
         send(_streamSock, httpRequest.c_str(), httpRequest.length(), 0);
-        // Ensure terminated with double CRLF if not already
         if (!httpRequest.endsWith("\r\n\r\n")) {
             if (httpRequest.endsWith("\r\n")) {
                 send(_streamSock, "\r\n", 2, 0);
@@ -693,7 +661,6 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
         send(_streamSock, defaultGet.c_str(), defaultGet.length(), 0);
     }
 
-    // Read HTTP response header until "\r\n\r\n" or "\n\n"
     char headerBuf[1024];
     int headerPos = 0;
     bool headerEnd = false;
@@ -723,10 +690,9 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     headerBuf[headerPos] = '\0';
     Serial.printf("[SLIMPROTO] HTTP stream headers received (%d bytes):\n%s\n", headerPos, headerBuf);
 
-    // CRITICAL: Relay response headers back to LMS / Roon over control socket
+    // server expects the HTTP response headers echoed back (RESP)
     _sendResp(headerBuf, headerPos);
 
-    // Reset resampler state
     _resampPhase = 0.0f;
     _lastSampleL = 0.0f;
     _lastSampleR = 0.0f;
@@ -734,7 +700,6 @@ bool SlimprotoClient::_startAudioStream(const String& httpRequest)
     return true;
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_stopAudioStream()
 {
     if (_streamSock >= 0) {
@@ -745,17 +710,15 @@ void SlimprotoClient::_stopAudioStream()
     _paused = false;
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_readAudioStreamData()
 {
     if (_streamSock < 0 || _paused) return;
 
-    // Drain available socket data into ring buffer
     while (_streaming && _streamSock >= 0 && _ringBuffer.space() >= 512) {
         uint8_t inBuf[1024 + sizeof(_carryBuf)];
         size_t totalBytes = _carryLen;
 
-        // Prepend carry-over bytes from previous read
+        // leftover bytes from the last read go first
         if (_carryLen > 0) {
             memcpy(inBuf, _carryBuf, _carryLen);
             _carryLen = 0;
@@ -765,7 +728,6 @@ void SlimprotoClient::_readAudioStreamData()
 
         if (bytesRead <= 0) {
             if (bytesRead < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
-                // No more data in socket right now, return to select
                 if (totalBytes > 0) {
                     memcpy(_carryBuf, inBuf, totalBytes);
                     _carryLen = totalBytes;
@@ -789,7 +751,7 @@ void SlimprotoClient::_readAudioStreamData()
         totalBytes += bytesRead;
         _bytesReceived += bytesRead;
 
-        // Check and parse container header (RIFF/WAVE or FORM/AIFF) on first packet
+        // skip the WAV / AIFF header on the first packet
         if (!_headerParsed) {
             if (totalBytes >= 12) {
                 if (memcmp(inBuf, "RIFF", 4) == 0 && memcmp(inBuf + 8, "WAVE", 4) == 0) {
@@ -872,7 +834,6 @@ void SlimprotoClient::_readAudioStreamData()
             _carryLen = 0;
         }
 
-        // Decode PCM bytes to stereo float samples [-1.0f, +1.0f]
         float decodedL[256];
         float decodedR[256];
 
@@ -928,12 +889,12 @@ void SlimprotoClient::_readAudioStreamData()
             }
         }
 
-        // Resample if incoming rate is 44.1 kHz (CD standard) to 48.0 kHz (DSP Engine standard)
+        // 44.1k -> 48k linear interpolation
         if (_sampleRate == 44100) {
             float resampledL[384];
             float resampledR[384];
             size_t outFrames = 0;
-            const float step = 44100.0f / 48000.0f; // 0.91875f
+            const float step = 44100.0f / 48000.0f;
 
             for (size_t i = 0; i < frameCount; ++i) {
                 float curL = decodedL[i];
@@ -955,11 +916,10 @@ void SlimprotoClient::_readAudioStreamData()
                 _ringBuffer.write(resampledL, resampledR, outFrames);
             }
         } else {
-            // Direct 48.0 kHz 1:1 feed
             _ringBuffer.write(decodedL, decodedR, frameCount);
         }
 
-        // Send STMs once initial buffering threshold is reached (~21 ms / 1024 frames)
+        // ~21 ms buffered, tell the server playback started
         if (!_startedSent && _ringBuffer.available() >= 1024) {
             _startedSent = true;
             _sendStat("STMs");
@@ -970,7 +930,6 @@ void SlimprotoClient::_readAudioStreamData()
     }
 }
 
-// -------------------------------------------------------------
 void SlimprotoClient::_updateMetadata(bool connected, bool streaming, bool paused, const char* statusMsg)
 {
     WiFiStreamMetadata meta;

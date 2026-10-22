@@ -36,8 +36,8 @@ private:
 
 public:
     struct Stats {
-        float    cpu0;        // 0.0 - 100.0 %
-        float    cpu1;        // 0.0 - 100.0 %
+        float    cpu0;
+        float    cpu1;
         uint32_t heapUsed;
         uint32_t heapTotal;
         uint32_t psramUsed;
@@ -69,7 +69,7 @@ public:
     static void update() {
         unsigned long now = millis();
         unsigned long elapsed = now - _s().lastSampleTime;
-        if (elapsed < 500) return; // sample window >= 500ms
+        if (elapsed < 500) return;
 
         uint32_t count0 = _s().idleCount0;
         uint32_t count1 = _s().idleCount1;
