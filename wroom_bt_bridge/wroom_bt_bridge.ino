@@ -13,7 +13,7 @@
 #define S3_UART_RX_PIN 18   // UART RX from ESP32-S3 GPIO 43 (TX)
 #define LED_PIN         2   // Standard built-in blue LED on DevKit V1
 
-#define SAMPLE_RATE   48000 // has to match the S3
+#define SAMPLE_RATE   44100 // Native Bluetooth A2DP audio rate
 #define BT_DEV_NAME   "ESP32-DSP-BT"
 
 BluetoothA2DPSink a2dp_sink;

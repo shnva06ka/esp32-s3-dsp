@@ -2,6 +2,7 @@
 #pragma once
 
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <cstring>
@@ -97,7 +98,7 @@ public:
             IPAddress ip = (WiFi.getMode() & WIFI_MODE_STA && WiFi.status() == WL_CONNECTED)
                              ? WiFi.localIP()
                              : WiFi.softAPIP();
-            Serial.printf("[NET] Web UI accessible at: http://%u.%u.%u.%u\n", ip[0], ip[1], ip[2], ip[3]);
+            Serial.printf("[NET] Web UI accessible at: http://%u.%u.%u.%u (or http://dsp.local)\n", ip[0], ip[1], ip[2], ip[3]);
         }
 
         // save to flash 1 s after the last change
@@ -140,6 +141,10 @@ private:
             }
             if (WiFi.status() == WL_CONNECTED) {
                 Serial.printf("\n[WEB] Wi-Fi connected! Station IP: %s\n", WiFi.localIP().toString().c_str());
+                if (MDNS.begin("dsp")) {
+                    MDNS.addService("http", "tcp", 80);
+                    Serial.println("[NET] mDNS responder active: http://dsp.local");
+                }
                 return;
             }
             Serial.println("\n[WEB] Wi-Fi connection timed out");
@@ -150,7 +155,10 @@ private:
         WiFi.softAP("ESP32-S3-DSP");
         Serial.printf("[WEB] Fallback AP active! Network SSID: 'ESP32-S3-DSP' | AP IP: %s\n",
                       WiFi.softAPIP().toString().c_str());
-        Serial.printf("[NET] Web UI accessible at: http://%s\n", WiFi.softAPIP().toString().c_str());
+        if (MDNS.begin("dsp")) {
+            MDNS.addService("http", "tcp", 80);
+        }
+        Serial.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
     }
 
     void _setupRoutes() {

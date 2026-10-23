@@ -264,23 +264,20 @@ void I2SAudio::_resampleAndWriteBt(size_t frames)
         float curL = static_cast<float>(_rxBufBt[i * 2    ]) * kScale;
         float curR = static_cast<float>(_rxBufBt[i * 2 + 1]) * kScale;
 
-        while (_btResampPhase < 1.0f && outCount < RuntimeTuning::kBtResampleChunkFrames) {
+        while (_btResampPhase < 1.0f) {
+            if (outCount >= RuntimeTuning::kBtResampleChunkFrames) {
+                _btRingBuffer.write(resampL, resampR, outCount);
+                outCount = 0;
+            }
             resampL[outCount] = _btLastL + _btResampPhase * (curL - _btLastL);
             resampR[outCount] = _btLastR + _btResampPhase * (curR - _btLastR);
             outCount++;
             _btResampPhase += step;
         }
 
-        if (_btResampPhase >= 1.0f) {
-            _btResampPhase -= 1.0f;
-        }
+        _btResampPhase -= 1.0f;
         _btLastL = curL;
         _btLastR = curR;
-
-        if (outCount >= (RuntimeTuning::kBtResampleChunkFrames - 32)) {
-            _btRingBuffer.write(resampL, resampR, outCount);
-            outCount = 0;
-        }
     }
 
     if (outCount > 0) {

@@ -345,7 +345,7 @@ void SlimprotoClient::_sendHelo()
     if (_controlSock < 0) return;
 
     const char* baseCap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Firmware=v1.0";
-    const char* customCap = ",ModelName=ESP32-S3-DSP,MaxSampleRate=48000,pcm,raw,wav";
+    const char* customCap = ",ModelName=ESP32-S3-DSP,MaxSampleRate=96000,pcm,raw,wav";
 
     size_t capLen = strlen(baseCap) + strlen(customCap);
 
@@ -900,19 +900,24 @@ void SlimprotoClient::_readAudioStreamData()
             }
         }
 
-        // 44.1k -> 48k linear interpolation
-        if (_sampleRate == RuntimeTuning::kSlimprotoDefaultRate) {
+        if (_sampleRate == RuntimeTuning::kDspOutputSampleRate) {
+            _ringBuffer.write(decodedL, decodedR, frameCount);
+        } else {
             float resampledL[RuntimeTuning::kSlimprotoResampleFrames];
             float resampledR[RuntimeTuning::kSlimprotoResampleFrames];
             size_t outFrames = 0;
-            const float step = static_cast<float>(RuntimeTuning::kSlimprotoDefaultRate) /
+            const float step = static_cast<float>(_sampleRate) /
                                static_cast<float>(RuntimeTuning::kDspOutputSampleRate);
 
             for (size_t i = 0; i < frameCount; ++i) {
                 float curL = decodedL[i];
                 float curR = decodedR[i];
 
-                while (_resampPhase < 1.0f && outFrames < RuntimeTuning::kSlimprotoResampleFrames) {
+                while (_resampPhase < 1.0f) {
+                    if (outFrames >= RuntimeTuning::kSlimprotoResampleFrames) {
+                        _ringBuffer.write(resampledL, resampledR, outFrames);
+                        outFrames = 0;
+                    }
                     resampledL[outFrames] = _lastSampleL + _resampPhase * (curL - _lastSampleL);
                     resampledR[outFrames] = _lastSampleR + _resampPhase * (curR - _lastSampleR);
                     outFrames++;
@@ -927,8 +932,6 @@ void SlimprotoClient::_readAudioStreamData()
             if (outFrames > 0) {
                 _ringBuffer.write(resampledL, resampledR, outFrames);
             }
-        } else {
-            _ringBuffer.write(decodedL, decodedR, frameCount);
         }
 
         // ~21 ms buffered, tell the server playback started
@@ -962,9 +965,16 @@ void SlimprotoClient::_updateMetadata(bool connected, bool streaming, bool pause
     meta.bitDepth   = _bitDepth;
 
     if (streaming) {
-        snprintf(meta.formatInfo, sizeof(meta.formatInfo) - 1,
-                 "PCM %u kHz / %u-bit -> 48kHz DSP",
-                 _sampleRate / 1000, _bitDepth);
+        if (_sampleRate == RuntimeTuning::kDspOutputSampleRate) {
+            snprintf(meta.formatInfo, sizeof(meta.formatInfo) - 1,
+                     "PCM %u kHz / %u-bit (Direct)",
+                     _sampleRate / 1000, _bitDepth);
+        } else {
+            snprintf(meta.formatInfo, sizeof(meta.formatInfo) - 1,
+                     "PCM %u.%u kHz / %u-bit -> %u kHz DSP",
+                     _sampleRate / 1000, (_sampleRate % 1000) / 100, _bitDepth,
+                     RuntimeTuning::kDspOutputSampleRate / 1000);
+        }
         strncpy(meta.trackTitle, statusMsg, sizeof(meta.trackTitle) - 1);
         strncpy(meta.trackArtist, "Wi-Fi Stream", sizeof(meta.trackArtist) - 1);
         strncpy(meta.trackAlbum, meta.serverName, sizeof(meta.trackAlbum) - 1);

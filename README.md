@@ -38,8 +38,8 @@ Highly modular, and optional effect modules; supports real time processing order
 
 ### Core Allocation (ESP32-S3)
 
-- **Core 1 (Audio Engine)**: FreeRTOS, DMA at 48 kHz 32-bit, 256 frame buffers DSP
-- **Core 0 (Network and Control)**: Wi-Fi WebUI, UART bridge to ESP32-WROOM, SlimProto client
+- **Core 1 (Audio Engine)**: FreeRTOS, DMA at 96 kHz 32-bit, 256 frame buffers DSP (Bluetooth 44.1 kHz resampled in real-time)
+- **Core 0 (Network and Control)**: Wi-Fi WebUI, UART bridge to ESP32-WROOM, SlimProto client (up to 96 kHz PCM)
 
 ---
 
@@ -100,7 +100,10 @@ Example:
 #define WIFI_SSID "YourNetworkName"
 #define WIFI_PASS "YourNetworkPassword"
 ```
-IP address printed on serial monitor.
-If it can't connect (or there are no credentials), starts fallback SoftAP:
+Once connected to Wi-Fi, the Web UI is accessible on your local network at:
+- **Local URL**: `http://dsp.local`
+- (Or via the station IP printed to the serial monitor)
+
+If it cannot connect (or no credentials are configured), it automatically starts fallback SoftAP:
 - **SSID**: `ESP32-S3-DSP`
-- **URL**: `http://192.168.4.1`
+- **URL**: `http://192.168.4.1` (or `http://dsp.local`)
