@@ -9,10 +9,11 @@
 #include <lwip/netdb.h>
 #include "audio_ring_buffer.h"
 #include "param_store.h"
+#include "runtime_tuning.h"
 
 class SlimprotoClient {
 public:
-    SlimprotoClient(ParamStore& params, AudioRingBuffer<16384>& ringBuffer);
+    SlimprotoClient(ParamStore& params, AudioRingBuffer<RuntimeTuning::kWiFiRingBufferFrames>& ringBuffer);
     ~SlimprotoClient();
 
     bool begin();
@@ -29,7 +30,7 @@ public:
 
 private:
     ParamStore&              _params;
-    AudioRingBuffer<16384>&  _ringBuffer;
+    AudioRingBuffer<RuntimeTuning::kWiFiRingBufferFrames>& _ringBuffer;
 
     TaskHandle_t             _taskHandle{nullptr};
     bool                     _running{false};
@@ -41,10 +42,10 @@ private:
     int                      _streamSock{-1};
 
     IPAddress                _serverIp{0, 0, 0, 0};
-    uint16_t                 _controlPort{3483};
-    uint16_t                 _streamPort{9000};
+    uint16_t                 _controlPort{RuntimeTuning::kSlimprotoControlPort};
+    uint16_t                 _streamPort{RuntimeTuning::kSlimprotoDefaultStreamPort};
 
-    uint32_t                 _sampleRate{44100};
+    uint32_t                 _sampleRate{RuntimeTuning::kSlimprotoDefaultRate};
     uint8_t                  _bitDepth{16};
     uint8_t                  _channels{2};
     bool                     _bigEndian{false};
@@ -54,7 +55,7 @@ private:
     bool                     _headerParsed{false};
     bool                     _startedSent{false};
 
-    uint8_t                  _carryBuf[8]{0};
+    uint8_t                  _carryBuf[RuntimeTuning::kSlimprotoCarryBytes]{0};
     size_t                   _carryLen{0};
 
     float                    _resampPhase{0.0f};
@@ -81,4 +82,3 @@ private:
 
     void _updateMetadata(bool connected, bool streaming, bool paused, const char* statusMsg);
 };
-

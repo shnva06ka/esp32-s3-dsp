@@ -4,9 +4,11 @@
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <cstring>
 #include "eq_html.h"
 #include "param_store.h"
 #include "sys_monitor.h"
+#include "dsp_module_id.h"
 
 // wifi_credentials.h is optional and gitignored
 #if __has_include("wifi_credentials.h")
@@ -292,13 +294,27 @@ private:
                 JsonArray arr = doc["order"].as<JsonArray>();
                 for (JsonVariant v : arr) {
                     const char* name = v.as<const char*>();
-                    if (name && strlen(name) > 0) {
+                    DspModuleId module = parseDspModuleId(name);
+                    if (module != DspModuleId::Unknown) {
                         if (orderStr.length() > 0) orderStr += ",";
-                        orderStr += name;
+                        orderStr += toDspModuleToken(module);
                     }
                 }
             } else if (doc["order"].is<const char*>()) {
-                orderStr = doc["order"].as<const char*>();
+                const char* rawOrder = doc["order"].as<const char*>();
+                char tmp[64];
+                strncpy(tmp, rawOrder ? rawOrder : "", sizeof(tmp) - 1);
+                tmp[sizeof(tmp) - 1] = '\0';
+                char* token = strtok(tmp, ",");
+                while (token) {
+                    while (*token == ' ') token++;
+                    DspModuleId module = parseDspModuleId(token);
+                    if (module != DspModuleId::Unknown) {
+                        if (orderStr.length() > 0) orderStr += ",";
+                        orderStr += toDspModuleToken(module);
+                    }
+                    token = strtok(nullptr, ",");
+                }
             }
             if (orderStr.length() > 0) {
                 _params.setModuleOrder(orderStr.c_str());
@@ -450,7 +466,12 @@ private:
             if (comma < 0) comma = orderStr.length();
             String item = orderStr.substring(startIdx, comma);
             item.trim();
-            if (item.length() > 0) orderArr.add(item);
+            if (item.length() > 0) {
+                DspModuleId module = parseDspModuleId(item.c_str());
+                if (module != DspModuleId::Unknown) {
+                    orderArr.add(toDspModuleToken(module));
+                }
+            }
             startIdx = comma + 1;
         }
 

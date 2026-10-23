@@ -10,6 +10,7 @@
 #include "audio_config.h"
 #include "param_store.h"
 #include "audio_ring_buffer.h"
+#include "runtime_tuning.h"
 
 using AudioCallback = std::function<void(float*, float*, size_t)>;
 
@@ -34,7 +35,7 @@ public:
     float rmsOutL() const { return _rmsOutL; }
     float rmsOutR() const { return _rmsOutR; }
 
-    AudioRingBuffer<16384>& getWiFiRingBuffer() { return _wifiRingBuffer; }
+    AudioRingBuffer<RuntimeTuning::kWiFiRingBufferFrames>& getWiFiRingBuffer() { return _wifiRingBuffer; }
 
 private:
     ParamStore& _params;
@@ -54,10 +55,10 @@ private:
     float* _rightMix{nullptr};
 
     // 16384 frames = ~341 ms at 48k
-    AudioRingBuffer<16384> _wifiRingBuffer;
+    AudioRingBuffer<RuntimeTuning::kWiFiRingBufferFrames> _wifiRingBuffer;
 
     // BT comes in at 44.1k and gets resampled to 48k
-    AudioRingBuffer<8192>  _btRingBuffer;
+    AudioRingBuffer<RuntimeTuning::kBtRingBufferFrames>  _btRingBuffer;
     float                  _btLastL{0.0f};
     float                  _btLastR{0.0f};
     float                  _btResampPhase{0.0f};
@@ -73,7 +74,7 @@ private:
     float _rmsOutL{0}, _rmsOutR{0};
 
     static constexpr float kScale = 1.0f / 2147483648.0f;
-    static constexpr float kFadeStep = 1.0f / 2400.0f;          // ~50 ms crossfade
+    static constexpr float kFadeStep = 1.0f / (static_cast<float>(kSampleRate) * 0.050f); // ~50 ms crossfade
 
     void  _allocBuffers();
     void  _freeBuffers();
