@@ -561,6 +561,7 @@ main {
   flex-direction: column;
   gap: 16px;
   width: 100%;
+  position: relative;
 }
 .module-header-left {
   display: flex;
@@ -626,15 +627,16 @@ main {
 }
 
 .module-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
   height: 4px;
   background: var(--accent);
   border-radius: 2px;
-  box-shadow: 0 0 10px rgba(136, 192, 208, 0.85);
-  margin: -2px 0;
-  position: relative;
+  box-shadow: 0 0 12px rgba(136, 192, 208, 0.95);
   pointer-events: none;
-  z-index: 100;
-  flex-shrink: 0;
+  z-index: 1000;
+  transition: top 0.06s ease-out;
 }
 .module-drop-indicator::before,
 .module-drop-indicator::after {
@@ -651,18 +653,16 @@ main {
 .module-drop-indicator::after { right: -6px; }
 
 .band-drop-indicator {
+  position: absolute;
+  top: 6px;
   width: 4px;
   height: 290px;
-  min-height: 290px;
   background: var(--accent);
   border-radius: 2px;
-  box-shadow: 0 0 12px rgba(136, 192, 208, 0.9);
-  margin: 0 -2px;
-  position: relative;
-  flex: 0 0 4px;
-  align-self: stretch;
+  box-shadow: 0 0 12px rgba(136, 192, 208, 0.95);
   pointer-events: none;
-  z-index: 100;
+  z-index: 1000;
+  transition: left 0.06s ease-out;
 }
 .band-drop-indicator::before,
 .band-drop-indicator::after {
@@ -693,12 +693,14 @@ main {
 }
 .band-drag-ghost {
   position: fixed;
-  pointer-events: none;
+  pointer-events: none !important;
   z-index: 10000;
-  opacity: 0.92;
+  opacity: 0.95;
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
-  transform: scale(1.03) rotate(1.2deg);
+  transform: scale(1.02);
   box-sizing: border-box;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .module-title-area {
@@ -982,6 +984,7 @@ main {
   overflow-y: clip;
   padding: 6px 0 8px 0;
   scroll-behavior: smooth;
+  position: relative;
 }
 .band-card {
   width: 175px;
@@ -1034,6 +1037,7 @@ main {
   border: none;
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 .band-dragger-titlebar:active {
   cursor: grabbing;
@@ -1540,6 +1544,155 @@ main {
   opacity: 1;
 }
 
+
+.wifi-cfg-panel {
+  margin-top: 14px;
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.wifi-cfg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  background: #E5EBF2;
+  transition: background 0.15s ease;
+}
+.wifi-cfg-header:hover {
+  background: #DCE3ED;
+}
+.wifi-cfg-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wifi-cfg-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nord0);
+}
+.wifi-cfg-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--active);
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.wifi-cfg-badge.ap-mode {
+  background: #D08770;
+}
+.wifi-cfg-badge.disconnected {
+  background: var(--muted);
+}
+.wifi-cfg-toggle-btn {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord9);
+}
+.wifi-cfg-body {
+  padding: 14px;
+  border-top: 1px solid var(--border-strong);
+  background: var(--nord5);
+}
+.wifi-cfg-desc {
+  font-size: 12px;
+  color: var(--nord3);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+.wifi-cfg-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 480px;
+}
+.wifi-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wifi-input-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wifi-pass-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.wifi-text-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: #FFFFFF;
+  color: var(--nord0);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.wifi-text-input:focus {
+  border-color: var(--accent);
+}
+.wifi-pass-toggle {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+  padding: 4px;
+}
+.wifi-pass-toggle:hover {
+  opacity: 1;
+}
+.wifi-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.btn-wifi-connect {
+  padding: 8px 18px;
+  background: var(--nord9);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s;
+}
+.btn-wifi-connect:hover {
+  background: var(--nord10);
+}
+.btn-wifi-connect:active {
+  transform: scale(0.98);
+}
+.wifi-status-msg {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nord3);
+}
+.wifi-status-msg.success {
+  color: #2E7D32;
+}
+.wifi-status-msg.error {
+  color: #C62828;
+}
+
 footer {
   text-align: center;
   max-width: 1400px;
@@ -1584,10 +1737,11 @@ footer {
 
 <main>
   <section class="module-box" id="mod-input">
-    <div class="module-header static-header">
+    <div class="module-header" onclick="toggleModuleCollapse('input')">
       <div class="module-title-area">
         <span class="module-title">ESP32-S3-DSP</span>
       </div>
+      <span class="collapse-icon">▼</span>
     </div>
     <div class="module-body">
       <div class="input-selector-grid">
@@ -1669,6 +1823,42 @@ footer {
           </div>
           <div class="sys-stat-bar-track">
             <div class="sys-stat-bar-fill" id="sys-bar-flash" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wifi-cfg-panel">
+        <div class="wifi-cfg-header" onclick="toggleWiFiConfig(event)">
+          <div class="wifi-cfg-title-row">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+              <line x1="12" y1="20" x2="12.01" y2="20"/>
+            </svg>
+            <span class="wifi-cfg-title">Local Wi-Fi Network Setup</span>
+            <span class="wifi-cfg-badge" id="wifi-cfg-cur-status">Checking...</span>
+          </div>
+          <span class="wifi-cfg-toggle-btn" id="wifi-cfg-arrow">Configure ▼</span>
+        </div>
+        <div class="wifi-cfg-body" id="wifi-cfg-body" style="display: none;">
+          <div class="wifi-cfg-desc">Connect the ESP32-S3 to your 2.4 GHz home Wi-Fi network. After connecting, the Web UI is reachable on your network at <strong>http://dsp.local</strong>.</div>
+          <div class="wifi-cfg-inputs">
+            <div class="wifi-input-group">
+              <label for="wifi-input-ssid">Network SSID</label>
+              <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="e.g. MyHomeNetwork" autocomplete="off" autocorrect="off" autocapitalize="none">
+            </div>
+            <div class="wifi-input-group">
+              <label for="wifi-input-pass">Password</label>
+              <div class="wifi-pass-wrap">
+                <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Wi-Fi Password" autocomplete="off">
+                <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show/Hide Password">👁</button>
+              </div>
+            </div>
+            <div class="wifi-actions-row">
+              <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Save &amp; Connect</button>
+              <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -2131,6 +2321,11 @@ const BAND_COLORS = [
   '#9B6FB0'  // Aurora Violet
 ];
 
+function getBandColor(b, index) {
+  if (b && b.color) return b.color;
+  return BAND_COLORS[(index !== undefined ? index : 0) % BAND_COLORS.length];
+}
+
 function hexToRgb(hex) {
   const num = parseInt(hex.replace('#', ''), 16);
   return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
@@ -2159,11 +2354,11 @@ let eqPreamp  = 0.0;
 let currentPreset = 'flat_5';
 
 let bands = [
-  { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true }, // Low Shelf
-  { band: 1, freq: 500.0,   gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true }, // Peaking
-  { band: 2, freq: 1000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true }, // Peaking
-  { band: 3, freq: 4000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true }, // Peaking
-  { band: 4, freq: 10000.0, gain: 0.0, q: 0.707, type: 2, order: 2, enabled: true }  // High Shelf
+  { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true, color: BAND_COLORS[0] }, // Low Shelf
+  { band: 1, freq: 500.0,   gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[1] }, // Peaking
+  { band: 2, freq: 1000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[2] }, // Peaking
+  { band: 3, freq: 4000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[3] }, // Peaking
+  { band: 4, freq: 10000.0, gain: 0.0, q: 0.707, type: 2, order: 2, enabled: true, color: BAND_COLORS[4] }  // High Shelf
 ];
 
 const PRESETS = {
@@ -2218,7 +2413,8 @@ function applyPreset(name) {
     q:    p.q,
     type: p.type,
     order: p.order || 2,
-    enabled: p.enabled
+    enabled: p.enabled,
+    color: BAND_COLORS[idx % BAND_COLORS.length]
   }));
 
   rebuildBandsUI();
@@ -2580,9 +2776,46 @@ function updateSysStatsUI(s) {
       elBar.style.background = pct > 90 ? 'var(--nord11)' : 'var(--nord10)';
     }
   }
+  if (s.wifi_ssid !== undefined) {
+    const badge = document.getElementById('wifi-cfg-cur-status');
+    if (badge) {
+      if (s.wifi_con) {
+        badge.className = 'wifi-cfg-badge';
+        badge.textContent = `Connected: ${s.wifi_ssid}`;
+      } else {
+        badge.className = 'wifi-cfg-badge ap-mode';
+        badge.textContent = s.wifi_ssid;
+      }
+    }
+  }
 }
 
 function handleMsg(d) {
+  if (d.t === 'wifi_status') {
+    const statusMsg = document.getElementById('wifi-cfg-msg');
+    const badge = document.getElementById('wifi-cfg-cur-status');
+    if (d.status === 'connected') {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg success';
+        statusMsg.innerHTML = `Connected to <strong>${d.ssid || ''}</strong>! IP: ${d.ip || ''} (<a href="http://dsp.local" target="_blank" style="color:inherit;text-decoration:underline;">http://dsp.local</a>)`;
+      }
+      if (badge) {
+        badge.className = 'wifi-cfg-badge';
+        badge.textContent = `Connected: ${d.ssid || d.ip || 'OK'}`;
+      }
+    } else if (d.status === 'failed') {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg error';
+        statusMsg.textContent = d.msg || 'Connection failed. Please check password.';
+      }
+    } else if (d.status === 'connecting') {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg';
+        statusMsg.textContent = d.msg || 'Connecting...';
+      }
+    }
+    return;
+  }
   if (d.t === 'bt_meta') {
     updateBluetoothUI(d);
     return;
@@ -2825,7 +3058,24 @@ function initModuleReordering() {
 
       const indicator = document.createElement('div');
       indicator.className = 'module-drop-indicator';
-      box.after(indicator);
+      container.appendChild(indicator);
+
+      let currentAfterElement = box.nextElementSibling;
+      const updateIndicator = (afterEl) => {
+        const cRect = container.getBoundingClientRect();
+        if (afterEl) {
+          const elRect = afterEl.getBoundingClientRect();
+          indicator.style.top = (elRect.top - cRect.top - 8 - 2) + 'px';
+        } else {
+          const remainingBoxes = container.querySelectorAll('.module-box[data-module]:not(.dragging)');
+          if (remainingBoxes.length > 0) {
+            const lastBox = remainingBoxes[remainingBoxes.length - 1];
+            const elRect = lastBox.getBoundingClientRect();
+            indicator.style.top = (elRect.bottom - cRect.top + 8 - 2) + 'px';
+          }
+        }
+      };
+      updateIndicator(currentAfterElement);
 
       const rect = box.getBoundingClientRect();
       const grabOffsetX = e.clientX - rect.left;
@@ -2859,11 +3109,8 @@ function initModuleReordering() {
         }
 
         const afterElement = getDragAfterElement(container, ev.clientY);
-        if (afterElement == null) {
-          container.appendChild(indicator);
-        } else if (afterElement !== indicator) {
-          container.insertBefore(indicator, afterElement);
-        }
+        currentAfterElement = afterElement;
+        updateIndicator(afterElement);
       };
 
       const onPointerUp = (ev) => {
@@ -2882,10 +3129,12 @@ function initModuleReordering() {
         dragger.removeEventListener('pointercancel', onPointerUp);
 
         ghost.remove();
+        indicator.remove();
 
-        if (indicator.parentNode) {
-          container.insertBefore(draggedModuleBox, indicator);
-          indicator.remove();
+        if (currentAfterElement) {
+          container.insertBefore(draggedModuleBox, currentAfterElement);
+        } else {
+          container.appendChild(draggedModuleBox);
         }
 
         if (draggedModuleBox) {
@@ -3643,17 +3892,37 @@ function drawResponse() {
     c.fillText(lbl, x, H - 4 * DPR);
   });
 
+  const zY = db2y(0, H);
+
+  // Per-band filled areas between band curve and 0dB line
   bands.forEach((b, i) => {
     if (!b.enabled) return;
     const isShelfOrPeak = (b.type === 0 || b.type === 1 || b.type === 2 || b.type === undefined);
     if (isShelfOrPeak && Math.abs(b.gain) < 0.1) return;
-    c.beginPath();
+
+    const bandColor = getBandColor(b, i);
+    const rgb = hexToRgb(bandColor);
+
+    const bPts = [];
     for (let k = 0; k <= NPTS; k++) {
       const f = F0 * Math.pow(F1 / F0, k / NPTS);
-      const x = f2x(f, W), y = db2y(eqPreamp + bandMagAt(b, f), H);
-      k === 0 ? c.moveTo(x, y) : c.lineTo(x, y);
+      const x = f2x(f, W), y = db2y(bandMagAt(b, f), H);
+      bPts.push({ x, y });
     }
-    c.strokeStyle = eqEnabled ? (BAND_COLORS[i % BAND_COLORS.length] + '88') : '#CBD5E1';
+
+    // Fill area between curve and 0dB line with band color
+    c.beginPath();
+    c.moveTo(bPts[0].x, zY);
+    bPts.forEach(p => c.lineTo(p.x, p.y));
+    c.lineTo(bPts[bPts.length - 1].x, zY);
+    c.closePath();
+    c.fillStyle = eqEnabled ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)` : 'rgba(160, 174, 192, 0.08)';
+    c.fill();
+
+    // Outline stroke for individual band curve
+    c.beginPath();
+    bPts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
+    c.strokeStyle = eqEnabled ? (bandColor + 'B0') : '#CBD5E1';
     c.lineWidth   = 1.5 * DPR;
     c.stroke();
   });
@@ -3664,15 +3933,7 @@ function drawResponse() {
     pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
   }
 
-  const zY = db2y(0, H);
-  c.beginPath();
-  c.moveTo(pts[0].x, zY);
-  pts.forEach(p => c.lineTo(p.x, p.y));
-  c.lineTo(pts[pts.length - 1].x, zY);
-  c.closePath();
-  c.fillStyle = eqEnabled ? 'rgba(94, 129, 172, 0.10)' : 'rgba(76, 86, 106, 0.06)';
-  c.fill();
-
+  // Draw overall total EQ composite response line
   c.beginPath();
   pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
   c.strokeStyle = eqEnabled ? '#5E81AC' : '#718096';
@@ -3683,10 +3944,11 @@ function drawResponse() {
   bands.forEach((b, i) => {
     const x = f2x(b.freq, W);
     const y = db2y(totalMagAt(b.freq), H);
+    const bandColor = getBandColor(b, i);
     c.beginPath();
     c.arc(x, y, 4.5 * DPR, 0, Math.PI * 2);
     if (eqEnabled) {
-      c.fillStyle   = b.enabled ? BAND_COLORS[i % BAND_COLORS.length] : '#A0AEC0';
+      c.fillStyle   = b.enabled ? bandColor : '#A0AEC0';
       c.strokeStyle = '#2E3440';
     } else {
       c.fillStyle   = b.enabled ? '#718096' : '#CBD5E1';
@@ -4026,7 +4288,8 @@ function rebuildBandsUI() {
     if (b.type === 5) { b.type = 3; b.order = 4; }
     else if (b.type === 6) { b.type = 4; b.order = 4; }
 
-    const bandColor = BAND_COLORS[i % BAND_COLORS.length];
+    const bandColor = getBandColor(b, i);
+    b.color = bandColor;
     const hsl = hexToHsl(bandColor);
     const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
 
@@ -4068,25 +4331,61 @@ function rebuildBandsUI() {
       e.preventDefault();
       e.stopPropagation();
 
+      const rect = card.getBoundingClientRect();
+      const grabOffsetX = e.clientX - rect.left;
+      const grabOffsetY = e.clientY - rect.top;
+
+      // Clone card before adding dragging styles
+      const ghost = card.cloneNode(true);
+      ghost.classList.add('band-drag-ghost');
+      ghost.classList.remove('dragging');
+      ghost.removeAttribute('id');
+      ghost.style.position = 'fixed';
+      ghost.style.left = (e.clientX - grabOffsetX) + 'px';
+      ghost.style.top = (e.clientY - grabOffsetY) + 'px';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.height = rect.height + 'px';
+      ghost.style.backgroundColor = cardBg;
+      ghost.style.borderColor = bandColor;
+      ghost.style.borderWidth = '3px';
+      ghost.style.borderStyle = 'solid';
+      ghost.style.opacity = '0.95';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.zIndex = '10000';
+      document.body.appendChild(ghost);
+
       card.classList.add('dragging');
       card.style.opacity = '0.35';
 
       const indicator = document.createElement('div');
       indicator.className = 'band-drop-indicator';
-      card.after(indicator);
+      root.appendChild(indicator);
 
-      const rect = card.getBoundingClientRect();
-      const grabOffsetX = e.clientX - rect.left;
-      const grabOffsetY = e.clientY - rect.top;
-
-      const ghost = card.cloneNode(true);
-      ghost.classList.add('band-drag-ghost');
-      ghost.classList.remove('dragging');
-      ghost.style.left = (e.clientX - grabOffsetX) + 'px';
-      ghost.style.top = (e.clientY - grabOffsetY) + 'px';
-      ghost.style.width = rect.width + 'px';
-      ghost.style.height = rect.height + 'px';
-      document.body.appendChild(ghost);
+      let currentAfterCard = card.nextElementSibling;
+      const updateBandIndicator = (afterEl) => {
+        const rootRect = root.getBoundingClientRect();
+        if (afterEl && afterEl !== indicator) {
+          const elRect = afterEl.getBoundingClientRect();
+          const x = (elRect.left - rootRect.left) + root.scrollLeft - 6;
+          indicator.style.left = (x - 2) + 'px';
+          indicator.style.top = '6px';
+          indicator.style.height = (root.clientHeight - 14) + 'px';
+        } else {
+          const actCard = document.getElementById('eq-actions-card');
+          const remainingCards = root.querySelectorAll('.band-card:not(.dragging)');
+          const targetCard = actCard || (remainingCards.length > 0 ? remainingCards[remainingCards.length - 1] : null);
+          if (targetCard) {
+            const elRect = targetCard.getBoundingClientRect();
+            const x = (targetCard === actCard)
+              ? (elRect.left - rootRect.left) + root.scrollLeft - 6
+              : (elRect.right - rootRect.left) + root.scrollLeft + 6;
+            indicator.style.left = (x - 2) + 'px';
+            indicator.style.top = '6px';
+            indicator.style.height = (root.clientHeight - 14) + 'px';
+          }
+        }
+      };
+      updateBandIndicator(currentAfterCard);
 
       try {
         draggerBar.setPointerCapture(e.pointerId);
@@ -4105,13 +4404,8 @@ function rebuildBandsUI() {
         }
 
         const afterCard = getBandDragAfterElement(root, ev.clientX);
-        if (afterCard) {
-          root.insertBefore(indicator, afterCard);
-        } else {
-          const actCard = document.getElementById('eq-actions-card');
-          if (actCard) root.insertBefore(indicator, actCard);
-          else root.appendChild(indicator);
-        }
+        currentAfterCard = afterCard;
+        updateBandIndicator(afterCard);
       };
 
       const onPointerUp = (ev) => {
@@ -4127,12 +4421,18 @@ function rebuildBandsUI() {
         draggerBar.removeEventListener('pointercancel', onPointerUp);
 
         ghost.remove();
-
-        const allCards = [...root.querySelectorAll('.band-card, .band-drop-indicator')];
-        let dropIdx = allCards.indexOf(indicator);
         indicator.remove();
+
         card.style.opacity = '';
         card.classList.remove('dragging');
+
+        const allBandCards = [...root.querySelectorAll('.band-card')];
+        let dropIdx;
+        if (currentAfterCard && currentAfterCard.classList.contains('band-card')) {
+          dropIdx = allBandCards.indexOf(currentAfterCard);
+        } else {
+          dropIdx = allBandCards.length;
+        }
 
         if (dropIdx !== -1) {
           if (i < dropIdx) dropIdx--;
@@ -4440,7 +4740,7 @@ function syncBandCardUI(i) {
   if (gSlider) gSlider.value = b.gain.toFixed(1);
   updateBandCardParamStates(i);
 
-  const bandColor = BAND_COLORS[i % BAND_COLORS.length];
+  const bandColor = getBandColor(b, i);
   const hsl = hexToHsl(bandColor);
   const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
 
@@ -4484,6 +4784,8 @@ function addBand() {
   }
 
   const newIndex = bands.length;
+  const usedColors = new Set(bands.map(b => b.color));
+  const chosenColor = BAND_COLORS.find(c => !usedColors.has(c)) || BAND_COLORS[newIndex % BAND_COLORS.length];
   const newBand = {
     band: newIndex,
     freq: nextFreq,
@@ -4491,7 +4793,8 @@ function addBand() {
     q: 0.707,
     type: 0,
     order: 2,
-    enabled: true
+    enabled: true,
+    color: chosenColor
   };
   bands.push(newBand);
   rebuildBandsUI();
@@ -5056,6 +5359,58 @@ document.addEventListener('click', (e) => {
     }
   }
 });
+
+
+function toggleWiFiConfig(e) {
+  if (e) e.stopPropagation();
+  const body = document.getElementById('wifi-cfg-body');
+  const btn = document.getElementById('wifi-cfg-arrow');
+  if (!body) return;
+  const isHidden = (body.style.display === 'none');
+  body.style.display = isHidden ? 'block' : 'none';
+  if (btn) btn.textContent = isHidden ? 'Hide ▲' : 'Configure ▼';
+}
+
+function togglePassVisibility() {
+  const passIn = document.getElementById('wifi-input-pass');
+  if (!passIn) return;
+  passIn.type = (passIn.type === 'password') ? 'text' : 'password';
+}
+
+function submitWiFiConfig() {
+  const ssidIn = document.getElementById('wifi-input-ssid');
+  const passIn = document.getElementById('wifi-input-pass');
+  const statusMsg = document.getElementById('wifi-cfg-msg');
+  if (!ssidIn) return;
+  const ssid = ssidIn.value.trim();
+  const pass = passIn ? passIn.value : '';
+
+  if (!ssid) {
+    if (statusMsg) {
+      statusMsg.className = 'wifi-status-msg error';
+      statusMsg.textContent = 'Please enter a Wi-Fi SSID.';
+    }
+    return;
+  }
+
+  if (statusMsg) {
+    statusMsg.className = 'wifi-status-msg';
+    statusMsg.textContent = `Connecting to "${ssid}"...`;
+  }
+
+  wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
+
+  try {
+    const params = new URLSearchParams();
+    params.append('ssid', ssid);
+    params.append('pass', pass);
+    fetch('/api/wifi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    }).catch(() => {});
+  } catch (_) {}
+}
 
 wsConnect();
 </script>

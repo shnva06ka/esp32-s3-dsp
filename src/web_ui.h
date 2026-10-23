@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <Preferences.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <cstring>
@@ -114,6 +115,10 @@ public:
                 _ws.textAll(_buildSysJson());
             }
         }
+
+        if (_wifiReconnectRequested && now >= _wifiReconnectTimer) {
+            _performWiFiReconnect();
+        }
     }
 
 private:
@@ -127,14 +132,30 @@ private:
     uint32_t          _lastWifiMetaVersion{1};
     std::atomic<bool> _stateBroadcastPending{false};
     String            _uartLine{""};
+    bool              _wifiReconnectRequested{false};
+    String            _newSSID{""};
+    String            _newPass{""};
+    unsigned long     _wifiReconnectTimer{0};
 
     void _startWiFi() {
-        bool hasCredentials = (strlen(WIFI_SSID) > 0 && strcmp(WIFI_SSID, "YourSSID") != 0);
+        Preferences prefs;
+        String savedSSID = "";
+        String savedPass = "";
+        if (prefs.begin("wifi_cfg", true)) {
+            savedSSID = prefs.getString("ssid", "");
+            savedPass = prefs.getString("pass", "");
+            prefs.end();
+        }
+
+        String targetSSID = savedSSID.length() > 0 ? savedSSID : String(WIFI_SSID);
+        String targetPass = savedSSID.length() > 0 ? savedPass : String(WIFI_PASS);
+
+        bool hasCredentials = (targetSSID.length() > 0 && targetSSID != "YourSSID");
 
         if (hasCredentials) {
             WiFi.mode(WIFI_STA);
-            WiFi.begin(WIFI_SSID, WIFI_PASS);
-            Serial.printf("[WEB] Connecting to Wi-Fi SSID '%s'", WIFI_SSID);
+            WiFi.begin(targetSSID.c_str(), targetPass.c_str());
+            Serial.printf("[WEB] Connecting to Wi-Fi SSID '%s'", targetSSID.c_str());
             for (uint8_t i = 0; i < 20 && WiFi.status() != WL_CONNECTED; ++i) {
                 delay(500);
                 Serial.print('.');
@@ -161,6 +182,56 @@ private:
         Serial.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
     }
 
+    void _performWiFiReconnect() {
+        _wifiReconnectRequested = false;
+        Serial.printf("\n[WEB] Attempting Wi-Fi connection to SSID '%s'...\n", _newSSID.c_str());
+
+        // Keep AP alive if active so connection is not immediately dropped
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.begin(_newSSID.c_str(), _newPass.c_str());
+
+        for (uint8_t i = 0; i < 25 && WiFi.status() != WL_CONNECTED; ++i) {
+            delay(400);
+            Serial.print('.');
+        }
+
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.printf("\n[WEB] Connected to '%s'! Station IP: %s\n", _newSSID.c_str(), WiFi.localIP().toString().c_str());
+
+            Preferences prefs;
+            if (prefs.begin("wifi_cfg", false)) {
+                prefs.putString("ssid", _newSSID);
+                prefs.putString("pass", _newPass);
+                prefs.end();
+            }
+
+            MDNS.end();
+            if (MDNS.begin("dsp")) {
+                MDNS.addService("http", "tcp", 80);
+                Serial.println("[NET] mDNS active: http://dsp.local");
+            }
+
+            StaticJsonDocument<256> doc;
+            doc["t"] = "wifi_status";
+            doc["status"] = "connected";
+            doc["ssid"] = _newSSID;
+            doc["ip"] = WiFi.localIP().toString();
+            doc["msg"] = "Connected successfully to " + _newSSID;
+            String out;
+            serializeJson(doc, out);
+            _ws.textAll(out);
+        } else {
+            Serial.println("\n[WEB] Wi-Fi connection failed! Remaining in current mode.");
+            StaticJsonDocument<256> doc;
+            doc["t"] = "wifi_status";
+            doc["status"] = "failed";
+            doc["msg"] = "Could not connect to '" + _newSSID + "'. Please check password and try again.";
+            String out;
+            serializeJson(doc, out);
+            _ws.textAll(out);
+        }
+    }
+
     void _setupRoutes() {
         _ws.onEvent([this](AsyncWebSocket* s, AsyncWebSocketClient* c,
                            AwsEventType type, void* arg, uint8_t* data, size_t len) {
@@ -176,6 +247,31 @@ private:
 
         _server.on("/api/params", HTTP_GET, [this](AsyncWebServerRequest* req) {
             req->send(200, "application/json", _buildStateJson());
+        });
+
+        _server.on("/api/wifi", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            String ssid = req->hasParam("ssid", true) ? req->getParam("ssid", true)->value() : "";
+            String pass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
+            if (ssid.length() > 0) {
+                _newSSID = ssid;
+                _newPass = pass;
+                _wifiReconnectRequested = true;
+                _wifiReconnectTimer = millis() + 300;
+                req->send(200, "application/json", "{\"status\":\"connecting\",\"msg\":\"Connecting to network...\"}");
+            } else {
+                req->send(400, "application/json", "{\"error\":\"Missing SSID\"}");
+            }
+        });
+
+        _server.on("/api/wifi", HTTP_GET, [](AsyncWebServerRequest* req) {
+            StaticJsonDocument<256> doc;
+            doc["connected"] = (WiFi.status() == WL_CONNECTED);
+            doc["ssid"] = (WiFi.status() == WL_CONNECTED) ? WiFi.SSID() : (WiFi.getMode() == WIFI_AP ? "ESP32-S3-DSP" : "");
+            doc["ip"] = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+            doc["mode"] = (WiFi.status() == WL_CONNECTED) ? "sta" : (WiFi.getMode() == WIFI_AP ? "ap" : "other");
+            String out;
+            serializeJson(doc, out);
+            req->send(200, "application/json", out);
         });
 
         _server.onNotFound([](AsyncWebServerRequest* req) {
@@ -286,6 +382,17 @@ private:
             meta.connected = true;
             meta.playing = true;
             _params.setBluetoothMetadata(meta);
+        }
+        else if (strcmp(t, "wifi_save") == 0 || strcmp(t, "wifi_config") == 0) {
+            const char* ssid = doc["ssid"] | "";
+            const char* pass = doc["pass"] | "";
+            if (strlen(ssid) > 0) {
+                _newSSID = ssid;
+                _newPass = pass;
+                _wifiReconnectRequested = true;
+                _wifiReconnectTimer = millis() + 300;
+                client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Initiating Wi-Fi connection...\"}");
+            }
         }
         else if (strcmp(t, "boot_defaults") == 0) {
             bool custom   = doc.containsKey("custom") ? doc["custom"].as<bool>() : false;
@@ -525,16 +632,19 @@ private:
 
     String _buildSysJson() {
         auto s = SystemMonitor::getStats();
-        StaticJsonDocument<256> doc;
-        doc["t"]       = "sys";
-        doc["cpu0"]    = roundf(s.cpu0 * 10.0f) / 10.0f;
-        doc["cpu1"]    = roundf(s.cpu1 * 10.0f) / 10.0f;
-        doc["heap_u"]  = s.heapUsed;
-        doc["heap_t"]  = s.heapTotal;
-        doc["psram_u"] = s.psramUsed;
-        doc["psram_t"] = s.psramTotal;
-        doc["flash_u"] = s.flashUsed;
-        doc["flash_t"] = s.flashTotal;
+        StaticJsonDocument<384> doc;
+        doc["t"]         = "sys";
+        doc["cpu0"]      = roundf(s.cpu0 * 10.0f) / 10.0f;
+        doc["cpu1"]      = roundf(s.cpu1 * 10.0f) / 10.0f;
+        doc["heap_u"]    = s.heapUsed;
+        doc["heap_t"]    = s.heapTotal;
+        doc["psram_u"]   = s.psramUsed;
+        doc["psram_t"]   = s.psramTotal;
+        doc["flash_u"]   = s.flashUsed;
+        doc["flash_t"]   = s.flashTotal;
+        doc["wifi_con"]  = (WiFi.status() == WL_CONNECTED);
+        doc["wifi_ssid"] = (WiFi.status() == WL_CONNECTED) ? WiFi.SSID() : (WiFi.getMode() == WIFI_AP ? "ESP32-S3-DSP (AP)" : "Disconnected");
+        doc["wifi_ip"]   = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
 
         String out;
         serializeJson(doc, out);
