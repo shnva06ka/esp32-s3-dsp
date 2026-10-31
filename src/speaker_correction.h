@@ -1,0 +1,176 @@
+#pragma once
+
+#include <cmath>
+#include <cstring>
+#if __has_include(<esp_dsp.h>)
+#include <esp_dsp.h>
+#define HAVE_ESP_DSP 1
+#endif
+#include "audio_config.h"
+#include "param_store.h"
+#include "subsonic.h"
+
+class SpeakerCorrection {
+public:
+    static constexpr size_t kDelayBufSize = 2048;
+
+    SpeakerCorrection() {
+        reset();
+        SubsonicParams defaultParams;
+        setParams(defaultParams);
+    }
+
+    void reset() {
+        _subsonic.reset();
+        memset(_delayBufL, 0, sizeof(_delayBufL));
+        memset(_delayBufR, 0, sizeof(_delayBufR));
+        _delayWriteIdx = 0;
+        memset(_hStateL, 0, sizeof(_hStateL));
+        memset(_hStateR, 0, sizeof(_hStateR));
+    }
+
+    void setParams(const SubsonicParams& p) {
+        _enabled = p.enabled;
+        _subsonic.setParams(p);
+
+        float bal = p.balance;
+        if (bal < -100.0f) bal = -100.0f;
+        if (bal >  100.0f) bal =  100.0f;
+
+        if (bal <= 0.0f) {
+            float lDb = (-bal / 100.0f) * 6.0f;
+            float rDb = (bal / 100.0f) * 24.0f;
+            _gainL = powf(10.0f, lDb / 20.0f);
+            _gainR = powf(10.0f, rDb / 20.0f);
+        } else {
+            float rDb = (bal / 100.0f) * 6.0f;
+            float lDb = (-bal / 100.0f) * 24.0f;
+            _gainL = powf(10.0f, lDb / 20.0f);
+            _gainR = powf(10.0f, rDb / 20.0f);
+        }
+
+        constexpr float Fs = static_cast<float>(kSampleRate);
+        float dMsL = (p.delayMsL < -20.0f) ? -20.0f : ((p.delayMsL > 20.0f) ? 20.0f : p.delayMsL);
+        float dMsR = (p.delayMsR < -20.0f) ? -20.0f : ((p.delayMsR > 20.0f) ? 20.0f : p.delayMsR);
+
+        float minD = (dMsL < dMsR) ? dMsL : dMsR;
+        float effL = (minD < 0.0f) ? (dMsL - minD) : dMsL;
+        float effR = (minD < 0.0f) ? (dMsR - minD) : dMsR;
+
+        _delaySamplesL = effL * (Fs / 1000.0f);
+        _delaySamplesR = effR * (Fs / 1000.0f);
+
+        _phaseDegL = _quantizePhase(p.phaseL);
+        _phaseDegR = _quantizePhase(p.phaseR);
+    }
+
+    void process(float* left, float* right, size_t frames) {
+        if (!_enabled || frames == 0) return;
+
+        _subsonic.process(left, right, frames);
+
+#if defined(HAVE_ESP_DSP)
+        if (fabsf(_gainL - 1.0f) > 1e-4f) {
+            dsps_mulc_f32(left,  left,  static_cast<int>(frames), _gainL, 1, 1);
+        }
+        if (fabsf(_gainR - 1.0f) > 1e-4f) {
+            dsps_mulc_f32(right, right, static_cast<int>(frames), _gainR, 1, 1);
+        }
+#else
+        for (size_t i = 0; i < frames; ++i) {
+            left[i]  *= _gainL;
+            right[i] *= _gainR;
+        }
+#endif
+
+        const bool needDelayL = (_delaySamplesL > 0.01f);
+        const bool needDelayR = (_delaySamplesR > 0.01f);
+
+        const size_t delayIntL = static_cast<size_t>(_delaySamplesL);
+        const float  fracL     = _delaySamplesL - static_cast<float>(delayIntL);
+        const float  invFracL  = 1.0f - fracL;
+
+        const size_t delayIntR = static_cast<size_t>(_delaySamplesR);
+        const float  fracR     = _delaySamplesR - static_cast<float>(delayIntR);
+        const float  invFracR  = 1.0f - fracR;
+
+        constexpr size_t kMask = kDelayBufSize - 1;
+
+        for (size_t i = 0; i < frames; ++i) {
+            float sL = left[i];
+            float sR = right[i];
+
+            _delayBufL[_delayWriteIdx] = sL;
+            _delayBufR[_delayWriteIdx] = sR;
+
+            if (needDelayL) {
+                size_t idxA = (_delayWriteIdx - delayIntL) & kMask;
+                size_t idxB = (idxA - 1) & kMask;
+                sL = _delayBufL[idxA] * invFracL + _delayBufL[idxB] * fracL;
+            }
+
+            if (needDelayR) {
+                size_t idxA = (_delayWriteIdx - delayIntR) & kMask;
+                size_t idxB = (idxA - 1) & kMask;
+                sR = _delayBufR[idxA] * invFracR + _delayBufR[idxB] * fracR;
+            }
+
+            _delayWriteIdx = (_delayWriteIdx + 1) & kMask;
+
+            left[i]  = _applyPhase(sL, _phaseDegL, _hStateL);
+            right[i] = _applyPhase(sR, _phaseDegR, _hStateR);
+        }
+    }
+
+private:
+    SubsonicFilter _subsonic;
+    bool           _enabled{false};
+    float          _gainL{1.0f};
+    float          _gainR{1.0f};
+    float          _delaySamplesL{0.0f};
+    float          _delaySamplesR{0.0f};
+    int16_t        _phaseDegL{0};
+    int16_t        _phaseDegR{0};
+
+    float          _delayBufL[kDelayBufSize]{};
+    float          _delayBufR[kDelayBufSize]{};
+    size_t         _delayWriteIdx{0};
+
+    float          _hStateL[4]{};
+    float          _hStateR[4]{};
+
+    static inline int16_t _quantizePhase(int16_t deg) {
+        if (deg < -157) return -180;
+        if (deg < -112) return -135;
+        if (deg < -67)  return -90;
+        if (deg < -22)  return -45;
+        if (deg <= 22)  return 0;
+        if (deg <= 67)  return 45;
+        if (deg <= 112) return 90;
+        if (deg <= 157) return 135;
+        return 180;
+    }
+
+    static inline float _ap1(float x, float c, float& s) {
+        float y = c * x + s;
+        s = x - c * y;
+        return y;
+    }
+
+    static inline float _applyPhase(float x, int16_t deg, float* state) {
+        if (deg == 0) return x;
+        if (deg == 180 || deg == -180) return -x;
+
+        float xI = _ap1(_ap1(x, 0.161758f, state[0]), 0.733029f, state[1]);
+        float xQ = _ap1(_ap1(x, 0.460144f, state[2]), 0.902267f, state[3]);
+
+        if (deg == 90)   return -xQ;
+        if (deg == -90)  return  xQ;
+        if (deg == 45)   return  0.70710678f * xI - 0.70710678f * xQ;
+        if (deg == -45)  return  0.70710678f * xI + 0.70710678f * xQ;
+        if (deg == 135)  return -0.70710678f * xI - 0.70710678f * xQ;
+        if (deg == -135) return -0.70710678f * xI + 0.70710678f * xQ;
+
+        return x;
+    }
+};

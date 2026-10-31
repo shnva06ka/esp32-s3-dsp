@@ -1,0 +1,5286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>ESP32-S3-DSP</title>
+<style>
+:root {
+  --nord0: #2E3440; --nord1: #3B4252;
+  --nord2: #434C5E;
+  --nord3: #4C566A; --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4; --nord7: #8FBCBB; --nord8: #88C0D0; --nord9: #81A1C1; --nord10: #5E81AC; --nord11: #BF616A; --nord12: #D08770; --nord13: #EBCB8B; --nord14: #438728; --nord15: #B48EAD; --bg: #EDF1F7;
+  --card-bg: #FFFFFF;
+  --card-header: #E5E9F0;
+  --border: #CBD5E1;
+  --border-strong: #4C566A;
+  --text: #2E3440;
+  --muted: #4C566A;
+  --accent: #5E81AC;
+  --active: #3D7820;
+  --danger: #BF616A;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+html, body, button, input, select, textarea {
+  font-family: var(--mono);
+}
+
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: none !important;
+  text-align-last: center;
+}
+select::-ms-expand {
+  display: none;
+}
+
+.conn-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(30, 34, 42, 0.75);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.conn-card {
+  background: #FFFFFF;
+  border: 2px solid var(--nord11);
+  border-radius: 8px;
+  padding: 26px 36px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.conn-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3.5px solid var(--nord4);
+  border-top-color: var(--nord11);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.conn-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--nord11);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.conn-desc {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.input-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.input-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  text-align: left;
+  font-family: var(--mono);
+  outline: none;
+}
+.input-card:hover {
+  background: var(--nord5);
+  border-color: var(--nord9);
+}
+.input-card:active {
+  transform: scale(0.99);
+}
+.input-card.active {
+  background: #E8F0FE;
+  border-color: var(--nord10);
+  border-width: 1.5px;
+}
+.input-card-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.input-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.input-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 4px;
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--nord0);
+  flex-shrink: 0;
+}
+.input-card.active .input-card-icon {
+  background: var(--nord10);
+  color: #FFFFFF;
+  border-color: var(--nord10);
+}
+.input-card-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.03em;
+}
+.input-card-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 3px 7px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: var(--nord5);
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.input-card.active .input-card-badge {
+  background: var(--nord10);
+  color: #FFFFFF;
+  border-color: var(--nord10);
+}
+
+.sys-stats-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.sys-stat-card {
+  background: var(--nord6);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sys-stat-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--mono);
+}
+.sys-stat-name {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sys-stat-val {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+}
+.sys-stat-bar-track {
+  width: 100%;
+  height: 5px;
+  background: var(--nord4);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.sys-stat-bar-fill {
+  height: 100%;
+  background: var(--nord10);
+  border-radius: 2px;
+  transition: width 0.35s ease, background 0.35s ease;
+}
+
+.active-source-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--nord0);
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 4px 10px;
+}
+.active-source-pill .badge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 1px solid var(--muted);
+}
+
+#mod-wifi-meta {
+  border-color: var(--border);
+}
+.wifi-stream-card {
+  padding: 2px 0;
+}
+.wifi-stream-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.wifi-info-item {
+  background: var(--nord6);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wifi-info-lbl {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--mono);
+}
+.wifi-info-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nord0);
+  font-family: var(--mono);
+  word-break: break-word;
+}
+
+main {
+  max-width: 1400px;
+  margin: 16px auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.module-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.module-box.bypassed {
+  border-color: var(--border);
+}
+.module-box.bypassed .module-header {
+  background: #E2E8F0;
+}
+.module-box.bypassed .module-title {
+  color: var(--nord3);
+}
+.module-box.bypassed .module-body {
+  filter: grayscale(1);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+}
+.module-box.bypassed .module-body::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(237, 241, 247, 0.45);
+  z-index: 100;
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+
+.submodule-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 2px 0 8px 2px;
+  font-family: var(--mono);
+}
+.submodule-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 14px 0 12px;
+  width: 100%;
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--card-header);
+  border-bottom: 1px solid var(--border-strong);
+  cursor: pointer;
+  user-select: none;
+}
+.module-box[data-module] .module-header {
+  padding: 0 16px 0 0;
+  min-height: 46px;
+  align-items: stretch;
+}
+.module-header:hover {
+  background: #DAE0EA;
+}
+.module-header.static-header {
+  cursor: default;
+}
+.module-header.static-header:hover {
+  background: var(--card-header);
+}
+.module-box.collapsed .module-header {
+  border-bottom: none;
+}
+#dsp-modules-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  position: relative;
+}
+.module-header-left {
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  gap: 14px;
+}
+.module-dragger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 46px;
+  min-width: 46px;
+  align-self: stretch;
+  background: var(--nord4);
+  border-right: 1px solid var(--border-strong);
+  cursor: grab;
+  cursor: -webkit-grab;
+  user-select: none;
+  touch-action: none;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.module-dragger:hover {
+  background: #D5DDE8;
+}
+.module-dragger:hover .drag-grip-dots {
+  opacity: 0.9;
+}
+.module-dragger:active {
+  cursor: grabbing;
+  cursor: -webkit-grabbing;
+  background: #C4CED8;
+}
+.drag-grip-dots {
+  color: var(--nord0);
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+.dragger-num {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--nord0);
+  opacity: 0.75;
+  pointer-events: none;
+}
+.module-box.bypassed .module-dragger {
+  background: #D8DFE8;
+  opacity: 0.7;
+}
+.module-box.dragging {
+  opacity: 0.35;
+  transform: scale(0.995);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 2px dashed #88C0D0;
+}
+.module-box.dragging .module-body {
+  display: none !important;
+}
+
+.module-drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 12px rgba(136, 192, 208, 0.95);
+  pointer-events: none;
+  z-index: 1000;
+  transition: top 0.06s ease-out;
+}
+.module-drop-indicator::before,
+.module-drop-indicator::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(136, 192, 208, 0.9);
+}
+.module-drop-indicator::before { left: -6px; }
+.module-drop-indicator::after { right: -6px; }
+
+.band-drop-indicator {
+  position: absolute;
+  top: 6px;
+  width: 4px;
+  height: 290px;
+  background: var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 12px rgba(136, 192, 208, 0.95);
+  pointer-events: none;
+  z-index: 1000;
+  transition: left 0.06s ease-out;
+}
+.band-drop-indicator::before,
+.band-drop-indicator::after {
+  content: '';
+  position: absolute;
+  left: -4px;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(136, 192, 208, 0.9);
+}
+.band-drop-indicator::before { top: -6px; }
+.band-drop-indicator::after { bottom: -6px; }
+
+.module-drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  opacity: 0.94;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02) rotate(0.6deg);
+  box-sizing: border-box;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.band-drag-ghost {
+  position: fixed;
+  pointer-events: none !important;
+  z-index: 10000;
+  opacity: 0.95;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: scale(1.02);
+  box-sizing: border-box;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.module-title-area {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.collapse-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--nord0);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  user-select: none;
+  transform-origin: center center;
+  transition: transform 0.08s cubic-bezier(0, 0, 0.2, 1), color 0.08s ease;
+  flex-shrink: 0;
+}
+.module-header:hover .collapse-icon {
+  color: var(--accent);
+  background: transparent;
+  border: none;
+}
+.module-box.collapsed .collapse-icon {
+  transform: rotate(-90deg);
+}
+.module-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--nord4);
+  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  box-sizing: border-box;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  top: 2px;
+  background-color: #FFFFFF;
+  border-radius: 50%;
+  border: 1px solid var(--nord0);
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.switch input:checked + .slider {
+  background-color: var(--active);
+  border-color: var(--nord0);
+}
+.switch input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.module-body {
+  padding: 14px 16px;
+}
+.module-box.collapsed .module-body {
+  display: none;
+}
+
+#canvas-wrap {
+  position: relative;
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+#graph-tip {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: #fff;
+  background: rgba(46, 52, 64, 0.92);
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 20;
+}
+#graph-band-menu {
+  position: fixed;
+  display: none;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 20000;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 700;
+  user-select: none;
+}
+#graph-band-menu .gm-head {
+  padding: 5px 12px;
+  color: var(--muted);
+  font-size: 11px;
+  border-left: 4px solid transparent;
+}
+#graph-band-menu .gm-opt {
+  padding: 6px 12px;
+  color: var(--nord0);
+  cursor: pointer;
+}
+#graph-band-menu .gm-opt:hover { background: var(--nord5); }
+#graph-band-menu .gm-opt.selected { color: var(--nord10); }
+#graph-band-menu .gm-opt.selected::before { content: '\2713 '; }
+#graph-band-menu .gm-danger { color: var(--nord11); }
+#graph-band-menu .gm-sep { height: 1px; background: var(--border-strong); margin: 4px 0; }
+
+#freq-canvas {
+  width: 100%;
+  height: 220px;
+  display: block;
+}
+
+.eq-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 12px;
+}
+.eq-preset-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  flex: 1;
+}
+.preset-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--nord0);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.btn-preset {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  background: #FFFFFF;
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.btn-preset:hover {
+  background: #DAE0EA;
+}
+.btn-preset.active {
+  background: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--nord0);
+}
+.btn-preset-action {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 8px;
+  background: var(--nord5);
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.btn-preset-action:hover {
+  background: #CBD5E1;
+  border-color: var(--nord0);
+}
+
+.eq-bands-box {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+.band-count-badge {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--nord0);
+  background: #FFFFFF;
+  border: 1px solid var(--border-strong);
+  padding: 3px 8px;
+  border-radius: 2px;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #FFFFFF;
+  border: 1px solid var(--nord0);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-transform: uppercase;
+}
+.btn-primary:hover {
+  background: #4C6F98;
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.eq-body-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.preamp-col {
+  width: 54px;
+  min-width: 54px;
+  max-width: 54px;
+  flex: 0 0 54px;
+  margin-top: 6px;
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  box-sizing: border-box;
+  background: var(--nord5);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 3px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  user-select: none;
+  transition: border-color 0.15s ease;
+}
+.preamp-col:hover {
+  border-color: var(--nord3);
+}
+.preamp-col .card-val-badge {
+  max-width: 48px;
+  padding: 3px 2px;
+}
+.preamp-slider-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  padding: 4px 0;
+}
+.preamp-slider {
+  -webkit-appearance: slider-vertical;
+  writing-mode: bt-lr;
+  width: 22px;
+  height: 200px;
+  cursor: pointer;
+  accent-color: #2E3440;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+#bands-container {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  overflow-y: clip;
+  padding: 6px 0 8px 0;
+  scroll-behavior: smooth;
+  position: relative;
+}
+#bands-container::-webkit-scrollbar {
+  height: 12px;
+}
+#bands-container::-webkit-scrollbar-track {
+  background: #D8DEE9;
+  border-radius: 6px;
+}
+#bands-container::-webkit-scrollbar-thumb {
+  background: #4C566A;
+  background-clip: padding-box;
+  border-style: solid;
+  border-color: transparent;
+  border-width: 2px 180px;
+  border-radius: 8px;
+}
+#bands-container::-webkit-scrollbar-thumb:hover {
+  background: #2E3440;
+}
+@supports not selector(::-webkit-scrollbar) {
+  #bands-container {
+    scrollbar-color: #4C566A #D8DEE9;
+  }
+}
+.band-card {
+  width: 175px;
+  min-width: 175px;
+  max-width: 175px;
+  flex: 0 0 175px;
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  box-sizing: border-box;
+  background: var(--nord5);
+  border: 3px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 6px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  transition: border-color 0.15s, opacity 0.15s, background 0.15s;
+  user-select: none;
+  position: relative;
+  z-index: 1;
+}
+.band-card:hover,
+.band-card:focus-within {
+  border-color: var(--nord0);
+  z-index: 50;
+}
+.band-card.dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+.band-card.drag-over {
+  border-color: var(--nord10);
+  background: #E8F0FE;
+}
+.band-card.band-bypassed {
+  opacity: 0.45;
+}
+
+
+.band-dragger-titlebar {
+  width: 100%;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.band-dragger-titlebar:active {
+  cursor: grabbing;
+}
+.drag-grip {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--nord0);
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
+}
+.band-dragger-titlebar:hover .drag-grip {
+  opacity: 0.9;
+}
+.band-select-checkbox {
+  display: none;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--nord11);
+}
+#bands-container.select-mode .band-select-checkbox {
+  display: block;
+}
+#bands-container.select-mode .drag-grip {
+  display: none;
+}
+#bands-container.select-mode .band-card {
+  cursor: pointer;
+}
+#bands-container.select-mode .band-card.selected {
+  border-color: var(--nord11) !important;
+  box-shadow: 0 0 0 2px var(--nord11);
+}
+
+.eq-actions-card {
+  width: 90px;
+  min-width: 90px;
+  max-width: 90px;
+  flex: 0 0 90px;
+  height: 290px;
+  min-height: 290px;
+  max-height: 290px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  user-select: none;
+}
+.btn-card-action {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--nord5);
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  color: var(--nord0);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+  padding: 12px 6px;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+.btn-card-action:hover {
+  background: #E5E9F0;
+  border-color: var(--nord3);
+  color: var(--nord0);
+  border-style: dashed;
+}
+.btn-card-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+.btn-card-action.btn-danger {
+  color: #BF616A;
+  border-color: #BF616A;
+}
+.btn-card-action.btn-danger:hover {
+  background: #BF616A;
+  color: #FFFFFF;
+}
+
+.band-type-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.band-type-menu-wrap {
+  position: relative;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.band-type-menu-btn {
+  width: 100%;
+  max-width: 135px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: var(--nord0);
+  border: none;
+  border-radius: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  outline: none;
+  transition: background 0.08s ease;
+  font-family: var(--mono);
+}
+.band-type-menu-btn:hover {
+  background: var(--nord1);
+}
+.type-btn-caret {
+  display: none;
+}
+
+.band-type-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 130px;
+  background: #2E3440;
+  border: 1px solid #434C5E;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  z-index: 120;
+  padding: 4px 0;
+  font-family: var(--mono);
+}
+.band-type-menu-wrap:hover .band-type-dropdown,
+.band-type-menu-wrap.open .band-type-dropdown {
+  display: block;
+}
+
+.band-menu-opt {
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ECEFF4;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.band-menu-opt:hover {
+  background: var(--nord10);
+  color: #FFFFFF;
+}
+.band-menu-opt.selected {
+  color: #88C0D0;
+  font-weight: 800;
+}
+
+.band-card-bottom-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding-top: 4px;
+}
+.band-card-bottom-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.band-bottom-gain {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.band-bottom-knobs {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.band-bypass-btn {
+  width: 24px;
+  height: 24px;
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+  flex-shrink: 0;
+}
+.band-bypass-btn svg {
+  width: 18px;
+  height: 18px;
+}
+.band-delete-btn {
+  width: 24px;
+  height: 24px;
+  border: none !important;
+  background: transparent !important;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  outline: none;
+  flex-shrink: 0;
+}
+.band-delete-btn svg {
+  width: 17px;
+  height: 17px;
+}
+
+.band-card-main-grid {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.band-gain-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 6px;
+}
+.band-slider-wrap {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0;
+  width: 100%;
+}
+.band-vslider {
+  -webkit-appearance: slider-vertical;
+  writing-mode: bt-lr;
+  width: 22px;
+  height: 122px;
+  cursor: pointer;
+  accent-color: #2E3440;
+  background: transparent;
+  border: none;
+  outline: none;
+}
+.preamp-slider::-webkit-slider-runnable-track,
+.band-vslider::-webkit-slider-runnable-track {
+  width: 6px;
+  height: 100%;
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9999px;
+  box-shadow: none;
+  margin: 0 auto;
+}
+.preamp-slider::-moz-range-track,
+.band-vslider::-moz-range-track {
+  width: 6px;
+  height: 100%;
+  background: #FFFFFF;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9999px;
+  box-shadow: none;
+  margin: 0 auto;
+}
+.preamp-slider::-moz-range-progress,
+.band-vslider::-moz-range-progress {
+  background: transparent;
+}
+.preamp-slider::-webkit-slider-thumb,
+.band-vslider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2E3440 !important;
+  border: 1.5px solid #434C5E !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  transform: translateX(6px);
+}
+.preamp-slider::-webkit-slider-thumb:hover,
+.band-vslider::-webkit-slider-thumb:hover {
+  background: #3B4252 !important;
+  border-color: #5E81AC !important;
+}
+.preamp-slider::-moz-range-thumb,
+.band-vslider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2E3440 !important;
+  border: 1.5px solid #434C5E !important;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.preamp-slider::-moz-range-thumb:hover,
+.band-vslider::-moz-range-thumb:hover {
+  background: #3B4252 !important;
+  border-color: #5E81AC !important;
+}
+.knob {
+  cursor: pointer;
+  filter: none;
+}
+.knob:hover {
+  filter: none;
+}
+.band-knobs-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 8px;
+}
+.band-knob-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.card-val-badge {
+  background: #2E3440;
+  color: #ECEFF4;
+  border-radius: 6px;
+  padding: 3px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 66px;
+  box-sizing: border-box;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+  user-select: none;
+}
+.card-val-badge * {
+  cursor: pointer;
+}
+.card-val-badge .badge-lbl {
+  font-size: 8.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #D8DEE9;
+  letter-spacing: 0.05em;
+  line-height: 1.1;
+}
+.badge-input-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+}
+.card-val-badge input.badge-val-input {
+  background: transparent;
+  border: none;
+  color: #ECEFF4;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  width: 100%;
+  outline: none;
+  padding: 0;
+  line-height: 1.2;
+  -moz-appearance: textfield;
+  appearance: textfield;
+  cursor: pointer;
+}
+.badge-unit {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #88C0D0;
+}
+
+.module-grid-controls {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overflow-y: clip;
+  padding: 6px 4px 10px;
+  scroll-behavior: smooth;
+}
+.control-pod {
+  width: 136px;
+  min-width: 136px;
+  max-width: 136px;
+  flex: 0 0 136px;
+  background: var(--nord5);
+  border: 1.5px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  transition: border-color 0.15s;
+}
+.control-pod:hover {
+  border-color: var(--nord0);
+}
+.control-pod .card-val-badge {
+  max-width: 90px;
+  padding: 4px 6px;
+}
+
+
+.boot-cfg-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 4px;
+}
+.boot-cfg-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: center;
+}
+.boot-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nord0);
+  cursor: pointer;
+}
+.boot-radio-label input[type="radio"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.boot-toggles-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  transition: opacity 0.2s ease;
+}
+.boot-toggle-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord0);
+  cursor: pointer;
+}
+.boot-toggle-item input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+.boot-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.boot-saved-indicator {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--active);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.boot-saved-indicator.visible {
+  opacity: 1;
+}
+
+
+.wifi-cfg-panel {
+  margin-top: 14px;
+  background: var(--nord5);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.wifi-cfg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  background: #E5EBF2;
+  transition: background 0.15s ease;
+}
+.wifi-cfg-header:hover {
+  background: #DCE3ED;
+}
+.wifi-cfg-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wifi-cfg-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nord0);
+}
+.wifi-cfg-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--active);
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.wifi-cfg-badge.ap-mode {
+  background: #D08770;
+}
+.wifi-cfg-badge.disconnected {
+  background: var(--muted);
+}
+.wifi-cfg-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.wifi-cfg-status-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wifi-cfg-toggle-btn {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord9);
+}
+.wifi-cfg-body {
+  padding: 14px;
+  border-top: 1px solid var(--border-strong);
+  background: var(--nord5);
+}
+.wifi-cfg-desc {
+  font-size: 12px;
+  color: var(--nord3);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+.wifi-cfg-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 480px;
+}
+.wifi-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wifi-input-group label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.wifi-pass-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.wifi-text-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 4px;
+  background: #FFFFFF;
+  color: var(--nord0);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.wifi-text-input:focus {
+  border-color: var(--accent);
+}
+.wifi-pass-toggle {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  opacity: 0.6;
+  padding: 4px;
+}
+.wifi-pass-toggle:hover {
+  opacity: 1;
+}
+.wifi-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.btn-wifi-connect {
+  padding: 8px 18px;
+  background: var(--nord9);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s;
+}
+.btn-wifi-connect:hover {
+  background: var(--nord10);
+}
+.btn-wifi-connect:active {
+  transform: scale(0.98);
+}
+.wifi-status-msg {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nord3);
+}
+.wifi-status-msg.success {
+  color: #2E7D32;
+}
+.wifi-status-msg.error {
+  color: #C62828;
+}
+
+footer {
+  text-align: center;
+  max-width: 1400px;
+  margin: 24px auto 32px;
+  padding: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  font-family: var(--mono);
+  box-sizing: border-box;
+}
+
+@media (max-width: 680px) {
+  .input-selector-grid {
+    grid-template-columns: 1fr;
+  }
+  .sys-stats-container {
+    grid-template-columns: 1fr;
+  }
+  .eq-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .eq-bands-box {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="conn-overlay" class="conn-overlay" style="display: none;">
+  <div class="conn-card">
+    <div class="conn-spinner"></div>
+    <div class="conn-title">Connection Lost</div>
+    <div class="conn-desc" id="conn-desc">Reconnecting to ESP32-S3...</div>
+  </div>
+</div>
+
+<main>
+  <section class="module-box" id="mod-input">
+    <div class="module-header" onclick="toggleModuleCollapse('input')">
+      <div class="module-title-area">
+        <span class="module-title">ESP32-S3-DSP</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div class="input-selector-grid">
+        <button class="input-card active" id="btn-src-1" onclick="setInputSource(1)" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12"/>
+              </svg>
+            </div>
+            <div class="input-card-title">Line In</div>
+          </div>
+          <span class="input-card-badge" id="badge-src-1">ACTIVE</span>
+        </button>
+
+        <button class="input-card" id="btn-src-2" onclick="setInputSource(2)" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
+              </svg>
+            </div>
+            <div class="input-card-title">Bluetooth</div>
+          </div>
+          <span class="input-card-badge" id="badge-src-2">STANDBY</span>
+        </button>
+
+        <button class="input-card" id="btn-src-3" onclick="setInputSource(3)" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                <line x1="12" y1="20" x2="12.01" y2="20"/>
+              </svg>
+            </div>
+            <div class="input-card-title">Squeezebox</div>
+          </div>
+          <span class="input-card-badge" id="badge-src-3">STANDBY</span>
+        </button>
+      </div>
+
+      <div class="sys-stats-container">
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Core 0 (Sys/Net)</span>
+            <span class="sys-stat-val" id="sys-val-cpu0">0.0%</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-cpu0" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Core 1 (Audio DSP)</span>
+            <span class="sys-stat-val" id="sys-val-cpu1">0.0%</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-cpu1" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Internal RAM</span>
+            <span class="sys-stat-val" id="sys-val-ram">-- / -- KB</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-ram" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
+            <span class="sys-stat-name">Flash Memory</span>
+            <span class="sys-stat-val" id="sys-val-flash">-- / -- MB</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-flash" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wifi-cfg-panel">
+        <div class="wifi-cfg-header" onclick="toggleWiFiConfig(event)">
+          <div class="wifi-cfg-title-row">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+              <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+              <line x1="12" y1="20" x2="12.01" y2="20"/>
+            </svg>
+            <span class="wifi-cfg-title">Wi-Fi setup</span>
+          </div>
+          <span class="wifi-cfg-toggle-btn" id="wifi-cfg-arrow">▼</span>
+        </div>
+        <div class="wifi-cfg-body" id="wifi-cfg-body" style="display: none;">
+          <div class="wifi-cfg-status-row">
+            <span class="wifi-cfg-status-label">Wi-Fi Status:</span>
+            <span class="wifi-cfg-badge" id="wifi-cfg-cur-status">Checking...</span>
+          </div>
+          <div class="wifi-cfg-desc">Connect the ESP32-S3 to your 2.4 GHz home Wi-Fi network. After connecting, the Web UI is reachable on your network at <strong>http://dsp.local</strong>.</div>
+          <div class="wifi-cfg-inputs">
+            <div class="wifi-input-group">
+              <label for="wifi-input-ssid">Network SSID</label>
+              <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="e.g. MyHomeNetwork" autocomplete="off" autocorrect="off" autocapitalize="none">
+            </div>
+            <div class="wifi-input-group">
+              <label for="wifi-input-pass">Password</label>
+              <div class="wifi-pass-wrap">
+                <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Wi-Fi Password" autocomplete="off">
+                <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show/Hide Password">👁</button>
+              </div>
+            </div>
+            <div class="wifi-actions-row">
+              <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Save &amp; Connect</button>
+              <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="module-box" id="mod-wifi-meta" style="display: none;">
+    <div class="module-header static-header">
+      <div class="module-title-area">
+        <span class="module-title">Wi-Fi Stream</span>
+      </div>
+      <div class="active-source-pill" id="wifi-status-pill">
+        <span class="badge-dot" id="wifi-status-dot"></span>
+        <span id="wifi-status-text">DISCONNECTED</span>
+      </div>
+    </div>
+    <div class="module-body">
+      <div class="wifi-stream-card">
+        <div class="wifi-stream-meta-grid">
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Server Endpoint</span>
+            <span class="wifi-info-val" id="wifi-server-val">Searching for server...</span>
+          </div>
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Stream Format</span>
+            <span class="wifi-info-val" id="wifi-format-val">PCM 44.1 kHz / 24-bit</span>
+          </div>
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Playback Status</span>
+            <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="dsp-modules-container">
+
+  <section class="module-box bypassed" id="mod-eq" data-module="eq">
+    <div class="module-header" onclick="toggleModuleCollapse('eq')">
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.3"/>
+            <circle cx="6" cy="2" r="1.3"/>
+            <circle cx="2" cy="7" r="1.3"/>
+            <circle cx="6" cy="7" r="1.3"/>
+            <circle cx="2" cy="12" r="1.3"/>
+            <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <span class="dragger-num">1</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-eq" onchange="toggleEQModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Parametric Equalizer</span>
+        </div>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div id="canvas-wrap">
+        <canvas id="freq-canvas"></canvas>
+      </div>
+
+      <div class="eq-toolbar-row">
+        <div class="eq-preset-box">
+          <span class="preset-label">Preset:</span>
+          <button class="btn-preset active" id="btn-pre-flat_5" onclick="applyPreset('flat_5')">Flat 5 Bands</button>
+          <button class="btn-preset" id="btn-pre-flat_10" onclick="applyPreset('flat_10')">Flat 10 Bands</button>
+          <button class="btn-preset" id="btn-pre-low" onclick="applyPreset('low_boost')">Low Boost</button>
+          <button class="btn-preset" id="btn-pre-high" onclick="applyPreset('high_boost')">High Boost</button>
+          <span id="custom-presets-list" style="display:inline-flex;gap:6px;"></span>
+          <button class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
+          <button class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
+          <input type="file" id="preset-file-input" accept=".json" style="display:none" onchange="importPresetFile(event)">
+        </div>
+      </div>
+
+      <div class="eq-body-layout">
+        <div class="preamp-col" id="eq-preamp-col">
+          <div class="preamp-slider-wrap">
+            <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
+          </div>
+          <div class="card-val-badge">
+            <span class="badge-lbl">PREAMP</span>
+            <div class="badge-input-row">
+              <input type="number" id="preamp-num" class="badge-val-input" min="-18" max="18" step="0.1" value="0.0">
+            </div>
+          </div>
+        </div>
+
+        <div id="bands-container"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="module-box bypassed" id="mod-compander" data-module="comp">
+    <div class="module-header" onclick="toggleModuleCollapse('comp')">
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.3"/>
+            <circle cx="6" cy="2" r="1.3"/>
+            <circle cx="2" cy="7" r="1.3"/>
+            <circle cx="6" cy="7" r="1.3"/>
+            <circle cx="2" cy="12" r="1.3"/>
+            <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <span class="dragger-num">2</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-comp" onchange="toggleCompanderModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Compressor</span>
+        </div>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div class="module-grid-controls">
+        <div class="control-pod">
+          <svg id="knob-comp-thresh" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">THRESHOLD</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-thresh" class="badge-val-input" min="-60" max="0" step="0.5" value="-18">
+              <span class="badge-unit">dBFS</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-pod">
+          <svg id="knob-comp-ratio" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">RATIO</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-ratio" class="badge-val-input" min="1" max="20" step="0.1" value="4">
+              <span class="badge-unit">:1</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-pod">
+          <svg id="knob-comp-att" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">ATTACK</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-att" class="badge-val-input" min="0.1" max="200" step="0.5" value="5">
+              <span class="badge-unit">ms</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-pod">
+          <svg id="knob-comp-rel" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">RELEASE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-rel" class="badge-val-input" min="10" max="2000" step="5" value="150">
+              <span class="badge-unit">ms</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-pod">
+          <svg id="knob-comp-gain" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">MAKEUP</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-comp-gain" class="badge-val-input" min="-12" max="24" step="0.5" value="0">
+              <span class="badge-unit">dB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="module-box bypassed" id="mod-limiter" data-module="lim">
+    <div class="module-header" onclick="toggleModuleCollapse('lim')">
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.3"/>
+            <circle cx="6" cy="2" r="1.3"/>
+            <circle cx="2" cy="7" r="1.3"/>
+            <circle cx="6" cy="7" r="1.3"/>
+            <circle cx="2" cy="12" r="1.3"/>
+            <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <span class="dragger-num">3</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-lim" onchange="toggleLimiterModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Limiter</span>
+        </div>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div class="module-grid-controls">
+        <div class="control-pod">
+          <svg id="knob-lim-ceil" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">CEILING</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-lim-ceil" class="badge-val-input" min="-6" max="0" step="0.1" value="-0.5">
+              <span class="badge-unit">dBFS</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-pod">
+          <svg id="knob-lim-knee" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">KNEE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-lim-knee" class="badge-val-input" min="0" max="6" step="0.1" value="3">
+              <span class="badge-unit">dB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="module-box bypassed" id="mod-subsonic" data-module="subsonic">
+    <div class="module-header" onclick="toggleModuleCollapse('subsonic')">
+      <div class="module-header-left">
+        <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
+          <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.3"/>
+            <circle cx="6" cy="2" r="1.3"/>
+            <circle cx="2" cy="7" r="1.3"/>
+            <circle cx="6" cy="7" r="1.3"/>
+            <circle cx="2" cy="12" r="1.3"/>
+            <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <span class="dragger-num">4</span>
+        </div>
+        <div class="module-title-area">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle On/Off">
+            <input type="checkbox" id="switch-subsonic" onchange="toggleSubsonicModule(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <span class="module-title">Speakers correction</span>
+        </div>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body">
+      <div class="submodule-title">Subsonic Filter</div>
+      <div class="module-grid-controls">
+        <div class="control-pod">
+          <svg id="knob-sub-freq" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">FREQ</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-sub-freq" class="badge-val-input" min="20" max="100" step="1" value="80">
+              <span class="badge-unit">Hz</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-pod">
+          <svg id="knob-sub-order" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">SLOPE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-sub-order" class="badge-val-input" min="6" max="24" step="6" value="12">
+              <span class="badge-unit">dB</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="submodule-separator"></div>
+
+      <div class="submodule-title">Channel Correction</div>
+      <div class="module-grid-controls">
+        <div class="control-pod">
+          <svg id="knob-spk-bal" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">BALANCE</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-bal" class="badge-val-input" min="-100" max="100" step="1" value="0">
+              <span class="badge-unit">%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-pod">
+          <svg id="knob-spk-delay-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">TIME L</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-delay-l" class="badge-val-input" min="-20" max="20" step="0.1" value="0.0">
+              <span class="badge-unit">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-pod">
+          <svg id="knob-spk-delay-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">TIME R</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-delay-r" class="badge-val-input" min="-20" max="20" step="0.1" value="0.0">
+              <span class="badge-unit">ms</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-pod">
+          <svg id="knob-spk-phase-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">PHASE L</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-phase-l" class="badge-val-input" min="-180" max="180" step="45" value="0">
+              <span class="badge-unit">°</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-pod">
+          <svg id="knob-spk-phase-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+          <div class="card-val-badge">
+            <span class="badge-lbl">PHASE R</span>
+            <div class="badge-input-row">
+              <input type="number" id="num-spk-phase-r" class="badge-val-input" min="-180" max="180" step="45" value="0">
+              <span class="badge-unit">°</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div> <section class="module-box" id="mod-boot-cfg">
+    <div class="module-header" onclick="toggleModuleCollapse('boot-cfg')">
+      <div class="module-title-area">
+        <span class="module-title">Startup Effects Configuration</span>
+      </div>
+      <span class="collapse-icon">▼</span>
+    </div>
+    <div class="module-body" id="body-boot-cfg">
+      <div class="boot-cfg-container">
+        <div class="boot-cfg-mode-row">
+          <label class="boot-radio-label">
+            <input type="radio" name="boot_mode" value="last_state" id="boot-mode-last" checked onchange="updateBootConfigUI(); sendBootDefaults();">
+            <span>Restore Last Saved State on Boot</span>
+          </label>
+          <label class="boot-radio-label">
+            <input type="radio" name="boot_mode" value="custom" id="boot-mode-custom" onchange="updateBootConfigUI(); sendBootDefaults();">
+            <span>Use Configured Startup Defaults</span>
+          </label>
+        </div>
+        <div class="boot-toggles-row" id="boot-toggles-wrap" style="opacity: 0.4; pointer-events: none;">
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-eq" onchange="onBootToggleChanged()">
+            <span>Equalizer ON</span>
+          </label>
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-sub" onchange="onBootToggleChanged()">
+            <span>Speakers Correction ON</span>
+          </label>
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-comp" onchange="onBootToggleChanged()">
+            <span>Compressor ON</span>
+          </label>
+          <label class="boot-toggle-item">
+            <input type="checkbox" id="boot-def-lim" onchange="onBootToggleChanged()">
+            <span>Limiter ON</span>
+          </label>
+        </div>
+        <div class="boot-actions-row">
+          <button class="btn-primary" onclick="saveCurrentAsBootDefaults()">Save Current States as Boot Defaults</button>
+          <span class="boot-saved-indicator" id="boot-saved-indicator">Saved to Flash</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  ESP32-S3-DSP FreeRTOS WebUI
+</footer>
+
+<script>
+const FS = 44100;
+const MAX_BANDS = 10;
+const BAND_COLORS = [
+  '#BF616A', // Nord11 Red
+  '#D08770', // Nord12 Orange
+  '#EBCB8B', // Nord13 Yellow
+  '#A3BE8C', // Nord14 Green
+  '#B48EAD', // Nord15 Purple
+  '#C2677C', // Aurora Coral Rose
+  '#DB9760', // Aurora Tangerine
+  '#8CA870', // Aurora Olive Green
+  '#68B092', // Aurora Emerald
+  '#9B6FB0'  // Aurora Violet
+];
+
+function getBandColor(b, index) {
+  if (b && b.color) return b.color;
+  return BAND_COLORS[(index !== undefined ? index : 0) % BAND_COLORS.length];
+}
+
+function hexToRgb(hex) {
+  const num = parseInt(hex.replace('#', ''), 16);
+  return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+}
+
+function hexToHsl(hex) {
+  let { r, g, b } = hexToRgb(hex);
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+let eqEnabled = false;
+let eqPreamp  = 0.0;
+let currentPreset = 'flat_5';
+
+let bands = [
+  { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true, color: BAND_COLORS[0] }, // Low Shelf
+  { band: 1, freq: 500.0,   gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[1] }, // Peaking
+  { band: 2, freq: 1000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[2] }, // Peaking
+  { band: 3, freq: 4000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[3] }, // Peaking
+  { band: 4, freq: 10000.0, gain: 0.0, q: 0.707, type: 2, order: 2, enabled: true, color: BAND_COLORS[4] }  // High Shelf
+];
+
+const PRESETS = {
+  flat_5: [
+    { freq: 100.0,   gain: 0.0,  q: 0.707, type: 1, order: 2, enabled: true },
+    { freq: 500.0,   gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 10000.0, gain: 0.0,  q: 0.707, type: 2, order: 2, enabled: true }
+  ],
+  flat_10: [
+    { freq: 31.5,    gain: 0.0,  q: 1.414, type: 1, order: 2, enabled: true },
+    { freq: 63.0,    gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 125.0,   gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 250.0,   gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 500.0,   gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 2000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 8000.0,  gain: 0.0,  q: 1.414, type: 0, order: 2, enabled: true },
+    { freq: 16000.0, gain: 0.0,  q: 1.414, type: 2, order: 2, enabled: true }
+  ],
+  low_boost: [
+    { freq: 100.0,   gain: 6.0,  q: 0.707, type: 1, order: 2, enabled: true },
+    { freq: 500.0,   gain: 2.5,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: -1.0, q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 10000.0, gain: -2.0, q: 0.707, type: 2, order: 2, enabled: true }
+  ],
+  high_boost: [
+    { freq: 100.0,   gain: -2.0, q: 0.707, type: 1, order: 2, enabled: true },
+    { freq: 500.0,   gain: -1.0, q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 1000.0,  gain: 0.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 4000.0,  gain: 3.0,  q: 0.707, type: 0, order: 2, enabled: true },
+    { freq: 10000.0, gain: 6.0,  q: 0.707, type: 2, order: 2, enabled: true }
+  ]
+};
+PRESETS.flat = PRESETS.flat_5;
+
+function applyPreset(name) {
+  if (name === 'flat') name = 'flat_5';
+  if (!PRESETS[name]) return;
+  currentPreset = name;
+  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`btn-pre-${name === 'low_boost' ? 'low' : (name === 'high_boost' ? 'high' : (name === 'flat_10' ? 'flat_10' : 'flat_5'))}`);
+  if (btn) btn.classList.add('active');
+
+  bands = PRESETS[name].map((p, idx) => ({
+    band: idx,
+    freq: p.freq,
+    gain: p.gain,
+    q:    p.q,
+    type: p.type,
+    order: p.order || 2,
+    enabled: p.enabled,
+    color: BAND_COLORS[idx % BAND_COLORS.length]
+  }));
+
+  rebuildBandsUI();
+  drawResponse();
+
+  wsTx({ t: 'eq_preset', name: name });
+  bands.forEach((_, i) => sendBand(i));
+}
+
+function saveCurrentPreset() {
+  const defaultName = `Preset ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+  const name = prompt("Enter preset name:", defaultName);
+  if (!name || !name.trim()) return;
+
+  const presetData = {
+    name: name.trim(),
+    preamp: eqPreamp,
+    bands: bands.map(b => ({
+      freq: b.freq,
+      gain: b.gain,
+      q: b.q,
+      type: b.type !== undefined ? b.type : 0,
+      order: b.order !== undefined ? b.order : 2,
+      enabled: b.enabled !== undefined ? b.enabled : true
+    }))
+  };
+
+  let customPresets = [];
+  try {
+    customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
+  } catch (_) { customPresets = []; }
+
+  const existingIdx = customPresets.findIndex(p => p.name.toLowerCase() === name.trim().toLowerCase());
+  if (existingIdx >= 0) {
+    customPresets[existingIdx] = presetData;
+  } else {
+    customPresets.push(presetData);
+  }
+  localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+  renderCustomPresets();
+
+  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelector(`[data-custom-preset="${CSS.escape(name.trim())}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name.trim().replace(/[^a-zA-Z0-9_-]/g, '_')}_preset.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importPresetFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !Array.isArray(data.bands) || data.bands.length === 0) {
+        alert("Invalid preset file: missing bands data.");
+        return;
+      }
+
+      if (typeof data.preamp === 'number') {
+        eqPreamp = Math.max(-18, Math.min(18, data.preamp));
+        updatePreampUI();
+        wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+      }
+
+      bands = data.bands.slice(0, MAX_BANDS).map((b, idx) => {
+        let t = parseInt(b.type) || 0;
+        let ord = parseInt(b.order) || 2;
+        if (t === 5) { t = 3; ord = 4; }
+        else if (t === 6) { t = 4; ord = 4; }
+        return {
+          band: idx,
+          freq: parseFloat(b.freq) || 1000,
+          gain: parseFloat(b.gain) || 0,
+          q:    parseFloat(b.q) || 0.707,
+          type: t,
+          order: ord,
+          enabled: b.enabled !== undefined ? b.enabled : true
+        };
+      });
+
+      document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+
+      const presetName = data.name || file.name.replace(/\.[^/.]+$/, "");
+      let customPresets = [];
+      try {
+        customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
+      } catch (_) { customPresets = []; }
+
+      const existingIdx = customPresets.findIndex(p => p.name.toLowerCase() === presetName.toLowerCase());
+      const customEntry = { name: presetName, preamp: eqPreamp, bands: bands };
+      if (existingIdx >= 0) {
+        customPresets[existingIdx] = customEntry;
+      } else {
+        customPresets.push(customEntry);
+      }
+      localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+      renderCustomPresets();
+
+      const importedBtn = document.querySelector(`[data-custom-preset="${CSS.escape(presetName)}"]`);
+      if (importedBtn) importedBtn.classList.add('active');
+
+      rebuildBandsUI();
+      drawResponse();
+
+      bands.forEach((_, i) => sendBand(i));
+
+      event.target.value = '';
+    } catch (err) {
+      alert("Error reading preset file: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderCustomPresets() {
+  const container = document.getElementById('custom-presets-list');
+  if (!container) return;
+  container.innerHTML = '';
+
+  let customPresets = [];
+  try {
+    customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
+  } catch (_) { customPresets = []; }
+
+  customPresets.forEach((p, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-preset';
+    btn.setAttribute('data-custom-preset', p.name);
+    btn.textContent = p.name;
+    btn.title = `Apply "${p.name}" (Right-click to delete)`;
+    btn.onclick = () => {
+      document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (typeof p.preamp === 'number') {
+        eqPreamp = p.preamp;
+        updatePreampUI();
+        wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+      }
+      bands = p.bands.map((b, i) => {
+        let t = b.type || 0;
+        let ord = b.order || 2;
+        if (t === 5) { t = 3; ord = 4; }
+        else if (t === 6) { t = 4; ord = 4; }
+        return {
+          band: i,
+          freq: b.freq,
+          gain: b.gain,
+          q: b.q,
+          type: t,
+          order: ord,
+          enabled: b.enabled !== undefined ? b.enabled : true
+        };
+      });
+      rebuildBandsUI();
+      drawResponse();
+      bands.forEach((_, i) => sendBand(i));
+    };
+
+    btn.oncontextmenu = (e) => {
+      e.preventDefault();
+      if (confirm(`Delete preset "${p.name}"?`)) {
+        customPresets.splice(idx, 1);
+        localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+        renderCustomPresets();
+      }
+    };
+
+    container.appendChild(btn);
+  });
+}
+
+let isPreampDragging = false;
+
+function initPreamp() {
+  const slider = document.getElementById('preamp-slider');
+  const input  = document.getElementById('preamp-num');
+  if (!slider || !input) return;
+
+  slider.addEventListener('input', e => {
+    isPreampDragging = true;
+    eqPreamp = Math.max(-18, Math.min(18, parseFloat(e.target.value) || 0));
+    input.value = eqPreamp.toFixed(1);
+    requestDrawResponse(); // Local visual preview only while sliding!
+  });
+
+  slider.addEventListener('change', () => {
+    isPreampDragging = false;
+    wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+    requestDrawResponse(); // Apply to ESP32 on mouse release!
+  });
+
+  slider.addEventListener('dblclick', () => {
+    isPreampDragging = false;
+    eqPreamp = 0.0;
+    slider.value = 0.0;
+    input.value = "0.0";
+    wsTx({ t: 'eq_preamp', preamp: 0.0 });
+    requestDrawResponse();
+  });
+
+  input.addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (isNaN(v)) v = eqPreamp;
+    v = Math.max(-18, Math.min(18, v));
+    eqPreamp = v;
+    slider.value = v;
+    input.value = v.toFixed(1);
+    wsTx({ t: 'eq_preamp', preamp: Math.round(v * 100) / 100 });
+    requestDrawResponse();
+  });
+
+  input.addEventListener('dblclick', () => {
+    eqPreamp = 0.0;
+    slider.value = 0.0;
+    input.value = "0.0";
+    wsTx({ t: 'eq_preamp', preamp: 0.0 });
+    requestDrawResponse();
+  });
+}
+
+function updatePreampUI() {
+  const slider = document.getElementById('preamp-slider');
+  const input  = document.getElementById('preamp-num');
+  if (slider) slider.value = eqPreamp;
+  if (input)  input.value  = eqPreamp.toFixed(1);
+}
+
+let subsonicParams = {
+  enabled: false, freq: 80.0, order: 2,
+  balance: 0, delayL: 0.0, delayR: 0.0, phaseL: 0, phaseR: 0
+};
+
+let compParams = {
+  enabled: false, threshold: -18.0, ratio: 4.0,
+  attackMs: 5.0, releaseMs: 150.0, makeup: 0.0
+};
+
+let limParams = {
+  enabled: false, ceiling: -0.5, knee: 3.0
+};
+
+let bandKnobs = []; // Array of { fKnob, qKnob }
+let subsonicKnobs = {};
+let compKnobs = {};
+let limKnobs  = {};
+
+let ws = null, wsRetry = null;
+
+function wsConnect() {
+  clearTimeout(wsRetry);
+
+  if (location.protocol === 'file:') {
+    setDot('ok', 'Offline Demo');
+    return;
+  }
+
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  try {
+    ws = new WebSocket(proto + '//' + location.host + '/ws');
+    ws.onopen = () => {
+      setDot('ok', 'Connected');
+      wsTx({ t: 'getState' });
+    };
+    ws.onclose = e => {
+      console.log('[WS] Disconnected, code:', e.code, 'reason:', e.reason);
+      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting...');
+      ws = null;
+      wsRetry = setTimeout(wsConnect, 1500);
+    };
+    ws.onerror = () => {
+      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Error');
+    };
+    ws.onmessage = e => {
+      try { handleMsg(JSON.parse(e.data)); } catch (_) {}
+    };
+  } catch (e) {
+    setDot('err', 'Offline Demo');
+  }
+}
+
+function wsTx(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function setDot(cls, txt) {
+  const dot = document.getElementById('ws-dot');
+  const lbl = document.getElementById('ws-lbl');
+  if (dot) dot.className = cls;
+  if (lbl) lbl.textContent = txt;
+
+  const overlay = document.getElementById('conn-overlay');
+  if (overlay) {
+    if (location.protocol === 'file:') {
+      overlay.style.display = 'none';
+    } else {
+      overlay.style.display = (cls === 'ok') ? 'none' : 'flex';
+      const desc = document.getElementById('conn-desc');
+      if (desc) desc.textContent = (cls === 'ok') ? '' : txt;
+    }
+  }
+}
+
+function updateSysStatsUI(s) {
+  if (!s) return;
+  if (s.cpu0 !== undefined) {
+    const v = Math.min(100, Math.max(0, s.cpu0));
+    const elVal = document.getElementById('sys-val-cpu0');
+    const elBar = document.getElementById('sys-bar-cpu0');
+    if (elVal) elVal.textContent = v.toFixed(1) + '%';
+    if (elBar) {
+      elBar.style.width = v + '%';
+      elBar.style.background = v > 85 ? 'var(--nord11)' : (v > 65 ? 'var(--nord12)' : 'var(--nord10)');
+    }
+  }
+  if (s.cpu1 !== undefined) {
+    const v = Math.min(100, Math.max(0, s.cpu1));
+    const elVal = document.getElementById('sys-val-cpu1');
+    const elBar = document.getElementById('sys-bar-cpu1');
+    if (elVal) elVal.textContent = v.toFixed(1) + '%';
+    if (elBar) {
+      elBar.style.width = v + '%';
+      elBar.style.background = v > 85 ? 'var(--nord11)' : (v > 65 ? 'var(--nord12)' : 'var(--nord14)');
+    }
+  }
+  if (s.heap_t && s.heap_t > 0) {
+    const usedKb = Math.round((s.heap_u || 0) / 1024);
+    const totKb  = Math.round(s.heap_t / 1024);
+    const pct    = Math.min(100, Math.max(0, Math.round(((s.heap_u || 0) / s.heap_t) * 100)));
+    const elVal  = document.getElementById('sys-val-ram');
+    const elBar  = document.getElementById('sys-bar-ram');
+    if (elVal) elVal.textContent = `${usedKb} / ${totKb} KB (${pct}%)`;
+    if (elBar) {
+      elBar.style.width = pct + '%';
+      elBar.style.background = pct > 85 ? 'var(--nord11)' : (pct > 70 ? 'var(--nord12)' : 'var(--nord10)');
+    }
+  }
+  if (s.flash_t && s.flash_t > 0) {
+    const usedMb = ((s.flash_u || 0) / (1024 * 1024)).toFixed(2);
+    const totMb  = (s.flash_t / (1024 * 1024)).toFixed(1);
+    const pct    = Math.min(100, Math.max(0, Math.round(((s.flash_u || 0) / s.flash_t) * 100)));
+    const elVal  = document.getElementById('sys-val-flash');
+    const elBar  = document.getElementById('sys-bar-flash');
+    if (elVal) elVal.textContent = `${usedMb} / ${totMb} MB (${pct}%)`;
+    if (elBar) {
+      elBar.style.width = pct + '%';
+      elBar.style.background = pct > 90 ? 'var(--nord11)' : 'var(--nord10)';
+    }
+  }
+  if (s.wifi_ssid !== undefined) {
+    const badge = document.getElementById('wifi-cfg-cur-status');
+    if (badge) {
+      if (s.wifi_con) {
+        badge.className = 'wifi-cfg-badge';
+        badge.textContent = `Connected: ${s.wifi_ssid}`;
+      } else {
+        badge.className = 'wifi-cfg-badge ap-mode';
+        badge.textContent = s.wifi_ssid;
+      }
+    }
+  }
+}
+
+function handleMsg(d) {
+  if (d.t === 'wifi_status') {
+    const statusMsg = document.getElementById('wifi-cfg-msg');
+    const badge = document.getElementById('wifi-cfg-cur-status');
+    if (d.status === 'connected') {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg success';
+        statusMsg.innerHTML = `Connected to <strong>${d.ssid || ''}</strong>! IP: ${d.ip || ''} (<a href="http://dsp.local" target="_blank" style="color:inherit;text-decoration:underline;">http://dsp.local</a>)`;
+      }
+      if (badge) {
+        badge.className = 'wifi-cfg-badge';
+        badge.textContent = `Connected: ${d.ssid || d.ip || 'OK'}`;
+      }
+    } else if (d.status === 'failed') {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg error';
+        statusMsg.textContent = d.msg || 'Connection failed. Please check password.';
+      }
+    } else if (d.status === 'connecting') {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg';
+        statusMsg.textContent = d.msg || 'Connecting...';
+      }
+    }
+    return;
+  }
+  if (d.t === 'wifi_meta') {
+    updateWiFiStreamUI(d);
+    return;
+  }
+  if (d.t === 'sys') {
+    updateSysStatsUI(d);
+    return;
+  }
+  if (d.t !== 'state') return;
+
+  if (d.sys) {
+    updateSysStatsUI(d.sys);
+  }
+
+  if (d.eq) {
+    eqEnabled = d.eq.enabled !== undefined ? d.eq.enabled : true;
+    updateBypassUI('eq', eqEnabled);
+
+    if (d.eq.preamp !== undefined && !isPreampDragging) {
+      eqPreamp = parseFloat(d.eq.preamp) || 0.0;
+      updatePreampUI();
+    }
+
+    if (Array.isArray(d.eq.bands)) {
+      const incomingBands = d.eq.bands.map(b => {
+        let t = parseInt(b.type) || 0;
+        let ord = parseInt(b.order) || 2;
+        if (t === 5) { t = 3; ord = 4; }
+        else if (t === 6) { t = 4; ord = 4; }
+        return {
+          band: b.band,
+          freq: parseFloat(b.freq) || 1000,
+          gain: parseFloat(b.gain) || 0,
+          q:    parseFloat(b.q) || 0.707,
+          type: t,
+          order: ord,
+          enabled: b.enabled !== undefined ? b.enabled : true
+        };
+      });
+
+      const root = document.getElementById('bands-container');
+      const needsFullRebuild = (incomingBands.length !== bands.length) || (root && root.children.length === 0);
+
+      if (needsFullRebuild) {
+        bands = incomingBands;
+        rebuildBandsUI();
+      } else {
+        incomingBands.forEach((b, idx) => {
+          if (bands[idx]) {
+            bands[idx].type = b.type;
+            bands[idx].order = b.order;
+            bands[idx].enabled = b.enabled;
+            const isDraggingThis = (activeGainSliderBand === idx) || (bandKnobs[idx] && ((bandKnobs[idx].fKnob && bandKnobs[idx].fKnob._drag) || (bandKnobs[idx].qKnob && bandKnobs[idx].qKnob._drag)));
+            if (!isDraggingThis) {
+              bands[idx].freq = b.freq;
+              bands[idx].gain = b.gain;
+              bands[idx].q = b.q;
+            }
+            syncBandCardUI(idx);
+          }
+        });
+      }
+    }
+  }
+
+  if (d.subsonic) {
+    Object.assign(subsonicParams, d.subsonic);
+    updateBypassUI('subsonic', subsonicParams.enabled);
+    syncSubsonicUI();
+  }
+
+  if (d.compander) {
+    Object.assign(compParams, d.compander);
+    updateBypassUI('comp', compParams.enabled);
+    syncCompanderUI();
+  }
+
+  if (d.limiter) {
+    Object.assign(limParams, d.limiter);
+    updateBypassUI('lim', limParams.enabled);
+    syncLimiterUI();
+  }
+
+  if (d.input) {
+    if (d.input.source !== undefined) {
+      selectedInputSource = parseInt(d.input.source) || 1;
+    }
+    if (d.input.active !== undefined) {
+      activeInputSource = parseInt(d.input.active) || 1;
+    }
+    updateInputSourceUI();
+  }
+
+  if (d.wifi_stream) {
+    updateWiFiStreamUI(d.wifi_stream);
+  }
+
+  if (d.boot_defaults) {
+    const isCustom = !!d.boot_defaults.custom;
+    const rLast = document.getElementById('boot-mode-last');
+    const rCust = document.getElementById('boot-mode-custom');
+    if (rLast) rLast.checked = !isCustom;
+    if (rCust) rCust.checked = isCustom;
+
+    const bEq = document.getElementById('boot-def-eq');
+    const bSub = document.getElementById('boot-def-sub');
+    const bComp = document.getElementById('boot-def-comp');
+    const bLim = document.getElementById('boot-def-lim');
+    if (bEq) bEq.checked = !!d.boot_defaults.eq;
+    if (bSub) bSub.checked = !!(d.boot_defaults.sub || d.boot_defaults.subsonic);
+    if (bComp) bComp.checked = !!d.boot_defaults.comp;
+    if (bLim) bLim.checked = !!d.boot_defaults.lim;
+    updateBootConfigUI();
+  }
+
+  if (d.module_order && !isDraggingModule) {
+    applyModuleOrder(d.module_order);
+  }
+
+  drawResponse();
+}
+
+function updateBootConfigUI() {
+  const isCustom = document.getElementById('boot-mode-custom')?.checked;
+  const wrap = document.getElementById('boot-toggles-wrap');
+  if (wrap) {
+    wrap.style.opacity = isCustom ? '1' : '0.4';
+    wrap.style.pointerEvents = isCustom ? 'auto' : 'none';
+  }
+}
+
+function onBootToggleChanged() {
+  const rCust = document.getElementById('boot-mode-custom');
+  if (rCust && !rCust.checked) {
+    rCust.checked = true;
+    updateBootConfigUI();
+  }
+  sendBootDefaults();
+}
+
+function sendBootDefaults() {
+  const isCustom = document.getElementById('boot-mode-custom')?.checked || false;
+  const eqOn = document.getElementById('boot-def-eq')?.checked || false;
+  const subOn = document.getElementById('boot-def-sub')?.checked || false;
+  const compOn = document.getElementById('boot-def-comp')?.checked || false;
+  const limOn = document.getElementById('boot-def-lim')?.checked || false;
+
+  wsTx({
+    t: 'boot_defaults',
+    custom: isCustom,
+    eq: eqOn,
+    sub: subOn,
+    subsonic: subOn,
+    comp: compOn,
+    lim: limOn
+  });
+
+  const ind = document.getElementById('boot-saved-indicator');
+  if (ind) {
+    ind.classList.add('visible');
+    setTimeout(() => ind.classList.remove('visible'), 2000);
+  }
+}
+
+function saveCurrentAsBootDefaults() {
+  const rCust = document.getElementById('boot-mode-custom');
+  if (rCust) rCust.checked = true;
+
+  const bEq = document.getElementById('boot-def-eq');
+  const bSub = document.getElementById('boot-def-sub');
+  const bComp = document.getElementById('boot-def-comp');
+  const bLim = document.getElementById('boot-def-lim');
+  if (bEq) bEq.checked = !!eqEnabled;
+  if (bSub) bSub.checked = !!(subsonicParams && subsonicParams.enabled);
+  if (bComp) bComp.checked = !!(compParams && compParams.enabled);
+  if (bLim) bLim.checked = !!(limParams && limParams.enabled);
+
+  updateBootConfigUI();
+  sendBootDefaults();
+}
+
+let isDraggingModule = false;
+let draggedModuleBox = null;
+let lastSentModuleOrder = '';
+
+function getCurrentModuleOrder() {
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return [];
+  return [...container.querySelectorAll('.module-box[data-module]')].map(el => el.getAttribute('data-module')).filter(Boolean);
+}
+
+function updateDraggerNumbers() {
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return;
+  const modules = container.querySelectorAll('.module-box[data-module]');
+  modules.forEach((mod, idx) => {
+    const numEl = mod.querySelector('.dragger-num');
+    if (numEl) numEl.textContent = (idx + 1);
+  });
+}
+
+function getDragAfterElement(container, y) {
+  const draggableElements = [...container.querySelectorAll('.module-box[data-module]:not(.dragging)')];
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function initModuleReordering() {
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return;
+
+  const draggers = container.querySelectorAll('.module-dragger');
+  draggers.forEach(dragger => {
+    dragger.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const box = dragger.closest('.module-box');
+      if (!box) return;
+
+      isDraggingModule = true;
+      draggedModuleBox = box;
+      box.classList.add('dragging');
+
+      const indicator = document.createElement('div');
+      indicator.className = 'module-drop-indicator';
+      container.appendChild(indicator);
+
+      let currentAfterElement = box.nextElementSibling;
+      const updateIndicator = (afterEl) => {
+        const cRect = container.getBoundingClientRect();
+        if (afterEl) {
+          const elRect = afterEl.getBoundingClientRect();
+          indicator.style.top = (elRect.top - cRect.top - 8 - 2) + 'px';
+        } else {
+          const remainingBoxes = container.querySelectorAll('.module-box[data-module]:not(.dragging)');
+          if (remainingBoxes.length > 0) {
+            const lastBox = remainingBoxes[remainingBoxes.length - 1];
+            const elRect = lastBox.getBoundingClientRect();
+            indicator.style.top = (elRect.bottom - cRect.top + 8 - 2) + 'px';
+          }
+        }
+      };
+      updateIndicator(currentAfterElement);
+
+      const rect = box.getBoundingClientRect();
+      const grabOffsetX = e.clientX - rect.left;
+      const grabOffsetY = e.clientY - rect.top;
+
+      const ghost = box.cloneNode(true);
+      ghost.classList.add('module-drag-ghost');
+      ghost.classList.remove('dragging');
+      const ghostBody = ghost.querySelector('.module-body');
+      if (ghostBody) ghostBody.remove();
+      ghost.style.left = (e.clientX - grabOffsetX) + 'px';
+      ghost.style.top = (e.clientY - grabOffsetY) + 'px';
+      ghost.style.width = rect.width + 'px';
+      document.body.appendChild(ghost);
+
+      try {
+        dragger.setPointerCapture(e.pointerId);
+      } catch (_) {}
+
+      const onPointerMove = (ev) => {
+        if (!isDraggingModule || !draggedModuleBox) return;
+        ev.preventDefault();
+
+        ghost.style.left = (ev.clientX - grabOffsetX) + 'px';
+        ghost.style.top = (ev.clientY - grabOffsetY) + 'px';
+
+        if (ev.clientY < 70) {
+          window.scrollBy({ top: -8, behavior: 'auto' });
+        } else if (ev.clientY > window.innerHeight - 70) {
+          window.scrollBy({ top: 8, behavior: 'auto' });
+        }
+
+        const afterElement = getDragAfterElement(container, ev.clientY);
+        currentAfterElement = afterElement;
+        updateIndicator(afterElement);
+      };
+
+      const onPointerUp = (ev) => {
+        if (!isDraggingModule) return;
+        isDraggingModule = false;
+
+        try {
+          dragger.releasePointerCapture(ev.pointerId);
+        } catch (_) {}
+
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        dragger.removeEventListener('pointermove', onPointerMove);
+        dragger.removeEventListener('pointerup', onPointerUp);
+        dragger.removeEventListener('pointercancel', onPointerUp);
+
+        ghost.remove();
+        indicator.remove();
+
+        if (currentAfterElement) {
+          container.insertBefore(draggedModuleBox, currentAfterElement);
+        } else {
+          container.appendChild(draggedModuleBox);
+        }
+
+        if (draggedModuleBox) {
+          draggedModuleBox.classList.remove('dragging');
+          draggedModuleBox = null;
+        }
+
+        updateDraggerNumbers();
+
+        const order = getCurrentModuleOrder();
+        const orderStr = order.join(',');
+        if (orderStr && orderStr !== lastSentModuleOrder) {
+          lastSentModuleOrder = orderStr;
+          wsTx({ t: 'module_order', order: order });
+        }
+      };
+
+      dragger.addEventListener('pointermove', onPointerMove);
+      dragger.addEventListener('pointerup', onPointerUp);
+      dragger.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+    });
+  });
+}
+
+function applyModuleOrder(orderList) {
+  if (!orderList) return;
+  if (typeof orderList === 'string') {
+    orderList = orderList.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(orderList) || orderList.length === 0) return;
+  const container = document.getElementById('dsp-modules-container');
+  if (!container) return;
+
+  orderList.forEach(id => {
+    const el = container.querySelector(`[data-module="${id}"]`);
+    if (el) container.appendChild(el);
+  });
+
+  updateDraggerNumbers();
+  lastSentModuleOrder = getCurrentModuleOrder().join(',');
+}
+
+let selectedInputSource = 1; // 1: AUX, 2: BT, 3: WIFI
+let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
+
+function setInputSource(src) {
+  selectedInputSource = src;
+  activeInputSource = src;
+  updateInputSourceUI();
+  wsTx({ t: 'input_source', source: src });
+}
+
+function updateInputSourceUI() {
+  const isAux  = (selectedInputSource === 1);
+  const isBt   = (selectedInputSource === 2);
+  const isWifi = (selectedInputSource === 3);
+
+  const btnAux  = document.getElementById('btn-src-1');
+  const btnBt   = document.getElementById('btn-src-2');
+  const btnWifi = document.getElementById('btn-src-3');
+
+  if (btnAux)  btnAux.classList.toggle('active', isAux);
+  if (btnBt)   btnBt.classList.toggle('active', isBt);
+  if (btnWifi) btnWifi.classList.toggle('active', isWifi);
+
+  const b1 = document.getElementById('badge-src-1');
+  const b2 = document.getElementById('badge-src-2');
+  const b3 = document.getElementById('badge-src-3');
+  if (b1) b1.textContent = isAux ? 'ACTIVE' : 'STANDBY';
+  if (b2) b2.textContent = isBt ? 'ACTIVE' : 'STANDBY';
+  if (b3) b3.textContent = isWifi ? 'ACTIVE' : 'STANDBY';
+
+  updateWiFiModuleVisibility();
+}
+
+function updateWiFiModuleVisibility() {
+  const wfMod = document.getElementById('mod-wifi-meta');
+  if (wfMod) {
+    const isWifi = (selectedInputSource === 3);
+    wfMod.style.display = isWifi ? 'block' : 'none';
+  }
+}
+
+function updateWiFiStreamUI(wf) {
+  if (!wf) return;
+  const dotEl    = document.getElementById('wifi-status-dot');
+  const textEl   = document.getElementById('wifi-status-text');
+  const serverEl = document.getElementById('wifi-server-val');
+  const formatEl = document.getElementById('wifi-format-val');
+  const stateEl  = document.getElementById('wifi-state-val');
+
+  if (wf.connected) {
+    if (dotEl) {
+      dotEl.style.backgroundColor = wf.streaming ? 'var(--nord14)' : 'var(--nord10)';
+      dotEl.style.borderColor = wf.streaming ? 'var(--nord14)' : 'var(--nord10)';
+    }
+    if (textEl) textEl.textContent = wf.streaming ? (wf.paused ? 'PAUSED' : 'STREAMING') : 'CONNECTED';
+    if (serverEl) serverEl.textContent = wf.server || wf.server_ip || 'Connected';
+  } else {
+    if (dotEl) {
+      dotEl.style.backgroundColor = 'var(--muted)';
+      dotEl.style.borderColor = 'var(--muted)';
+    }
+    if (textEl) textEl.textContent = 'SEARCHING';
+    if (serverEl) serverEl.textContent = 'Searching for server...';
+  }
+
+  if (formatEl && wf.format) formatEl.textContent = wf.format;
+  if (stateEl) {
+    if (wf.streaming) {
+      stateEl.textContent = wf.paused ? 'Paused' : 'Playing Stream';
+    } else if (wf.connected) {
+      stateEl.textContent = 'Ready (Idle)';
+    } else {
+      stateEl.textContent = 'Listening on Port 3483';
+    }
+  }
+}
+
+function polarToCartesian(cx, cy, r, angleInRad) {
+  return {
+    x: cx + r * Math.cos(angleInRad),
+    y: cy + r * Math.sin(angleInRad)
+  };
+}
+
+function describeArc(cx, cy, r, startAngle, endAngle) {
+  let diff = endAngle - startAngle;
+  if (diff <= 0.001) return '';
+  const start = polarToCartesian(cx, cy, r, startAngle);
+  const end   = polarToCartesian(cx, cy, r, endAngle);
+  const largeArcFlag = diff > Math.PI ? 1 : 0;
+  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
+}
+
+class Knob {
+  constructor(el, opts) {
+    if (!el) return;
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    let svg;
+    if (el.tagName.toLowerCase() === 'svg') {
+      svg = el;
+    } else {
+      svg = document.createElementNS(svgNS, 'svg');
+      if (el.id) svg.id = el.id;
+      if (el.className) svg.setAttribute('class', el.className);
+      const w = el.getAttribute('width') || el.clientWidth || 54;
+      const h = el.getAttribute('height') || el.clientHeight || 54;
+      svg.setAttribute('width', w);
+      svg.setAttribute('height', h);
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+      if (el.parentNode) el.parentNode.replaceChild(svg, el);
+    }
+    this.el = svg;
+
+    Object.assign(this, {
+      min: 0,
+      max: 100,
+      step: null,
+      value: 0,
+      defaultVal: undefined,
+      unit: '',
+      color: '#5E81AC',
+      decimals: 1,
+      centerZero: false,
+      logScale: false,
+      onSlide: null,
+      onChange: null,
+      onApply: null,
+      onEnd: null
+    }, opts);
+
+    if (this.defaultVal === undefined) {
+      this.defaultVal = this.centerZero ? 0 : this.min;
+    }
+
+    const W = parseFloat(svg.getAttribute('width')) || 54;
+    const H = parseFloat(svg.getAttribute('height')) || 54;
+    this.W = W;
+    this.H = H;
+    this.cx = W / 2;
+    this.cy = H / 2;
+    this.R = Math.min(W, H) / 2 - 1.5;
+    this.rDisc = this.R - 1.5;
+
+    svg.innerHTML = `
+      <circle class="knob-disc" cx="${this.cx}" cy="${this.cy}" r="${this.rDisc}" fill="#2E3440" stroke="#434C5E" stroke-width="1.5"/>
+      <line class="knob-notch" stroke="#ECEFF4" stroke-width="2.8" stroke-linecap="round"/>
+    `;
+
+    this._notchEl = svg.querySelector('.knob-notch');
+
+    this.SA  = Math.PI * 0.75;
+    this.SWP = Math.PI * 1.5;
+
+    this._drag = false;
+    this._y0   = 0;
+    this._v0   = 0;
+
+    this._onMove = (e) => {
+      if (!this._drag) return;
+      this._mm(e.clientY, e.shiftKey);
+    };
+
+    this._onUp = () => {
+      if (!this._drag) return;
+      this._drag = false;
+      window.removeEventListener('mousemove', this._onMove);
+      window.removeEventListener('mouseup', this._onUp);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    };
+
+    this._onTouchMove = (e) => {
+      if (!this._drag) return;
+      e.preventDefault();
+      this._mm(e.touches[0].clientY, false);
+    };
+
+    this._onTouchEnd = () => {
+      if (!this._drag) return;
+      this._drag = false;
+      window.removeEventListener('touchmove', this._onTouchMove);
+      window.removeEventListener('touchend', this._onTouchEnd);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    };
+
+    svg.addEventListener('mousedown', e => {
+      this._md(e.clientY);
+      window.addEventListener('mousemove', this._onMove, { passive: true });
+      window.addEventListener('mouseup', this._onUp);
+    });
+
+    svg.addEventListener('dblclick', () => {
+      this.set(this.defaultVal, true);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    });
+
+    svg.addEventListener('wheel', e => {
+      e.preventDefault();
+      if (this.step && this.step > 0) {
+        this.set(this.value - Math.sign(e.deltaY) * this.step, true);
+      } else if (this.logScale) {
+        const factor = Math.pow(1.025, -Math.sign(e.deltaY));
+        this.set(this.value * factor, true);
+      } else {
+        const step = (this.max - this.min) / 100;
+        this.set(this.value - Math.sign(e.deltaY) * step, true);
+      }
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    }, { passive: false });
+
+    svg.addEventListener('touchstart', e => {
+      e.preventDefault();
+      this._md(e.touches[0].clientY);
+      window.addEventListener('touchmove', this._onTouchMove, { passive: false });
+      window.addEventListener('touchend', this._onTouchEnd);
+    }, { passive: false });
+
+    this.draw();
+  }
+
+  configure(opts) {
+    Object.assign(this, opts);
+    if (this.defaultVal === undefined) {
+      this.defaultVal = this.centerZero ? 0 : this.min;
+    }
+    this.set(this.value, false);
+    return this;
+  }
+
+  _md(y) {
+    this._drag = true;
+    this._y0 = y;
+    this._v0 = this.value;
+  }
+
+  _mm(y, fineTune = false) {
+    if (!this._drag) return;
+    const dy = this._y0 - y;
+    if (this.logScale) {
+      const sens = fineTune ? 1500 : 500;
+      const range = Math.log(this.max / this.min);
+      const curT  = Math.log(this._v0 / this.min) / range;
+      const newT  = Math.max(0, Math.min(1, curT + dy / sens));
+      this.set(this.min * Math.exp(newT * range), true);
+    } else if (this.step && this.step > 0) {
+      const sens = 120;
+      const range = this.max - this.min;
+      const rawV = this._v0 + dy * range / sens;
+      const stepped = Math.round((rawV - this.min) / this.step) * this.step + this.min;
+      this.set(stepped, true);
+    } else {
+      const sens = fineTune ? 500 : 180;
+      const range = this.max - this.min;
+      this.set(this._v0 + dy * range / sens, true);
+    }
+  }
+
+  set(v, isSlide = false) {
+    let clamped = Math.max(this.min, Math.min(this.max, v));
+    if (this.step && this.step > 0) {
+      clamped = Math.round((clamped - this.min) / this.step) * this.step + this.min;
+    }
+    this.value = +clamped.toFixed(this.decimals + 1);
+    this.draw();
+    if (isSlide) {
+      if (this.onSlide) this.onSlide(this.value);
+      else if (this.onChange) this.onChange(this.value);
+    }
+    return this;
+  }
+
+  setQuiet(v) {
+    if (this._drag) return this;
+    let clamped = Math.max(this.min, Math.min(this.max, v));
+    if (this.step && this.step > 0) {
+      clamped = Math.round((clamped - this.min) / this.step) * this.step + this.min;
+    }
+    this.value = +clamped.toFixed(this.decimals + 1);
+    this.draw();
+    return this;
+  }
+
+  draw() {
+    let t = 0;
+    if (this.logScale) {
+      t = Math.log(this.value / this.min) / Math.log(this.max / this.min);
+    } else {
+      t = (this.value - this.min) / (this.max - this.min);
+    }
+    t = Math.max(0, Math.min(1, t));
+
+    const vA = this.SA + t * this.SWP;
+
+    const notchR1 = Math.max(2, this.rDisc - 13);
+    const notchR2 = Math.max(4, this.rDisc - 2);
+    const x1 = this.cx + notchR1 * Math.cos(vA);
+    const y1 = this.cy + notchR1 * Math.sin(vA);
+    const x2 = this.cx + notchR2 * Math.cos(vA);
+    const y2 = this.cy + notchR2 * Math.sin(vA);
+    if (this._notchEl) {
+      this._notchEl.setAttribute('x1', x1.toFixed(2));
+      this._notchEl.setAttribute('y1', y1.toFixed(2));
+      this._notchEl.setAttribute('x2', x2.toFixed(2));
+      this._notchEl.setAttribute('y2', y2.toFixed(2));
+    }
+  }
+}
+
+const fCanvas = document.getElementById('freq-canvas');
+const fCtx    = fCanvas.getContext('2d');
+const DB_MAX  = 18;
+const F0 = 20, F1 = 20000;
+const NPTS = 500;
+
+function f2x(f, W) {
+  return Math.log10(f / F0) / Math.log10(F1 / F0) * W;
+}
+function db2y(db, H) {
+  return H * (0.5 - db / (2 * DB_MAX));
+}
+
+function singleBiquadMag(type, freq, gain, q, f) {
+  const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
+  const safeQ = Math.max(0.05, q);
+  const w0 = 2 * Math.PI * safeFreq / FS;
+  const cw0 = Math.cos(w0), sw0 = Math.sin(w0);
+  const al = sw0 / (2 * safeQ);
+
+  let b0 = 1, b1 = 0, b2 = 0;
+  let a0 = 1, a1 = 0, a2 = 0;
+
+  switch (type) {
+    case 1: { // Low Shelf
+      const A = Math.pow(10, gain / 40);
+      const twoSqrtAAlpha = 2 * Math.sqrt(A) * al;
+      b0 =    A * ((A + 1) - (A - 1) * cw0 + twoSqrtAAlpha);
+      b1 =  2*A * ((A - 1) - (A + 1) * cw0);
+      b2 =    A * ((A + 1) - (A - 1) * cw0 - twoSqrtAAlpha);
+      a0 =         (A + 1) + (A - 1) * cw0 + twoSqrtAAlpha;
+      a1 =   -2 * ((A - 1) + (A + 1) * cw0);
+      a2 =         (A + 1) + (A - 1) * cw0 - twoSqrtAAlpha;
+      break;
+    }
+    case 2: { // High Shelf
+      const A = Math.pow(10, gain / 40);
+      const twoSqrtAAlpha = 2 * Math.sqrt(A) * al;
+      b0 =    A * ((A + 1) + (A - 1) * cw0 + twoSqrtAAlpha);
+      b1 = -2*A * ((A - 1) + (A + 1) * cw0);
+      b2 =    A * ((A + 1) + (A - 1) * cw0 - twoSqrtAAlpha);
+      a0 =         (A + 1) - (A - 1) * cw0 + twoSqrtAAlpha;
+      a1 =    2 * ((A - 1) - (A + 1) * cw0);
+      a2 =         (A + 1) - (A - 1) * cw0 - twoSqrtAAlpha;
+      break;
+    }
+    case 3: { // Low Pass
+      b0 = (1 - cw0) * 0.5;
+      b1 =  1 - cw0;
+      b2 = (1 - cw0) * 0.5;
+      a0 =  1 + al;
+      a1 = -2 * cw0;
+      a2 =  1 - al;
+      break;
+    }
+    case 4: { // High Pass
+      b0 =  (1 + cw0) * 0.5;
+      b1 = -(1 + cw0);
+      b2 =  (1 + cw0) * 0.5;
+      a0 =  1 + al;
+      a1 = -2 * cw0;
+      a2 =  1 - al;
+      break;
+    }
+    case 0: // Peaking
+    default: {
+      const A = Math.pow(10, gain / 40);
+      b0 =  1 + al * A;
+      b1 = -2 * cw0;
+      b2 =  1 - al * A;
+      a0 =  1 + al / A;
+      a1 = -2 * cw0;
+      a2 =  1 - al / A;
+      break;
+    }
+  }
+
+  const invA0 = Math.abs(a0) > 1e-12 ? 1 / a0 : 1;
+  const B0 = b0 * invA0, B1 = b1 * invA0, B2 = b2 * invA0;
+  const A1 = a1 * invA0, A2 = a2 * invA0;
+
+  const w  = 2 * Math.PI * f / FS;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const c2 = Math.cos(2 * w), s2 = Math.sin(2 * w);
+
+  const nRe = B0 + B1 * c1 + B2 * c2,  nIm = -B1 * s1 - B2 * s2;
+  const dRe = 1  + A1 * c1 + A2 * c2,  dIm = -A1 * s1 - A2 * s2;
+  const dM2 = dRe * dRe + dIm * dIm;
+  if (dM2 < 1e-20) return -120;
+  return 10 * Math.log10((nRe * nRe + nIm * nIm) / dM2 + 1e-12);
+}
+
+function eval1stOrderLP(freq, f) {
+  const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
+  const w0 = 2 * Math.PI * safeFreq / FS;
+  const K = Math.tan(w0 * 0.5);
+  const b0 = K / (1 + K);
+  const a1 = (K - 1) / (1 + K);
+  const w = 2 * Math.PI * f / FS;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const nRe = b0 + b0 * c1, nIm = -b0 * s1;
+  const dRe = 1 + a1 * c1,  dIm = -a1 * s1;
+  const dM2 = dRe * dRe + dIm * dIm;
+  if (dM2 < 1e-20) return -120;
+  return 10 * Math.log10((nRe * nRe + nIm * nIm) / dM2 + 1e-12);
+}
+
+function eval1stOrderHP(freq, f) {
+  const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
+  const w0 = 2 * Math.PI * safeFreq / FS;
+  const K = Math.tan(w0 * 0.5);
+  const b0 = 1 / (1 + K);
+  const a1 = (K - 1) / (1 + K);
+  const w = 2 * Math.PI * f / FS;
+  const c1 = Math.cos(w), s1 = Math.sin(w);
+  const nRe = b0 - b0 * c1, nIm = b0 * s1;
+  const dRe = 1 + a1 * c1,  dIm = -a1 * s1;
+  const dM2 = dRe * dRe + dIm * dIm;
+  if (dM2 < 1e-20) return -120;
+  return 10 * Math.log10((nRe * nRe + nIm * nIm) / dM2 + 1e-12);
+}
+
+function bandMagAt(b, f) {
+  if (!b.enabled) return 0;
+  let type  = b.type || 0;
+  let order = b.order || 2;
+  if (type === 5) { type = 3; order = 4; }
+  else if (type === 6) { type = 4; order = 4; }
+
+  if ((type === 0 || type === 1 || type === 2) && Math.abs(b.gain) < 0.001) return 0;
+
+  if (type === 3) { // Low Pass
+    if (order === 1) {
+      return Math.max(-60, Math.min(30, eval1stOrderLP(b.freq, f)));
+    }
+    if (order === 3) {
+      const m = eval1stOrderLP(b.freq, f) + singleBiquadMag(3, b.freq, 0, 1.0, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    if (order === 4) {
+      const m = singleBiquadMag(3, b.freq, 0, 1.30656296, f) + singleBiquadMag(3, b.freq, 0, 0.5411961, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    const m = singleBiquadMag(3, b.freq, 0, b.q, f);
+    return Math.max(-60, Math.min(30, m));
+  }
+
+  if (type === 4) { // High Pass
+    if (order === 1) {
+      return Math.max(-60, Math.min(30, eval1stOrderHP(b.freq, f)));
+    }
+    if (order === 3) {
+      const m = eval1stOrderHP(b.freq, f) + singleBiquadMag(4, b.freq, 0, 1.0, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    if (order === 4) {
+      const m = singleBiquadMag(4, b.freq, 0, 1.30656296, f) + singleBiquadMag(4, b.freq, 0, 0.5411961, f);
+      return Math.max(-60, Math.min(30, m));
+    }
+    const m = singleBiquadMag(4, b.freq, 0, b.q, f);
+    return Math.max(-60, Math.min(30, m));
+  }
+
+  const m = singleBiquadMag(type, b.freq, b.gain, b.q, f);
+  return Math.max(-60, Math.min(30, m));
+}
+
+function totalMagAt(f) {
+  return eqPreamp + bands.reduce((s, b) => s + bandMagAt(b, f), 0);
+}
+
+let drawResponseRafId = null;
+function requestDrawResponse() {
+  if (drawResponseRafId) return;
+  drawResponseRafId = requestAnimationFrame(() => {
+    drawResponseRafId = null;
+    drawResponse();
+  });
+}
+
+function drawResponse() {
+  const rect = fCanvas.getBoundingClientRect();
+  const DPR  = window.devicePixelRatio || 1;
+  const W    = Math.round(rect.width * DPR);
+  const H    = Math.round(rect.height * DPR);
+  if (fCanvas.width !== W || fCanvas.height !== H) {
+    fCanvas.width  = W;
+    fCanvas.height = H;
+  }
+  const c    = fCtx;
+
+  c.clearRect(0, 0, W, H);
+
+  c.fillStyle = '#FFFFFF';
+  c.fillRect(0, 0, W, H);
+
+  [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
+    const y = db2y(db, H);
+    c.beginPath();
+    c.moveTo(0, y);
+    c.lineTo(W, y);
+    c.strokeStyle = db === 0 ? '#4C566A' : '#E5E9F0';
+    c.lineWidth   = db === 0 ? 1.5 * DPR : 1 * DPR;
+    c.stroke();
+  });
+
+  [50, 100, 200, 500, 1000, 2000, 5000, 10000].forEach(f => {
+    const x = f2x(f, W);
+    c.beginPath();
+    c.moveTo(x, 0);
+    c.lineTo(x, H);
+    c.strokeStyle = '#E5E9F0';
+    c.lineWidth   = 1 * DPR;
+    c.stroke();
+
+    const lbl = f >= 1000 ? (f / 1000) + 'k' : String(f);
+    c.font = `600 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
+    c.fillStyle = '#718096';
+    c.textAlign = 'center';
+    c.textBaseline = 'bottom';
+    c.fillText(lbl, x, H - 4 * DPR);
+  });
+
+  const zY = db2y(0, H);
+
+  // Per-band filled areas between band curve and 0dB line
+  bands.forEach((b, i) => {
+    if (!b.enabled) return;
+    const isShelfOrPeak = (b.type === 0 || b.type === 1 || b.type === 2 || b.type === undefined);
+    if (isShelfOrPeak && Math.abs(b.gain) < 0.1) return;
+
+    const bandColor = getBandColor(b, i);
+    const rgb = hexToRgb(bandColor);
+
+    const bPts = [];
+    for (let k = 0; k <= NPTS; k++) {
+      const f = F0 * Math.pow(F1 / F0, k / NPTS);
+      const x = f2x(f, W), y = db2y(bandMagAt(b, f), H);
+      bPts.push({ x, y });
+    }
+
+    // Fill area between curve and 0dB line with band color
+    c.beginPath();
+    c.moveTo(bPts[0].x, zY);
+    bPts.forEach(p => c.lineTo(p.x, p.y));
+    c.lineTo(bPts[bPts.length - 1].x, zY);
+    c.closePath();
+    c.fillStyle = eqEnabled ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)` : 'rgba(160, 174, 192, 0.08)';
+    c.fill();
+
+    // Outline stroke for individual band curve
+    c.beginPath();
+    bPts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
+    c.strokeStyle = eqEnabled ? (bandColor + 'B0') : '#CBD5E1';
+    c.lineWidth   = 1.5 * DPR;
+    c.stroke();
+  });
+
+  const pts = [];
+  for (let k = 0; k <= NPTS; k++) {
+    const f = F0 * Math.pow(F1 / F0, k / NPTS);
+    pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
+  }
+
+  // Draw overall total EQ composite response line
+  c.beginPath();
+  pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
+  c.strokeStyle = eqEnabled ? '#000000' : '#718096';
+  c.lineWidth   = 3.5 * DPR;
+  c.lineJoin    = 'round';
+  c.stroke();
+
+  bands.forEach((b, i) => {
+    const x = f2x(b.freq, W);
+    const y = db2y(totalMagAt(b.freq), H);
+    const bandColor = getBandColor(b, i);
+    c.beginPath();
+    c.arc(x, y, 4.5 * DPR, 0, Math.PI * 2);
+    if (eqEnabled) {
+      c.fillStyle   = b.enabled ? bandColor : '#A0AEC0';
+      c.strokeStyle = '#2E3440';
+    } else {
+      c.fillStyle   = b.enabled ? '#718096' : '#CBD5E1';
+      c.strokeStyle = '#4C566A';
+    }
+    c.lineWidth   = 1.5 * DPR;
+    c.fill();
+    c.stroke();
+  });
+
+  [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
+    if (db === -18 || db === 18) return;
+    const y = db2y(db, H);
+    let txt;
+    if (db === 0) {
+      txt = '  0';
+    } else if (Math.abs(db) < 10) {
+      txt = (db > 0 ? ' +' : ' -') + Math.abs(db);
+    } else {
+      txt = (db > 0 ? '+' : '') + db;
+    }
+    c.save();
+    c.font = `700 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+
+    const tw = c.measureText(txt).width;
+    const px = 5 * DPR;
+    const py = y - 7 * DPR;
+    const pw = tw + 8 * DPR;
+    const ph = 14 * DPR;
+
+    c.fillStyle = 'rgba(255, 255, 255, 0.94)';
+    c.beginPath();
+    c.rect(px, py, pw, ph);
+    c.fill();
+    c.strokeStyle = db === 0 ? '#4C566A' : '#D8DEE9';
+    c.lineWidth   = 1 * DPR;
+    c.stroke();
+
+    c.fillStyle = db === 0 ? '#2E3440' : '#4C566A';
+    c.fillText(txt, px + 4 * DPR, y);
+    c.restore();
+  });
+}
+
+new ResizeObserver(drawResponse).observe(fCanvas);
+
+// ---- Interactive EQ graph points: left-drag = freq/gain, middle-drag = Q/slope, right-click = menu ----
+const graphTip = document.createElement('div');
+graphTip.id = 'graph-tip';
+document.getElementById('canvas-wrap').appendChild(graphTip);
+
+const graphMenu = document.createElement('div');
+graphMenu.id = 'graph-band-menu';
+document.body.appendChild(graphMenu);
+
+function y2db(y, H) { return (0.5 - y / H) * 2 * DB_MAX; }
+function x2f(x, W)  { return F0 * Math.pow(F1 / F0, Math.max(0, Math.min(1, x / W))); }
+
+function graphHitBand(px, py) {
+  const rect = fCanvas.getBoundingClientRect();
+  let best = -1, bestD = 14 * 14;
+  bands.forEach((b, i) => {
+    const x = f2x(b.freq, rect.width);
+    const y = db2y(totalMagAt(b.freq), rect.height);
+    const d = (x - px) * (x - px) + (y - py) * (y - py);
+    if (d <= bestD) { bestD = d; best = i; }
+  });
+  return best;
+}
+
+function graphFmtFreq(f) { return f >= 1000 ? (f / 1000).toFixed(2) + ' kHz' : Math.round(f) + ' Hz'; }
+
+function showGraphTip(i, px, py) {
+  const b = bands[i];
+  if (!b) return;
+  const isPass = (b.type === 3 || b.type === 4);
+  let txt = graphFmtFreq(b.freq);
+  if (!isPass) txt += '  ' + (b.gain >= 0 ? '+' : '') + b.gain.toFixed(1) + ' dB';
+  txt += isPass ? '  ' + (b.order || 2) * 6 + ' dB/oct' : '  Q ' + b.q.toFixed(2);
+  graphTip.textContent = txt;
+  graphTip.style.display = 'block';
+  const w = fCanvas.getBoundingClientRect().width;
+  graphTip.style.left = Math.max(4, Math.min(w - graphTip.offsetWidth - 4, px + 14)) + 'px';
+  graphTip.style.top = Math.max(4, py - 30) + 'px';
+}
+
+function closeGraphMenu() { graphMenu.style.display = 'none'; }
+
+function openGraphMenu(i, clientX, clientY) {
+  const b = bands[i];
+  if (!b) return;
+  const types = ['Peaking', 'Low Shelf', 'High Shelf', 'Low Pass', 'High Pass'];
+  graphMenu.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'gm-head';
+  head.textContent = 'Band ' + (i + 1);
+  head.style.borderLeftColor = getBandColor(b, i);
+  graphMenu.appendChild(head);
+  types.forEach((name, t) => {
+    const el = document.createElement('div');
+    el.className = 'gm-opt' + (b.type === t ? ' selected' : '');
+    el.textContent = name;
+    el.addEventListener('click', () => { selectBandFilter(i, t); syncBandCardUI(i); closeGraphMenu(); });
+    graphMenu.appendChild(el);
+  });
+  const sep = document.createElement('div');
+  sep.className = 'gm-sep';
+  graphMenu.appendChild(sep);
+  const byp = document.createElement('div');
+  byp.className = 'gm-opt';
+  byp.textContent = b.enabled ? 'Bypass band' : 'Enable band';
+  byp.addEventListener('click', () => {
+    const btn = document.getElementById('band-bypass-' + i);
+    if (btn) btn.click();
+    closeGraphMenu();
+  });
+  graphMenu.appendChild(byp);
+  if (bands.length > 1) {
+    const del = document.createElement('div');
+    del.className = 'gm-opt gm-danger';
+    del.textContent = 'Remove band';
+    del.addEventListener('click', () => { closeGraphMenu(); removeBand(i); });
+    graphMenu.appendChild(del);
+  }
+  graphMenu.style.display = 'block';
+  const mw = graphMenu.offsetWidth, mh = graphMenu.offsetHeight;
+  graphMenu.style.left = Math.min(clientX, window.innerWidth - mw - 6) + 'px';
+  graphMenu.style.top = Math.min(clientY, window.innerHeight - mh - 6) + 'px';
+}
+
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#graph-band-menu')) closeGraphMenu(); });
+window.addEventListener('scroll', closeGraphMenu, { passive: true });
+
+let graphDrag = null;
+
+fCanvas.style.touchAction = 'none';
+
+fCanvas.addEventListener('contextmenu', (e) => {
+  const rect = fCanvas.getBoundingClientRect();
+  const i = graphHitBand(e.clientX - rect.left, e.clientY - rect.top);
+  if (i >= 0) {
+    e.preventDefault();
+    openGraphMenu(i, e.clientX, e.clientY);
+  }
+});
+
+fCanvas.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
+
+function applyGraphPos(d, x, y, rect) {
+  const b = bands[d.i];
+  if (!b) return;
+  const isPass = (b.type === 3 || b.type === 4);
+  const f = Math.max(20, Math.min(20000, x2f(x, rect.width)));
+  b.freq = f;
+  if (!isPass) {
+    const targetDb = Math.max(-18, Math.min(18, y2db(y, rect.height)));
+    const others = totalMagAt(f) - bandMagAt(b, f);
+    const isShelf = (b.type === 1 || b.type === 2);
+    let g = (targetDb - others) * (isShelf ? 2 : 1);
+    g = Math.max(-18, Math.min(18, g));
+    b.gain = Math.round(g * 10) / 10;
+  }
+  syncBandCardUI(d.i);
+  sendBandThrottled(d.i);
+  requestDrawResponse();
+  showGraphTip(d.i, f2x(b.freq, rect.width), db2y(totalMagAt(b.freq), rect.height));
+}
+
+function stepGraphSmooth() {
+  // Smoothing removed
+}
+
+fCanvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 && e.button !== 1) return;
+  const rect = fCanvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const i = graphHitBand(px, py);
+  if (i < 0) return;
+  e.preventDefault();
+  closeGraphMenu();
+  const b = bands[i];
+  const ptX = f2x(b.freq, rect.width);
+  const ptY = db2y(totalMagAt(b.freq), rect.height);
+  const mode = e.button === 1 ? 'q' : 'pos';
+  graphDrag = {
+    i, mode, pointerId: e.pointerId,
+    startY: e.clientY, startQ: b.q, startOrder: b.order || 2
+  };
+  activeGainSliderBand = i;
+  try { fCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+  fCanvas.style.cursor = 'grabbing';
+  showGraphTip(i, ptX, ptY);
+});
+
+fCanvas.addEventListener('pointermove', (e) => {
+  const rect = fCanvas.getBoundingClientRect();
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+
+  if (!graphDrag) {
+    fCanvas.style.cursor = graphHitBand(px, py) >= 0 ? 'pointer' : 'default';
+    return;
+  }
+  const d = graphDrag;
+  const b = bands[d.i];
+  if (!b) return;
+  const isPass = (b.type === 3 || b.type === 4);
+
+  if (d.mode === 'pos') {
+    const clampedX = Math.max(0, Math.min(rect.width, px));
+    const clampedY = Math.max(0, Math.min(rect.height, py));
+    applyGraphPos(d, clampedX, clampedY, rect);
+  } else {
+    const dy = d.startY - e.clientY;
+    if (isPass) {
+      b.order = Math.max(1, Math.min(4, Math.round(d.startOrder + dy / 75)));
+    } else {
+      b.q = Math.max(0.1, Math.min(8.0, d.startQ * Math.exp(dy / 180)));
+    }
+    syncBandCardUI(d.i);
+    sendBandThrottled(d.i);
+    requestDrawResponse();
+    showGraphTip(d.i, f2x(b.freq, rect.width), db2y(totalMagAt(b.freq), rect.height));
+  }
+});
+
+function endGraphDrag(e) {
+  if (!graphDrag) return;
+  const d = graphDrag;
+  const i = d.i;
+  try { fCanvas.releasePointerCapture(d.pointerId); } catch (_) {}
+  graphDrag = null;
+  activeGainSliderBand = null;
+  graphTip.style.display = 'none';
+  const rect = fCanvas.getBoundingClientRect();
+  const px = e ? e.clientX - rect.left : -1;
+  const py = e ? e.clientY - rect.top : -1;
+  fCanvas.style.cursor = (px >= 0 && py >= 0 && graphHitBand(px, py) >= 0) ? 'pointer' : 'default';
+  sendBandThrottled(i, true);
+  requestDrawResponse();
+}
+fCanvas.addEventListener('pointerup', endGraphDrag);
+window.addEventListener('pointerup', endGraphDrag);
+fCanvas.addEventListener('pointercancel', endGraphDrag);
+fCanvas.addEventListener('pointerleave', () => { if (!graphDrag) graphTip.style.display = 'none'; });
+
+
+let dragSourceIndex = null;
+let activeGainSliderBand = null;
+let bandSendTimers = {};
+
+function sendBand(i) {
+  const b = bands[i];
+  if (!b) return;
+  wsTx({
+    t: 'eq_band',
+    band: i,
+    freq: Math.round(b.freq * 10) / 10,
+    gain: Math.round(b.gain * 100) / 100,
+    q:    Math.round(b.q * 1000) / 1000,
+    type: b.type || 0,
+    order: b.order || 2,
+    enabled: b.enabled
+  });
+}
+
+function sendBandThrottled(i, immediate = false) {
+  if (immediate) {
+    if (bandSendTimers[i]) {
+      clearTimeout(bandSendTimers[i]);
+      delete bandSendTimers[i];
+    }
+    sendBand(i);
+    return;
+  }
+  if (!bandSendTimers[i]) {
+    sendBand(i);
+    bandSendTimers[i] = setTimeout(() => {
+      delete bandSendTimers[i];
+      sendBand(i);
+    }, 40);
+  }
+}
+
+function getBandTypeLabel(type) {
+  switch (type) {
+    case 0: return 'Peaking';
+    case 1: return 'Low Shelf';
+    case 2: return 'High Shelf';
+    case 3: return 'Low Pass';
+    case 4: return 'High Pass';
+    default: return 'Peaking';
+  }
+}
+
+function toggleBandMenu(i, event) {
+  if (event) event.stopPropagation();
+  const wrap = document.getElementById(`band-type-wrap-${i}`);
+  if (!wrap) return;
+  const wasOpen = wrap.classList.contains('open');
+  document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
+    w.classList.remove('open');
+  });
+  if (!wasOpen) {
+    wrap.classList.add('open');
+  }
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.band-type-menu-wrap')) {
+    document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
+      w.classList.remove('open');
+    });
+  }
+});
+
+function selectBandFilter(i, type) {
+  const b = bands[i];
+  if (!b) return;
+  b.type = type;
+  if (type === 3 || type === 4) {
+    if (!b.order || b.order < 1 || b.order > 4) b.order = 2;
+  }
+
+  document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
+    w.classList.remove('open');
+  });
+
+  updateBandCardParamStates(i);
+  sendBand(i);
+  requestDrawResponse();
+}
+
+function updateBandCardParamStates(i) {
+  const b = bands[i];
+  if (!b) return;
+  const card = document.getElementById(`band-card-${i}`);
+  if (!card) return;
+
+  const gainCol = card.querySelector(`#gain-col-${i}`);
+  const qUnit = card.querySelector(`#q-col-${i}`);
+  const gSlider = card.querySelector(`#slider-g-${i}`);
+  const gNumInput = card.querySelector(`#num-g-${i}`);
+  const btnLabel = card.querySelector(`#type-btn-label-${i}`);
+  const qBadgeLbl = card.querySelector(`#lbl-q-${i}`);
+  const qNumInput = card.querySelector(`#num-q-${i}`);
+
+  if (btnLabel) {
+    btnLabel.textContent = getBandTypeLabel(b.type);
+  }
+
+  const menu = card.querySelector(`#band-type-menu-${i}`);
+  if (menu) {
+    menu.querySelectorAll('.band-menu-opt').forEach(el => el.classList.remove('selected'));
+    const opts = menu.querySelectorAll('.band-menu-opt');
+    if (opts[b.type]) opts[b.type].classList.add('selected');
+  }
+
+  const isPassFilter = (b.type === 3 || b.type === 4);
+  if (isPassFilter) {
+    if (gainCol) {
+      gainCol.style.opacity = '0.3';
+      gainCol.style.pointerEvents = 'none';
+    }
+    b.gain = 0;
+    if (gNumInput) gNumInput.value = "0.0";
+    if (gSlider) gSlider.value = 0;
+
+    if (qBadgeLbl) qBadgeLbl.textContent = 'SLOPE';
+    if (qNumInput) {
+      qNumInput.min = '6';
+      qNumInput.max = '24';
+      qNumInput.step = '6';
+      qNumInput.value = (b.order || 2) * 6;
+    }
+    if (bandKnobs[i] && bandKnobs[i].qKnob) {
+      bandKnobs[i].qKnob.configure({
+        min: 6, max: 24, step: 6, decimals: 0,
+        value: (b.order || 2) * 6
+      });
+    }
+  } else {
+    if (gainCol) {
+      gainCol.style.opacity = '1';
+      gainCol.style.pointerEvents = 'auto';
+    }
+    if (qBadgeLbl) qBadgeLbl.textContent = 'Q';
+    if (qNumInput) {
+      qNumInput.min = '0.1';
+      qNumInput.max = '8.0';
+      qNumInput.step = '0.01';
+      qNumInput.value = b.q.toFixed(2);
+    }
+    if (bandKnobs[i] && bandKnobs[i].qKnob) {
+      bandKnobs[i].qKnob.configure({
+        min: 0.1, max: 8.0, step: null, decimals: 2,
+        value: b.q
+      });
+    }
+  }
+}
+
+let isSelectMode = false;
+let selectedBandIndices = new Set();
+
+function toggleSelectMode() {
+  if (isSelectMode) exitSelectMode();
+  else enterSelectMode();
+}
+
+function enterSelectMode() {
+  isSelectMode = true;
+  selectedBandIndices.clear();
+  const container = document.getElementById('bands-container');
+  if (container) container.classList.add('select-mode');
+  updateActionCardButtons();
+}
+
+function exitSelectMode() {
+  isSelectMode = false;
+  selectedBandIndices.clear();
+  const container = document.getElementById('bands-container');
+  if (container) container.classList.remove('select-mode');
+  document.querySelectorAll('.band-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.band-select-checkbox').forEach(cb => { cb.checked = false; });
+  updateActionCardButtons();
+}
+
+function toggleBandSelection(index) {
+  if (!isSelectMode) return;
+  if (selectedBandIndices.has(index)) {
+    selectedBandIndices.delete(index);
+  } else {
+    selectedBandIndices.add(index);
+  }
+  updateSelectionUI();
+}
+
+function updateSelectionUI() {
+  bands.forEach((_, i) => {
+    const card = document.getElementById(`band-card-${i}`);
+    const cb = card ? card.querySelector('.band-select-checkbox') : null;
+    const isSel = selectedBandIndices.has(i);
+    if (card) {
+      if (isSel) card.classList.add('selected');
+      else card.classList.remove('selected');
+    }
+    if (cb) cb.checked = isSel;
+  });
+  updateActionCardButtons();
+}
+
+function updateActionCardButtons() {
+  const btnTop = document.getElementById('btn-action-top');
+  const btnBottom = document.getElementById('btn-action-bottom');
+  if (!btnTop || !btnBottom) return;
+
+  if (isSelectMode) {
+    btnTop.innerHTML = '<span>Cancel</span>';
+    btnTop.disabled = false;
+    btnTop.classList.remove('btn-danger');
+
+    const count = selectedBandIndices.size;
+    btnBottom.innerHTML = `<span>Delete (${count})</span>`;
+    btnBottom.disabled = (count === 0 || count >= bands.length);
+    btnBottom.classList.add('btn-danger');
+  } else {
+    btnTop.innerHTML = '<span>Add band</span>';
+    btnTop.disabled = bands.length >= MAX_BANDS;
+    btnTop.classList.remove('btn-danger');
+
+    btnBottom.innerHTML = '<span>Select band</span>';
+    btnBottom.disabled = bands.length <= 1;
+    btnBottom.classList.remove('btn-danger');
+  }
+}
+
+function handleActionTopClick() {
+  if (isSelectMode) {
+    exitSelectMode();
+  } else {
+    addBand();
+  }
+}
+
+function handleActionBottomClick() {
+  if (isSelectMode) {
+    deleteSelectedBands();
+  } else {
+    enterSelectMode();
+  }
+}
+
+function deleteSelectedBands() {
+  if (selectedBandIndices.size === 0) return;
+  if (selectedBandIndices.size >= bands.length) {
+    alert("Cannot remove all bands. At least 1 band must remain.");
+    return;
+  }
+
+  const toDelete = Array.from(selectedBandIndices).sort((a, b) => b - a);
+  toDelete.forEach(idx => {
+    bands.splice(idx, 1);
+    wsTx({ t: 'remove_band', band: idx });
+  });
+
+  exitSelectMode();
+  rebuildBandsUI();
+  bands.forEach((_, idx) => sendBand(idx));
+  requestDrawResponse();
+}
+
+function getBandDragAfterElement(container, x) {
+  const draggableElements = [...container.querySelectorAll('.band-card:not(.dragging)')];
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = x - box.left - box.width / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function rebuildBandsUI() {
+  const root = document.getElementById('bands-container');
+  if (!root) return;
+  root.innerHTML = '';
+  bandKnobs = [];
+
+  bands.forEach((b, i) => {
+    b.band = i;
+    if (b.type === undefined) b.type = 0;
+    if (b.order === undefined) b.order = 2;
+    if (b.type === 5) { b.type = 3; b.order = 4; }
+    else if (b.type === 6) { b.type = 4; b.order = 4; }
+
+    const bandColor = getBandColor(b, i);
+    b.color = bandColor;
+    const hsl = hexToHsl(bandColor);
+    const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+
+    const card = document.createElement('div');
+    card.className = 'band-card' + (b.enabled ? '' : ' band-bypassed');
+    card.id = `band-card-${i}`;
+
+    card.addEventListener('click', (e) => {
+      if (isSelectMode && !e.target.closest('button, input, svg')) {
+        toggleBandSelection(i);
+      }
+    });
+
+    const draggerBar = document.createElement('div');
+    draggerBar.className = 'band-dragger-titlebar';
+    draggerBar.title = 'Drag to reorder band position';
+
+    const chk = document.createElement('input');
+    chk.type = 'checkbox';
+    chk.className = 'band-select-checkbox';
+    chk.checked = selectedBandIndices.has(i);
+    chk.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleBandSelection(i);
+    });
+    draggerBar.appendChild(chk);
+
+    const grip = document.createElement('span');
+    grip.className = 'drag-grip';
+    grip.textContent = ':::';
+    draggerBar.appendChild(grip);
+
+    card.appendChild(draggerBar);
+
+    draggerBar.addEventListener('pointerdown', (e) => {
+      if (isSelectMode) return;
+      if (e.button !== undefined && e.button !== 0) return;
+      if (e.target.closest('.band-select-checkbox')) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = card.getBoundingClientRect();
+      const grabOffsetX = e.clientX - rect.left;
+      const grabOffsetY = e.clientY - rect.top;
+
+      // Clone card before adding dragging styles
+      const ghost = card.cloneNode(true);
+      ghost.classList.add('band-drag-ghost');
+      ghost.classList.remove('dragging');
+      ghost.removeAttribute('id');
+      ghost.style.position = 'fixed';
+      ghost.style.left = (e.clientX - grabOffsetX) + 'px';
+      ghost.style.top = (e.clientY - grabOffsetY) + 'px';
+      ghost.style.width = rect.width + 'px';
+      ghost.style.height = rect.height + 'px';
+      ghost.style.backgroundColor = cardBg;
+      ghost.style.borderColor = bandColor;
+      ghost.style.borderWidth = '3px';
+      ghost.style.borderStyle = 'solid';
+      ghost.style.opacity = '0.95';
+      ghost.style.pointerEvents = 'none';
+      ghost.style.zIndex = '10000';
+      document.body.appendChild(ghost);
+
+      card.classList.add('dragging');
+      card.style.opacity = '0.35';
+
+      const indicator = document.createElement('div');
+      indicator.className = 'band-drop-indicator';
+      root.appendChild(indicator);
+
+      let currentAfterCard = card.nextElementSibling;
+      const updateBandIndicator = (afterEl) => {
+        const rootRect = root.getBoundingClientRect();
+        if (afterEl && afterEl !== indicator) {
+          const elRect = afterEl.getBoundingClientRect();
+          const x = (elRect.left - rootRect.left) + root.scrollLeft - 6;
+          indicator.style.left = (x - 2) + 'px';
+          indicator.style.top = '6px';
+          indicator.style.height = '290px';
+        } else {
+          const actCard = document.getElementById('eq-actions-card');
+          const remainingCards = root.querySelectorAll('.band-card:not(.dragging)');
+          const targetCard = actCard || (remainingCards.length > 0 ? remainingCards[remainingCards.length - 1] : null);
+          if (targetCard) {
+            const elRect = targetCard.getBoundingClientRect();
+            const x = (targetCard === actCard)
+              ? (elRect.left - rootRect.left) + root.scrollLeft - 6
+              : (elRect.right - rootRect.left) + root.scrollLeft + 6;
+            indicator.style.left = (x - 2) + 'px';
+            indicator.style.top = '6px';
+            indicator.style.height = '290px';
+          }
+        }
+      };
+      updateBandIndicator(currentAfterCard);
+
+      try {
+        draggerBar.setPointerCapture(e.pointerId);
+      } catch (_) {}
+
+      const onPointerMove = (ev) => {
+        ev.preventDefault();
+        ghost.style.left = (ev.clientX - grabOffsetX) + 'px';
+        ghost.style.top = (ev.clientY - grabOffsetY) + 'px';
+
+        const cRect = root.getBoundingClientRect();
+        if (ev.clientX < cRect.left + 60) {
+          root.scrollLeft -= 10;
+        } else if (ev.clientX > cRect.right - 60) {
+          root.scrollLeft += 10;
+        }
+
+        const afterCard = getBandDragAfterElement(root, ev.clientX);
+        currentAfterCard = afterCard;
+        updateBandIndicator(afterCard);
+      };
+
+      const onPointerUp = (ev) => {
+        try {
+          draggerBar.releasePointerCapture(ev.pointerId);
+        } catch (_) {}
+
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        draggerBar.removeEventListener('pointermove', onPointerMove);
+        draggerBar.removeEventListener('pointerup', onPointerUp);
+        draggerBar.removeEventListener('pointercancel', onPointerUp);
+
+        ghost.remove();
+        indicator.remove();
+
+        card.style.opacity = '';
+        card.classList.remove('dragging');
+
+        const allBandCards = [...root.querySelectorAll('.band-card')];
+        let dropIdx;
+        if (currentAfterCard && currentAfterCard.classList.contains('band-card')) {
+          dropIdx = allBandCards.indexOf(currentAfterCard);
+        } else {
+          dropIdx = allBandCards.length;
+        }
+
+        if (dropIdx !== -1) {
+          if (i < dropIdx) dropIdx--;
+          if (dropIdx !== i) {
+            const [movedBand] = bands.splice(i, 1);
+            bands.splice(dropIdx, 0, movedBand);
+            bands.forEach((bd, idx) => {
+              bd.band = idx;
+              sendBand(idx);
+            });
+            rebuildBandsUI();
+            requestDrawResponse();
+          }
+        }
+      };
+
+      draggerBar.addEventListener('pointermove', onPointerMove);
+      draggerBar.addEventListener('pointerup', onPointerUp);
+      draggerBar.addEventListener('pointercancel', onPointerUp);
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+    });
+
+    const typeRow = document.createElement('div');
+    typeRow.className = 'band-type-row';
+    const currentLabel = getBandTypeLabel(b.type);
+    typeRow.innerHTML = `
+      <div class="band-type-menu-wrap" id="band-type-wrap-${i}">
+        <button type="button" class="band-type-menu-btn" id="type-btn-${i}" onclick="toggleBandMenu(${i}, event)">
+          <span id="type-btn-label-${i}">${currentLabel}</span>
+          <span class="type-btn-caret">v</span>
+        </button>
+        <div class="band-type-dropdown" id="band-type-menu-${i}">
+          <div class="band-menu-opt ${b.type === 0 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 0)">Peaking</div>
+          <div class="band-menu-opt ${b.type === 1 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 1)">Low Shelf</div>
+          <div class="band-menu-opt ${b.type === 2 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 2)">High Shelf</div>
+          <div class="band-menu-opt ${b.type === 3 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 3)">Low Pass</div>
+          <div class="band-menu-opt ${b.type === 4 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 4)">High Pass</div>
+        </div>
+      </div>
+    `;
+    card.appendChild(typeRow);
+
+    const mainGrid = document.createElement('div');
+    mainGrid.className = 'band-card-main-grid';
+
+    const gainCol = document.createElement('div');
+    gainCol.className = 'band-gain-col';
+    gainCol.id = `gain-col-${i}`;
+    gainCol.innerHTML = `
+      <div class="band-slider-wrap">
+        <input type="range" id="slider-g-${i}" class="band-vslider" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}" orient="vertical">
+      </div>
+      <div class="card-val-badge">
+        <span class="badge-lbl">Gain</span>
+        <div class="badge-input-row">
+          <input type="number" id="num-g-${i}" class="badge-val-input" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}">
+        </div>
+      </div>
+    `;
+    mainGrid.appendChild(gainCol);
+
+    const knobsCol = document.createElement('div');
+    knobsCol.className = 'band-knobs-col';
+
+    const qUnit = document.createElement('div');
+    qUnit.className = 'band-knob-unit';
+    qUnit.id = `q-col-${i}`;
+    const isPass = (b.type === 3 || b.type === 4);
+    qUnit.innerHTML = `
+      <svg id="knob-q-${i}" class="knob" width="54" height="54" viewBox="0 0 54 54"></svg>
+      <div class="card-val-badge">
+        <span class="badge-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
+        <div class="badge-input-row">
+          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '6' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? ((b.order || 2) * 6) : b.q.toFixed(2)}">
+          ${isPass ? '<span class="badge-unit">dB</span>' : ''}
+        </div>
+      </div>
+    `;
+    knobsCol.appendChild(qUnit);
+
+    const fUnit = document.createElement('div');
+    fUnit.className = 'band-knob-unit';
+    fUnit.id = `f-col-${i}`;
+    fUnit.innerHTML = `
+      <svg id="knob-f-${i}" class="knob" width="54" height="54" viewBox="0 0 54 54"></svg>
+      <div class="card-val-badge">
+        <span class="badge-lbl">Freq</span>
+        <div class="badge-input-row">
+          <input type="number" id="num-f-${i}" class="badge-val-input" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
+        </div>
+      </div>
+    `;
+    knobsCol.appendChild(fUnit);
+
+    mainGrid.appendChild(knobsCol);
+    card.appendChild(mainGrid);
+
+    const bottomRow = document.createElement('div');
+    bottomRow.className = 'band-card-bottom-row';
+    bottomRow.innerHTML = `
+      <div class="band-card-bottom-col band-bottom-gain">
+        <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
+          </svg>
+        </button>
+      </div>
+      <div class="band-card-bottom-col band-bottom-knobs">
+        ${bands.length > 1 ? `
+        <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" onclick="removeBand(${i})" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>` : ''}
+      </div>
+    `;
+    card.appendChild(bottomRow);
+
+    const applyBandCardStyle = () => {
+      const bypassBtn = card.querySelector(`#band-bypass-${i}`);
+      if (b.enabled) {
+        card.style.backgroundColor = cardBg;
+        card.style.borderColor = bandColor;
+        card.style.borderWidth = '3px';
+        if (bypassBtn) {
+          bypassBtn.style.color = 'var(--muted)';
+        }
+        card.classList.remove('band-bypassed');
+      } else {
+        card.style.backgroundColor = 'var(--nord5)';
+        card.style.borderColor = 'var(--border-strong)';
+        card.style.borderWidth = '3px';
+        if (bypassBtn) {
+          bypassBtn.style.color = 'var(--muted)';
+        }
+        card.classList.add('band-bypassed');
+      }
+    };
+
+    bottomRow.querySelector(`#band-bypass-${i}`).addEventListener('click', (e) => {
+      e.stopPropagation();
+      b.enabled = !b.enabled;
+      applyBandCardStyle();
+      sendBand(i);
+      requestDrawResponse();
+    });
+
+    applyBandCardStyle();
+    root.appendChild(card);
+
+    const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
+      min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
+      logScale: true, color: bandColor,
+      decimals: 0,
+      onSlide: v => {
+        b.freq = v;
+        card.querySelector(`#num-f-${i}`).value = Math.round(v);
+        sendBandThrottled(i);
+        requestDrawResponse();
+      },
+      onApply: v => {
+        b.freq = v;
+        card.querySelector(`#num-f-${i}`).value = Math.round(v);
+        sendBandThrottled(i, true);
+        requestDrawResponse();
+      }
+    });
+
+    card.querySelector(`#num-f-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.freq;
+      v = Math.max(20, Math.min(20000, v));
+      e.target.value = Math.round(v);
+      b.freq = v;
+      fKnob.set(v, false);
+      sendBandThrottled(i, true);
+      requestDrawResponse();
+    });
+
+    const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
+      min: isPass ? 6 : 0.1,
+      max: isPass ? 24 : 8.0,
+      step: isPass ? 6 : null,
+      value: isPass ? ((b.order || 2) * 6) : b.q,
+      defaultVal: isPass ? 12 : 0.707,
+      decimals: isPass ? 0 : 2,
+      onSlide: v => {
+        if (b.type === 3 || b.type === 4) {
+          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+          card.querySelector(`#num-q-${i}`).value = b.order * 6;
+        } else {
+          b.q = v;
+          card.querySelector(`#num-q-${i}`).value = v.toFixed(2);
+        }
+        sendBandThrottled(i);
+        requestDrawResponse();
+      },
+      onApply: v => {
+        if (b.type === 3 || b.type === 4) {
+          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+          card.querySelector(`#num-q-${i}`).value = b.order * 6;
+        } else {
+          b.q = v;
+          card.querySelector(`#num-q-${i}`).value = v.toFixed(2);
+        }
+        sendBandThrottled(i, true);
+        requestDrawResponse();
+      }
+    });
+
+    card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (b.type === 3 || b.type === 4) {
+        if (isNaN(v)) v = (b.order || 2) * 6;
+        v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
+        e.target.value = v;
+        b.order = Math.round(v / 6);
+        qKnob.set(v, false);
+      } else {
+        if (isNaN(v)) v = b.q;
+        v = Math.max(0.1, Math.min(8.0, v));
+        e.target.value = v.toFixed(2);
+        b.q = v;
+        qKnob.set(v, false);
+      }
+      sendBandThrottled(i, true);
+      requestDrawResponse();
+    });
+
+    const gSlider = card.querySelector(`#slider-g-${i}`);
+    const gNumInput = card.querySelector(`#num-g-${i}`);
+
+    gSlider.addEventListener('input', e => {
+      let v = parseFloat(e.target.value);
+      b.gain = v;
+      gNumInput.value = v.toFixed(1);
+      activeGainSliderBand = i;
+      sendBandThrottled(i);
+      requestDrawResponse();
+    });
+
+    gSlider.addEventListener('change', () => {
+      activeGainSliderBand = null;
+      sendBandThrottled(i, true);
+      requestDrawResponse();
+    });
+
+    gSlider.addEventListener('pointerup', () => {
+      activeGainSliderBand = null;
+    });
+
+    gNumInput.addEventListener('change', e => {
+      let v = parseFloat(e.target.value);
+      if (isNaN(v)) v = b.gain;
+      v = Math.max(-18, Math.min(18, v));
+      e.target.value = v.toFixed(1);
+      b.gain = v;
+      gSlider.value = v;
+      sendBandThrottled(i, true);
+      requestDrawResponse();
+    });
+
+    bandKnobs.push({ fKnob, qKnob });
+    updateBandCardParamStates(i);
+  });
+
+  const actionCard = document.createElement('div');
+  actionCard.className = 'eq-actions-card';
+  actionCard.id = 'eq-actions-card';
+  actionCard.innerHTML = `
+    <button type="button" class="btn-card-action" id="btn-action-top" onclick="handleActionTopClick()">
+      <span>Add band</span>
+    </button>
+    <button type="button" class="btn-card-action" id="btn-action-bottom" onclick="handleActionBottomClick()">
+      <span>Select band</span>
+    </button>
+  `;
+  root.appendChild(actionCard);
+
+  updateActionCardButtons();
+  requestDrawResponse();
+}
+
+function syncBandCardUI(i) {
+  const b = bands[i];
+  if (!b) return;
+  const card = document.getElementById(`band-card-${i}`);
+  if (!card) return;
+
+  const numF = card.querySelector(`#num-f-${i}`);
+  const numQ = card.querySelector(`#num-q-${i}`);
+  const numG = card.querySelector(`#num-g-${i}`);
+  const gSlider = card.querySelector(`#slider-g-${i}`);
+  const bypassBtn = card.querySelector(`#band-bypass-${i}`);
+
+  if (numF) numF.value = Math.round(b.freq);
+  if (numQ) {
+    if (b.type === 3 || b.type === 4) numQ.value = (b.order || 2) * 6;
+    else numQ.value = b.q.toFixed(2);
+  }
+  if (numG) numG.value = b.gain.toFixed(1);
+  if (gSlider) gSlider.value = b.gain.toFixed(1);
+  updateBandCardParamStates(i);
+
+  const bandColor = getBandColor(b, i);
+  const hsl = hexToHsl(bandColor);
+  const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+
+  if (b.enabled) {
+    card.style.backgroundColor = cardBg;
+    card.style.borderColor = bandColor;
+    card.style.borderWidth = '3px';
+    if (bypassBtn) {
+      bypassBtn.style.color = bandColor;
+    }
+    card.classList.remove('band-bypassed');
+  } else {
+    card.style.backgroundColor = 'var(--nord5)';
+    card.style.borderColor = 'var(--border-strong)';
+    card.style.borderWidth = '3px';
+    if (bypassBtn) {
+      bypassBtn.style.color = 'var(--muted)';
+    }
+    card.classList.add('band-bypassed');
+  }
+
+  if (bandKnobs[i]) {
+    if (bandKnobs[i].fKnob) bandKnobs[i].fKnob.setQuiet(b.freq);
+    if (bandKnobs[i].qKnob) {
+      if (b.type === 3 || b.type === 4) bandKnobs[i].qKnob.setQuiet((b.order || 2) * 6);
+      else bandKnobs[i].qKnob.setQuiet(b.q);
+    }
+  }
+}
+
+function addBand() {
+  if (bands.length >= MAX_BANDS) return;
+
+  const candidateFreqs = [250, 500, 2000, 4000, 8000, 16000, 63, 125, 315];
+  let nextFreq = 1000;
+  for (let f of candidateFreqs) {
+    if (!bands.some(b => Math.abs(b.freq - f) < f * 0.25)) {
+      nextFreq = f;
+      break;
+    }
+  }
+
+  const newIndex = bands.length;
+  const usedColors = new Set(bands.map(b => b.color));
+  const chosenColor = BAND_COLORS.find(c => !usedColors.has(c)) || BAND_COLORS[newIndex % BAND_COLORS.length];
+  const newBand = {
+    band: newIndex,
+    freq: nextFreq,
+    gain: 0.0,
+    q: 0.707,
+    type: 0,
+    order: 2,
+    enabled: true,
+    color: chosenColor
+  };
+  bands.push(newBand);
+  rebuildBandsUI();
+
+  const container = document.getElementById('bands-container');
+  if (container) {
+    container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
+  }
+
+  wsTx({
+    t: 'add_band',
+    freq: newBand.freq,
+    gain: newBand.gain,
+    q: newBand.q,
+    type: newBand.type,
+    order: newBand.order
+  });
+}
+
+function removeBand(index) {
+  if (bands.length <= 1) return;
+  bands.splice(index, 1);
+  rebuildBandsUI();
+  wsTx({ t: 'remove_band', band: index });
+  bands.forEach((_, i) => sendBand(i));
+  requestDrawResponse();
+}
+
+function updateBypassUI(mod, enabled) {
+  const boxId = `mod-${mod === 'eq' ? 'eq' : (mod === 'subsonic' ? 'subsonic' : (mod === 'comp' ? 'compander' : 'limiter'))}`;
+  const box = document.getElementById(boxId);
+  const sw = document.getElementById(`switch-${mod}`);
+
+  if (sw) sw.checked = !!enabled;
+
+  if (box) {
+    if (enabled) {
+      box.classList.remove('bypassed');
+    } else {
+      box.classList.add('bypassed');
+    }
+  }
+}
+
+function toggleModuleCollapse(mod) {
+  const map = {
+    'eq': 'mod-eq',
+    'subsonic': 'mod-subsonic',
+    'comp': 'mod-compander',
+    'lim': 'mod-limiter',
+    'boot-cfg': 'mod-boot-cfg',
+    'input': 'mod-input'
+  };
+  const boxId = map[mod] || `mod-${mod}`;
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  box.classList.toggle('collapsed');
+  if (mod === 'eq' && !box.classList.contains('collapsed')) {
+    setTimeout(requestDrawResponse, 60);
+  }
+}
+
+function toggleEQModule(checked) {
+  if (typeof checked === 'boolean') {
+    eqEnabled = checked;
+  } else {
+    eqEnabled = !eqEnabled;
+  }
+  updateBypassUI('eq', eqEnabled);
+  drawResponse();
+  wsTx({ t: 'eq_toggle', enabled: eqEnabled });
+}
+
+function toggleSubsonicModule(checked) {
+  if (typeof checked === 'boolean') {
+    subsonicParams.enabled = checked;
+  } else {
+    subsonicParams.enabled = !subsonicParams.enabled;
+  }
+  updateBypassUI('subsonic', subsonicParams.enabled);
+  sendSubsonic();
+}
+
+function toggleCompanderModule(checked) {
+  if (typeof checked === 'boolean') {
+    compParams.enabled = checked;
+  } else {
+    compParams.enabled = !compParams.enabled;
+  }
+  updateBypassUI('comp', compParams.enabled);
+  sendCompander();
+}
+
+function toggleLimiterModule(checked) {
+  if (typeof checked === 'boolean') {
+    limParams.enabled = checked;
+  } else {
+    limParams.enabled = !limParams.enabled;
+  }
+  updateBypassUI('lim', limParams.enabled);
+  sendLimiter();
+}
+
+let subSendTimer = null;
+function sendSubsonicThrottled(immediate = false) {
+  if (immediate) {
+    if (subSendTimer) { clearTimeout(subSendTimer); subSendTimer = null; }
+    sendSubsonic();
+    return;
+  }
+  if (!subSendTimer) {
+    sendSubsonic();
+    subSendTimer = setTimeout(() => {
+      subSendTimer = null;
+      sendSubsonic();
+    }, 40);
+  }
+}
+
+function initSubsonicKnobs() {
+  subsonicKnobs.freq = new Knob(document.getElementById('knob-sub-freq'), {
+    min: 20, max: 100, value: subsonicParams.freq, defaultVal: 80,
+    logScale: true, color: '#88C0D0', decimals: 0,
+    onChange: v => {
+      subsonicParams.freq = v;
+      document.getElementById('num-sub-freq').value = Math.round(v);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-sub-freq').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(20, Math.min(100, v));
+      subsonicParams.freq = v;
+      subsonicKnobs.freq.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  subsonicKnobs.order = new Knob(document.getElementById('knob-sub-order'), {
+    min: 6, max: 24, step: 6, value: (subsonicParams.order || 2) * 6, defaultVal: 12,
+    decimals: 0,
+    onChange: v => {
+      const ord = Math.max(1, Math.min(4, Math.round(v / 6)));
+      subsonicParams.order = ord;
+      document.getElementById('num-sub-order').value = ord * 6;
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-sub-order').addEventListener('change', e => {
+    let v = parseInt(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
+      const ord = Math.max(1, Math.min(4, v / 6));
+      subsonicParams.order = ord;
+      e.target.value = ord * 6;
+      subsonicKnobs.order.set(ord * 6, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  subsonicKnobs.balance = new Knob(document.getElementById('knob-spk-bal'), {
+    min: -100, max: 100, step: 1, value: subsonicParams.balance || 0, defaultVal: 0,
+    centerZero: true, decimals: 0, color: '#88C0D0',
+    onChange: v => {
+      subsonicParams.balance = Math.round(v);
+      document.getElementById('num-spk-bal').value = Math.round(v);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-bal').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-100, Math.min(100, Math.round(v)));
+      subsonicParams.balance = v;
+      subsonicKnobs.balance.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  subsonicKnobs.delayL = new Knob(document.getElementById('knob-spk-delay-l'), {
+    min: -20, max: 20, step: 0.1, value: subsonicParams.delayL || 0.0, defaultVal: 0.0,
+    centerZero: true, decimals: 1, color: '#81A1C1',
+    onChange: v => {
+      subsonicParams.delayL = parseFloat(v.toFixed(1));
+      document.getElementById('num-spk-delay-l').value = v.toFixed(1);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-delay-l').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-20, Math.min(20, Math.round(v * 10) / 10));
+      subsonicParams.delayL = v;
+      subsonicKnobs.delayL.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  subsonicKnobs.delayR = new Knob(document.getElementById('knob-spk-delay-r'), {
+    min: -20, max: 20, step: 0.1, value: subsonicParams.delayR || 0.0, defaultVal: 0.0,
+    centerZero: true, decimals: 1, color: '#81A1C1',
+    onChange: v => {
+      subsonicParams.delayR = parseFloat(v.toFixed(1));
+      document.getElementById('num-spk-delay-r').value = v.toFixed(1);
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-delay-r').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-20, Math.min(20, Math.round(v * 10) / 10));
+      subsonicParams.delayR = v;
+      subsonicKnobs.delayR.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  subsonicKnobs.phaseL = new Knob(document.getElementById('knob-spk-phase-l'), {
+    min: -180, max: 180, step: 45, value: subsonicParams.phaseL || 0, defaultVal: 0,
+    centerZero: true, decimals: 0, color: '#B48EAD',
+    onChange: v => {
+      const p = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseL = p;
+      document.getElementById('num-spk-phase-l').value = p;
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-phase-l').addEventListener('change', e => {
+    let v = parseInt(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseL = v;
+      e.target.value = v;
+      subsonicKnobs.phaseL.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+
+  subsonicKnobs.phaseR = new Knob(document.getElementById('knob-spk-phase-r'), {
+    min: -180, max: 180, step: 45, value: subsonicParams.phaseR || 0, defaultVal: 0,
+    centerZero: true, decimals: 0, color: '#B48EAD',
+    onChange: v => {
+      const p = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseR = p;
+      document.getElementById('num-spk-phase-r').value = p;
+      sendSubsonicThrottled(false);
+    },
+    onEnd: () => sendSubsonicThrottled(true)
+  });
+  document.getElementById('num-spk-phase-r').addEventListener('change', e => {
+    let v = parseInt(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-180, Math.min(180, Math.round(v / 45) * 45));
+      subsonicParams.phaseR = v;
+      e.target.value = v;
+      subsonicKnobs.phaseR.set(v, false);
+      sendSubsonicThrottled(true);
+    }
+  });
+}
+
+function syncSubsonicUI() {
+  if (subsonicKnobs.freq) {
+    subsonicKnobs.freq.setQuiet(subsonicParams.freq);
+    document.getElementById('num-sub-freq').value = Math.round(subsonicParams.freq);
+    const slopeDb = (subsonicParams.order || 2) * 6;
+    subsonicKnobs.order.setQuiet(slopeDb);
+    document.getElementById('num-sub-order').value = slopeDb;
+  }
+  if (subsonicKnobs.balance) {
+    subsonicKnobs.balance.setQuiet(subsonicParams.balance || 0);
+    const el = document.getElementById('num-spk-bal');
+    if (el) el.value = Math.round(subsonicParams.balance || 0);
+  }
+  if (subsonicKnobs.delayL) {
+    subsonicKnobs.delayL.setQuiet(subsonicParams.delayL || 0.0);
+    const el = document.getElementById('num-spk-delay-l');
+    if (el) el.value = (subsonicParams.delayL || 0.0).toFixed(1);
+  }
+  if (subsonicKnobs.delayR) {
+    subsonicKnobs.delayR.setQuiet(subsonicParams.delayR || 0.0);
+    const el = document.getElementById('num-spk-delay-r');
+    if (el) el.value = (subsonicParams.delayR || 0.0).toFixed(1);
+  }
+  if (subsonicKnobs.phaseL) {
+    subsonicKnobs.phaseL.setQuiet(subsonicParams.phaseL || 0);
+    const el = document.getElementById('num-spk-phase-l');
+    if (el) el.value = subsonicParams.phaseL || 0;
+  }
+  if (subsonicKnobs.phaseR) {
+    subsonicKnobs.phaseR.setQuiet(subsonicParams.phaseR || 0);
+    const el = document.getElementById('num-spk-phase-r');
+    if (el) el.value = subsonicParams.phaseR || 0;
+  }
+}
+
+function sendSubsonic() {
+  wsTx({
+    t: 'subsonic',
+    freq: subsonicParams.freq,
+    order: subsonicParams.order,
+    enabled: subsonicParams.enabled,
+    balance: subsonicParams.balance,
+    delayL: subsonicParams.delayL,
+    delayR: subsonicParams.delayR,
+    phaseL: subsonicParams.phaseL,
+    phaseR: subsonicParams.phaseR
+  });
+}
+
+let compSendTimer = null;
+function sendCompanderThrottled(immediate = false) {
+  if (immediate) {
+    if (compSendTimer) { clearTimeout(compSendTimer); compSendTimer = null; }
+    sendCompander();
+    return;
+  }
+  if (!compSendTimer) {
+    sendCompander();
+    compSendTimer = setTimeout(() => {
+      compSendTimer = null;
+      sendCompander();
+    }, 40);
+  }
+}
+
+let limSendTimer = null;
+function sendLimiterThrottled(immediate = false) {
+  if (immediate) {
+    if (limSendTimer) { clearTimeout(limSendTimer); limSendTimer = null; }
+    sendLimiter();
+    return;
+  }
+  if (!limSendTimer) {
+    sendLimiter();
+    limSendTimer = setTimeout(() => {
+      limSendTimer = null;
+      sendLimiter();
+    }, 40);
+  }
+}
+
+function initCompanderKnobs() {
+  compKnobs.thresh = new Knob(document.getElementById('knob-comp-thresh'), {
+    min: -60, max: 0, value: compParams.threshold, defaultVal: -18,
+    color: '#81A1C1', decimals: 1,
+    onChange: v => {
+      compParams.threshold = v;
+      document.getElementById('num-comp-thresh').value = v.toFixed(1);
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
+  });
+  document.getElementById('num-comp-thresh').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-60, Math.min(0, v));
+      compParams.threshold = v;
+      compKnobs.thresh.set(v, false);
+      sendCompanderThrottled(true);
+    }
+  });
+
+  compKnobs.ratio = new Knob(document.getElementById('knob-comp-ratio'), {
+    min: 1, max: 20, value: compParams.ratio, defaultVal: 4,
+    color: '#88C0D0', decimals: 1,
+    onChange: v => {
+      compParams.ratio = v;
+      document.getElementById('num-comp-ratio').value = v.toFixed(1);
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
+  });
+  document.getElementById('num-comp-ratio').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(1, Math.min(20, v));
+      compParams.ratio = v;
+      compKnobs.ratio.set(v, false);
+      sendCompanderThrottled(true);
+    }
+  });
+
+  compKnobs.att = new Knob(document.getElementById('knob-comp-att'), {
+    min: 0.1, max: 200, value: compParams.attackMs, defaultVal: 5,
+    color: '#A3BE8C', decimals: 1,
+    onChange: v => {
+      compParams.attackMs = v;
+      document.getElementById('num-comp-att').value = v.toFixed(1);
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
+  });
+  document.getElementById('num-comp-att').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(0.1, Math.min(200, v));
+      compParams.attackMs = v;
+      compKnobs.att.set(v, false);
+      sendCompanderThrottled(true);
+    }
+  });
+
+  compKnobs.rel = new Knob(document.getElementById('knob-comp-rel'), {
+    min: 10, max: 2000, value: compParams.releaseMs, defaultVal: 150,
+    color: '#D08770', decimals: 0,
+    onChange: v => {
+      compParams.releaseMs = v;
+      document.getElementById('num-comp-rel').value = Math.round(v);
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
+  });
+  document.getElementById('num-comp-rel').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(10, Math.min(2000, v));
+      compParams.releaseMs = v;
+      compKnobs.rel.set(v, false);
+      sendCompanderThrottled(true);
+    }
+  });
+
+  compKnobs.gain = new Knob(document.getElementById('knob-comp-gain'), {
+    min: -12, max: 24, value: compParams.makeup, defaultVal: 0,
+    centerZero: true, color: '#B48EAD', decimals: 1,
+    onChange: v => {
+      compParams.makeup = v;
+      document.getElementById('num-comp-gain').value = v.toFixed(1);
+      sendCompanderThrottled(false);
+    },
+    onEnd: () => sendCompanderThrottled(true)
+  });
+  document.getElementById('num-comp-gain').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-12, Math.min(24, v));
+      compParams.makeup = v;
+      compKnobs.gain.set(v, false);
+      sendCompanderThrottled(true);
+    }
+  });
+}
+
+function syncCompanderUI() {
+  if (compKnobs.thresh) {
+    compKnobs.thresh.setQuiet(compParams.threshold);
+    document.getElementById('num-comp-thresh').value = compParams.threshold.toFixed(1);
+    compKnobs.ratio.setQuiet(compParams.ratio);
+    document.getElementById('num-comp-ratio').value = compParams.ratio.toFixed(1);
+    compKnobs.att.setQuiet(compParams.attackMs);
+    document.getElementById('num-comp-att').value = compParams.attackMs.toFixed(1);
+    compKnobs.rel.setQuiet(compParams.releaseMs);
+    document.getElementById('num-comp-rel').value = Math.round(compParams.releaseMs);
+    compKnobs.gain.setQuiet(compParams.makeup);
+    document.getElementById('num-comp-gain').value = compParams.makeup.toFixed(1);
+  }
+}
+
+function sendCompander() {
+  wsTx({
+    t: 'compander',
+    threshold: compParams.threshold,
+    ratio: compParams.ratio,
+    attackMs: compParams.attackMs,
+    releaseMs: compParams.releaseMs,
+    makeup: compParams.makeup,
+    enabled: compParams.enabled
+  });
+}
+
+function initLimiterKnobs() {
+  limKnobs.ceil = new Knob(document.getElementById('knob-lim-ceil'), {
+    min: -6, max: 0, value: limParams.ceiling, defaultVal: -0.5,
+    color: '#BF616A', decimals: 1,
+    onChange: v => {
+      limParams.ceiling = v;
+      document.getElementById('num-lim-ceil').value = v.toFixed(1);
+      sendLimiterThrottled(false);
+    },
+    onEnd: () => sendLimiterThrottled(true)
+  });
+  document.getElementById('num-lim-ceil').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(-6, Math.min(0, v));
+      limParams.ceiling = v;
+      limKnobs.ceil.set(v, false);
+      sendLimiterThrottled(true);
+    }
+  });
+
+  limKnobs.knee = new Knob(document.getElementById('knob-lim-knee'), {
+    min: 0, max: 6, value: limParams.knee, defaultVal: 3.0,
+    color: '#8FBCBB', decimals: 1,
+    onChange: v => {
+      limParams.knee = v;
+      document.getElementById('num-lim-knee').value = v.toFixed(1);
+      sendLimiterThrottled(false);
+    },
+    onEnd: () => sendLimiterThrottled(true)
+  });
+  document.getElementById('num-lim-knee').addEventListener('change', e => {
+    let v = parseFloat(e.target.value);
+    if (!isNaN(v)) {
+      v = Math.max(0, Math.min(6, v));
+      limParams.knee = v;
+      limKnobs.knee.set(v, false);
+      sendLimiterThrottled(true);
+    }
+  });
+}
+
+function syncLimiterUI() {
+  if (limKnobs.ceil) {
+    limKnobs.ceil.setQuiet(limParams.ceiling);
+    document.getElementById('num-lim-ceil').value = limParams.ceiling.toFixed(1);
+    limKnobs.knee.setQuiet(limParams.knee);
+    document.getElementById('num-lim-knee').value = limParams.knee.toFixed(1);
+  }
+}
+
+function sendLimiter() {
+  wsTx({
+    t: 'limiter',
+    ceiling: limParams.ceiling,
+    knee: limParams.knee,
+    enabled: limParams.enabled
+  });
+}
+
+updateInputSourceUI();
+initPreamp();
+renderCustomPresets();
+rebuildBandsUI();
+initSubsonicKnobs();
+initCompanderKnobs();
+initLimiterKnobs();
+initModuleReordering();
+updateDraggerNumbers();
+
+updateBypassUI('eq', eqEnabled);
+updateBypassUI('subsonic', subsonicParams.enabled);
+updateBypassUI('comp', compParams.enabled);
+updateBypassUI('lim', limParams.enabled);
+
+document.addEventListener('click', (e) => {
+  const badge = e.target.closest('.card-val-badge');
+  if (badge) {
+    const inp = badge.querySelector('input.badge-val-input');
+    if (inp) {
+      inp.focus();
+      setTimeout(() => inp.select(), 10);
+    }
+  }
+});
+
+
+function toggleWiFiConfig(e) {
+  if (e) e.stopPropagation();
+  const body = document.getElementById('wifi-cfg-body');
+  const btn = document.getElementById('wifi-cfg-arrow');
+  if (!body) return;
+  const isHidden = (body.style.display === 'none');
+  body.style.display = isHidden ? 'block' : 'none';
+  if (btn) btn.textContent = isHidden ? '▲' : '▼';
+}
+
+function togglePassVisibility() {
+  const passIn = document.getElementById('wifi-input-pass');
+  if (!passIn) return;
+  passIn.type = (passIn.type === 'password') ? 'text' : 'password';
+}
+
+function submitWiFiConfig() {
+  const ssidIn = document.getElementById('wifi-input-ssid');
+  const passIn = document.getElementById('wifi-input-pass');
+  const statusMsg = document.getElementById('wifi-cfg-msg');
+  if (!ssidIn) return;
+  const ssid = ssidIn.value.trim();
+  const pass = passIn ? passIn.value : '';
+
+  if (!ssid) {
+    if (statusMsg) {
+      statusMsg.className = 'wifi-status-msg error';
+      statusMsg.textContent = 'Please enter a Wi-Fi SSID.';
+    }
+    return;
+  }
+
+  if (statusMsg) {
+    statusMsg.className = 'wifi-status-msg';
+    statusMsg.textContent = `Connecting to "${ssid}"...`;
+  }
+
+  wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
+
+  try {
+    const params = new URLSearchParams();
+    params.append('ssid', ssid);
+    params.append('pass', pass);
+    fetch('/api/wifi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    }).catch(() => {});
+  } catch (_) {}
+}
+
+wsConnect();
+</script>
+</body>
+</html>
