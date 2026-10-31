@@ -49,8 +49,6 @@ ESP32-WROOM to ESP32-S3:
 | BCK    | GPIO 22 | GPIO 16 |
 | WS     | GPIO 21 | GPIO 17 |
 | DATA   | GPIO 23 | GPIO 18 |
-| TX     | GPIO 19 | GPIO 44 |
-| RX     | GPIO 18 | GPIO 43 |
 
 ## Build
 
