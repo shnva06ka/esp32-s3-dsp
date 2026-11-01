@@ -1,12 +1,12 @@
 import gzip
 
-with open("test/index.html", "rb") as f:
+with open("data/index.html", "rb") as f:
     data = f.read()
 
 gz = gzip.compress(data, compresslevel=9)
 
 with open("src/eq_html.h", "w") as f:
-    f.write("// Auto-generated from test/index.html\n")
+    f.write("// Auto-generated from data/index.html\n")
     f.write("#pragma once\n")
     f.write("#include <Arduino.h>\n\n")
     f.write(f"const uint32_t PAGE_INDEX_HTML_GZ_LEN = {len(gz)};\n")
@@ -21,4 +21,3 @@ with open("src/eq_html.h", "w") as f:
     f.write("};\n")
 
 print(f"Compressed {len(data)} bytes to {len(gz)} bytes in src/eq_html.h")
-
