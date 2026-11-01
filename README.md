@@ -5,7 +5,7 @@ Real-time stereo audio processor built on the ESP32-S3, controlled from a web in
 ## Features
 
 - Three inputs: Line In, Bluetooth, Squeezebox
-- Fixed 44.1 kHz sample rate end to end, with no resampling
+- Fixed 96 kHz sample rate for DSP and I2S, with on-device resampling for lower rates
 - Parametric EQ with up to 10 bands (Peaking, Shelf, Low Pass, High Pass, up to 4th order)
 - Speaker correction: subsonic filter, balance, per-channel delay, phase
 - Compressor and soft-knee limiter
@@ -23,7 +23,7 @@ Squeezebox ---------/
 
 - **ESP32-S3**: audio engine, DSP, web UI, and Squeezebox client
 - **ESP32-WROOM** (optional): Bluetooth A2DP receiver, since the S3 has no Bluetooth Classic. Any I2S source can replace it.
-- **Squeezebox**: works with Logitech Media Server and compatible players such as Roon. Supports FLAC, WAV, AIFF, and PCM. The server converts other rates to 44.1 kHz.
+- **Squeezebox**: works with Logitech Media Server and compatible players such as Roon. Supports FLAC up to 96 kHz; lower rates (44.1, 48, 88.2 kHz) and 44.1 kHz Bluetooth audio are resampled to 96 kHz on Core 0.
 
 Tested with PCM1808 (ADC) and PCM5102A (DAC).
 
