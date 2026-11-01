@@ -11,6 +11,7 @@ extern struct buffer *outputbuf;
 extern struct streamstate stream;
 extern struct outputstate output;
 extern struct decodestate decode;
+extern "C" volatile unsigned sl_source_rate;
 
 SlimprotoClient::SlimprotoClient(ParamStore& params)
     : _params(params)
@@ -32,7 +33,7 @@ bool SlimprotoClient::begin() {
     stream_init(lINFO, STREAMBUF_SIZE);
     decode_init(lINFO, "pcm,flc", "");
 
-    slimproto_start(lINFO, NULL, mac, "ESP32-S3-DSP", 44100);
+    slimproto_start(lINFO, NULL, mac, "ESP32-S3-DSP", SAMPLE_RATE);
 
     _running = true;
     xTaskCreatePinnedToCore(
@@ -83,13 +84,18 @@ void SlimprotoClient::_runTelemetry() {
         meta.connected  = _running;
         meta.streaming  = isStream;
         meta.paused     = isPaused;
-        meta.sampleRate = 44100;
+        meta.sampleRate = sl_source_rate ? sl_source_rate : (uint32_t)SAMPLE_RATE;
         meta.bitDepth   = 24;
-        meta.pos        = output.frames_played / 44100;
+        meta.pos        = output.frames_played / (uint32_t)SAMPLE_RATE;
 
         if (isStream) {
             idleSinceMs = 0;
-            snprintf(meta.formatInfo, sizeof(meta.formatInfo), "PCM 44.1kHz 24-bit");
+            unsigned srcRate = sl_source_rate ? sl_source_rate : (unsigned)SAMPLE_RATE;
+            if (srcRate == (unsigned)SAMPLE_RATE) {
+                snprintf(meta.formatInfo, sizeof(meta.formatInfo), "FLAC %u.%u kHz 24-bit", srcRate / 1000, (srcRate % 1000) / 100);
+            } else {
+                snprintf(meta.formatInfo, sizeof(meta.formatInfo), "FLAC %u.%u kHz > %u kHz", srcRate / 1000, (srcRate % 1000) / 100, (unsigned)SAMPLE_RATE / 1000);
+            }
             if (_params.getInputMode() != INPUT_MODE_WIFI) {
                 Serial.println("[SLIMPROTO] Auto-switching input mode to Squeezebox");
                 _params.setInputMode(INPUT_MODE_WIFI);

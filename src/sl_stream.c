@@ -50,7 +50,7 @@ static bool _send_header(void) {
 }
 
 #define BOUNCE_SIZE 16384
-static DRAM_ATTR uint8_t s_rxBounce[BOUNCE_SIZE];
+static uint8_t *s_rxBounce = NULL;
 
 static void stream_task(void *arg) {
     (void)arg;
@@ -68,12 +68,12 @@ static void stream_task(void *arg) {
         space = _buf_space(streambuf);
         UNLOCK_S;
 
-        if (cur_fd < 0 || cur_state <= STREAMING_WAIT) {
+        if (cur_fd < 0 || cur_state <= STREAMING_WAIT || !s_rxBounce) {
             vTaskDelay(pdMS_TO_TICKS(5));
             continue;
         }
 
-        if (space < sizeof(s_rxBounce)) {
+        if (space < BOUNCE_SIZE) {
             vTaskDelay(pdMS_TO_TICKS(2));
             continue;
         }
@@ -131,7 +131,7 @@ static void stream_task(void *arg) {
                     continue;
                 }
 
-                // Drain socket via internal SRAM bounce buffer WITHOUT holding LOCK_S during recv()
+                // Drain socket via bounce buffer WITHOUT holding LOCK_S during recv()
                 while (running) {
                     LOCK_S;
                     cur_fd = fd;
@@ -191,7 +191,12 @@ void stream_init(log_level level, unsigned stream_buf_size) {
 
     buf_init(streambuf, stream_buf_size);
     stream.state = STOPPED;
-    stream.header = (char *)malloc(MAX_HEADER);
+    if (!s_rxBounce) {
+        s_rxBounce = (uint8_t *)heap_caps_malloc(BOUNCE_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_rxBounce) s_rxBounce = (uint8_t *)malloc(BOUNCE_SIZE);
+    }
+    stream.header = (char *)heap_caps_malloc(MAX_HEADER, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!stream.header) stream.header = (char *)malloc(MAX_HEADER);
     if (stream.header) stream.header[0] = '\0';
     stream.header_len = 0;
     stream.sent_headers = false;
@@ -223,6 +228,10 @@ void stream_close(void) {
     if (stream.header) {
         free(stream.header);
         stream.header = NULL;
+    }
+    if (s_rxBounce) {
+        free(s_rxBounce);
+        s_rxBounce = NULL;
     }
     buf_destroy(streambuf);
 }
@@ -301,4 +310,3 @@ bool stream_disconnect(void) {
     UNLOCK_S;
     return disc;
 }
-

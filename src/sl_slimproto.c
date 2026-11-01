@@ -124,6 +124,8 @@ static in_addr_t slimproto_ip = 0;
 static event_event wake_e;
 static TaskHandle_t slimproto_task_handle = NULL;
 static bool running = true;
+static u8_t *s_pktBuffer = NULL;
+static char *s_headerCopy = NULL;
 
 static struct {
     u32_t updated;
@@ -170,7 +172,7 @@ void slimproto_send_packet(const u8_t *packet, size_t len) {
 }
 
 static void sendHELO(bool reconnect, const u8_t mac[6]) {
-    const char *cap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Firmware=" VERSION ",ModelName=ESP32-S3-DSP,Rates=44100,flc";  /* FLAC only: forces LMS to compress; raw PCM needs 1.4-2.3 MB/s */    struct HELO_packet pkt;
+    const char *cap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Firmware=" VERSION ",ModelName=ESP32-S3-DSP,MaxSampleRate=96000,flc";  /* FLAC only: forces LMS to compress; raw PCM needs 1.4-2.3 MB/s */    struct HELO_packet pkt;
 
     memset(&pkt, 0, sizeof(pkt));
     memcpy(pkt.opcode, "HELO", 4);
@@ -486,6 +488,7 @@ static void dispatch_packet(u8_t *pack, int len) {
     else if (!memcmp(pack, "aude", 4)) process_aude(pack, len);
     else if (!memcmp(pack, "setd", 4)) process_setd(pack, len);
     else if (!memcmp(pack, "serv", 4)) process_serv(pack, len);
+    else if (!memcmp(pack, "vers", 4)) { /* server version announcement - nothing to do */ }
     else {
         LOG_WARN("Unhandled LMS packet opcode: %.4s", pack);
     }
@@ -493,7 +496,7 @@ static void dispatch_packet(u8_t *pack, int len) {
 
 static void slimproto_task(void *arg) {
     (void)arg;
-    static u8_t buffer[MAX_HEADER];
+    u8_t *buffer = s_pktBuffer;
     int expect = 0;
     int got = 0;
     u32_t last = 0;
@@ -513,6 +516,14 @@ static void slimproto_task(void *arg) {
                 vTaskDelay(pdMS_TO_TICKS(2000));
                 continue;
             }
+
+            /* Back off so a server that keeps resetting us isn't hammered */
+            static u32_t s_lastAttempt = 0;
+            u32_t since = gettime_ms() - s_lastAttempt;
+            if (s_lastAttempt && since < 3000) {
+                vTaskDelay(pdMS_TO_TICKS(3000 - since));
+            }
+            s_lastAttempt = gettime_ms();
 
             struct sockaddr_in addr;
             int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -586,7 +597,7 @@ static void slimproto_task(void *arg) {
                 if (got == 2) {
                     expect = (buffer[0] << 8) | buffer[1];
                     got = 0;
-                    if (expect > (int)sizeof(buffer)) {
+                    if (expect > MAX_HEADER) {
                         LOG_ERROR("Packet too large: %d bytes", expect);
                         closesocket(control_sock);
                         control_sock = -1;
@@ -622,7 +633,6 @@ static void slimproto_task(void *arg) {
             bool _stream_disconnect = false;
             bool _start_output = false;
             disconnect_code disc_code = DISCONNECT_OK;
-            static char s_headerCopy[MAX_HEADER];
             size_t s_headerLen = 0;
 
             last = now;
@@ -641,7 +651,7 @@ static void slimproto_task(void *arg) {
 
             if (!stream.sent_headers && (stream.state == STREAMING_HTTP || stream.state == STREAMING_WAIT || stream.state == STREAMING_BUFFERING)) {
                 s_headerLen = stream.header_len;
-                if (s_headerLen > 0 && s_headerLen < MAX_HEADER) {
+                if (s_headerLen > 0 && s_headerLen < MAX_HEADER && s_headerCopy) {
                     memcpy(s_headerCopy, stream.header, s_headerLen);
                     s_headerCopy[s_headerLen] = '\0';
                     _sendRESP = true;
@@ -762,10 +772,19 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
         slimproto_ip = inet_addr(server);
     }
 
+    if (!s_pktBuffer) {
+        s_pktBuffer = (u8_t *)heap_caps_malloc(MAX_HEADER, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_pktBuffer) s_pktBuffer = (u8_t *)malloc(MAX_HEADER);
+    }
+    if (!s_headerCopy) {
+        s_headerCopy = (char *)heap_caps_malloc(MAX_HEADER, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_headerCopy) s_headerCopy = (char *)malloc(MAX_HEADER);
+    }
+
     _wake_create(&wake_e);
     running = true;
 
-    xTaskCreatePinnedToCore(
+    BaseType_t rc = xTaskCreatePinnedToCore(
         slimproto_task,
         "sl_control",
         8192,
@@ -774,6 +793,9 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
         &slimproto_task_handle,
         0
     );
+    if (rc != pdPASS) {
+        LOG_ERROR("Failed to create sl_control task! (rc=%d, free internal=%u)", (int)rc, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    }
 }
 
 void slimproto_stop(void) {

@@ -60,6 +60,9 @@ static void decode_task(void *arg) {
 
         if (!ran) {
             vTaskDelay(pdMS_TO_TICKS(2));
+        } else if (space < (outputbuf->size / 4)) {
+            /* Output buffer is >75% full: yield 1 ms so idle task & lower-priority tasks run */
+            vTaskDelay(pdMS_TO_TICKS(1));
         } else {
             taskYIELD();
         }
@@ -85,14 +88,15 @@ void decode_init(log_level level, const char *include_codecs, const char *exclud
     codec = NULL;
 
     decode_running = true;
+    /* Run FLAC decoding + resampling on Core 0 so Core 1 is dedicated to 96 kHz DSP + I2S */
     xTaskCreatePinnedToCore(
         decode_task,
         "sl_decode",
         16384,
         NULL,
-        5,
+        4,
         &decode_task_handle,
-        1
+        0
     );
 }
 

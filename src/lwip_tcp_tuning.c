@@ -105,8 +105,9 @@ void __wrap_tcp_recved(struct tcp_pcb *pcb, u16_t len)
 
 err_t __wrap_tcp_close(struct tcp_pcb *pcb)
 {
-    if (pcb != NULL && pcb->rcv_wnd == (tcpwnd_size_t)TUNED_TCP_WND) {
-        /* Match compiled TCP_WND_MAX so tcp_close_shutdown() sees a full window */
+    if (pcb != NULL && pcb->rcv_wnd > 0) {
+        /* Match compiled TCP_WND_MAX (5760) so tcp_close_shutdown() sees a full window
+         * and performs a clean FIN close instead of sending TCP RST and purging unsent data. */
         pcb->rcv_wnd = (tcpwnd_size_t)STOCK_TCP_WND;
     }
     return __real_tcp_close(pcb);

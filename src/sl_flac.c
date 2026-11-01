@@ -9,6 +9,7 @@
 #include "dr_flac.h"
 
 #include "squeezelite.h"
+#include "sl_resample.h"
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -23,7 +24,14 @@ extern bool decode_running;
 #define UNLOCK_O mutex_unlock(outputbuf->mutex)
 
 static drflac *pFlac = NULL;
-static drflac_int32 s_flacDecBuf[1024 * 2];
+static drflac_int32 *s_flacDecBuf = NULL;
+
+/* Resampling to the fixed DSP/I2S rate (SAMPLE_RATE) */
+#define OUT_RATE        ((unsigned)SAMPLE_RATE)
+#define RS_OUT_CAP      4096
+static resampler_t *s_rs = NULL;
+static float *s_inL = NULL, *s_inR = NULL, *s_outL = NULL, *s_outR = NULL;
+volatile unsigned sl_source_rate = 0;   /* sample rate of the stream currently decoded (for UI) */
 
 static size_t _flac_read_cb(void *pUserData, void *buffer, size_t bytesToRead) {
     (void)pUserData;
@@ -73,6 +81,10 @@ static drflac_bool32 _flac_seek_cb(void *pUserData, int offset, drflac_seek_orig
 }
 
 static decode_state flac_decode(void) {
+    if (!s_flacDecBuf) {
+        return DECODE_ERROR;
+    }
+
     if (!pFlac) {
         LOCK_S;
         unsigned avail = _buf_used(streambuf);
@@ -91,11 +103,26 @@ static decode_state flac_decode(void) {
 
         LOG_INFO("FLAC stream opened: %u channels, %u Hz, %u bits/sample",
                  pFlac->channels, pFlac->sampleRate, pFlac->bitsPerSample);
+
+        resampler_destroy(s_rs);
+        s_rs = NULL;
+        sl_source_rate = pFlac->sampleRate;
+        if (pFlac->sampleRate != OUT_RATE) {
+            s_rs = resampler_create(pFlac->sampleRate, OUT_RATE);
+            if (!s_rs) {
+                LOG_ERROR("Cannot resample %u Hz -> %u Hz (unsupported rate or out of memory)",
+                          pFlac->sampleRate, OUT_RATE);
+                drflac_close(pFlac);
+                pFlac = NULL;
+                return DECODE_ERROR;
+            }
+            LOG_INFO("Resampling %u Hz -> %u Hz on Core %d", pFlac->sampleRate, OUT_RATE, xPortGetCoreID());
+        }
     }
 
     if (decode.new_stream) {
         LOCK_O;
-        output.next_sample_rate = 44100;
+        output.next_sample_rate = OUT_RATE;
         output.format = S32_LE;
         output.track_start = outputbuf->writep;
         decode.new_stream = false;
@@ -106,7 +133,13 @@ static decode_state flac_decode(void) {
     LOCK_O;
     frames_t space_frames = min(_buf_space(outputbuf), _buf_cont_write(outputbuf)) / BYTES_PER_FRAME;
     UNLOCK_O;
-    if (space_frames < max_decode) max_decode = space_frames;
+    if (s_rs) {
+        frames_t cap = space_frames < RS_OUT_CAP ? space_frames : RS_OUT_CAP;
+        frames_t in_fit = (frames_t)resampler_in_for_out(s_rs, cap);
+        if (in_fit < max_decode) max_decode = in_fit;
+    } else if (space_frames < max_decode) {
+        max_decode = space_frames;
+    }
 
     if (max_decode == 0) {
         return DECODE_RUNNING;
@@ -120,6 +153,36 @@ static decode_state flac_decode(void) {
         return toend ? DECODE_COMPLETE : DECODE_RUNNING;
     }
 
+    if (s_rs) {
+        // Deinterleave to float, resample to OUT_RATE, convert back to 32-bit PCM
+        const drflac_int32 *rsrc = s_flacDecBuf;
+        const bool stereo = (pFlac->channels > 1);
+        for (frames_t i = 0; i < (frames_t)framesRead; ++i) {
+            float l = (float)rsrc[0] * (1.0f / 2147483648.0f);
+            float r = stereo ? (float)rsrc[1] * (1.0f / 2147483648.0f) : l;
+            s_inL[i] = l;
+            s_inR[i] = r;
+            rsrc += stereo ? 2 : 1;
+        }
+
+        size_t outN = resampler_process(s_rs, s_inL, s_inR, (size_t)framesRead, s_outL, s_outR, RS_OUT_CAP);
+        if (outN == 0) {
+            return DECODE_RUNNING;
+        }
+
+        LOCK_O;
+        ISAMPLE_T *rptr = (ISAMPLE_T *)(void *)outputbuf->writep;
+        for (size_t i = 0; i < outN; ++i) {
+            float l = fmaxf(-1.0f, fminf(1.0f, s_outL[i]));
+            float r = fmaxf(-1.0f, fminf(1.0f, s_outR[i]));
+            *rptr++ = (s32_t)(l * 2147483392.0f);
+            *rptr++ = (s32_t)(r * 2147483392.0f);
+        }
+        _buf_inc_writep(outputbuf, (unsigned)outN * BYTES_PER_FRAME);
+        UNLOCK_O;
+        return DECODE_RUNNING;
+    }
+
     LOCK_O;
     ISAMPLE_T *optr = (ISAMPLE_T *)(void *)outputbuf->writep;
 
@@ -128,10 +191,7 @@ static decode_state flac_decode(void) {
 
     // drflac_read_pcm_frames_s32 outputs 32-bit MSB-aligned signed PCM samples
     if (pFlac->channels > 1) {
-        while (count--) {
-            *optr++ = (s32_t)(*src++);
-            *optr++ = (s32_t)(*src++);
-        }
+        memcpy(optr, src, (size_t)framesRead * BYTES_PER_FRAME);
     } else {
         while (count--) {
             s32_t val = (s32_t)(*src++);
@@ -164,6 +224,8 @@ static void flac_close(void) {
         drflac_close(pFlac);
         pFlac = NULL;
     }
+    resampler_destroy(s_rs);
+    s_rs = NULL;
     LOG_INFO("Closing FLAC codec");
 }
 
@@ -178,5 +240,20 @@ static struct codec flac_codec = {
 };
 
 struct codec *register_flac(void) {
+    if (!s_flacDecBuf) {
+        s_flacDecBuf = (drflac_int32 *)heap_caps_malloc(1024 * 2 * sizeof(drflac_int32), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!s_flacDecBuf) {
+            s_flacDecBuf = (drflac_int32 *)heap_caps_malloc(1024 * 2 * sizeof(drflac_int32), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        }
+    }
+    if (!s_inL) {
+        s_inL  = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_inR  = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_outL = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_outR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_inL || !s_inR || !s_outL || !s_outR) {
+            LOG_ERROR("FLAC resampler buffers allocation failed");
+        }
+    }
     return &flac_codec;
 }

@@ -77,14 +77,20 @@ public:
             dsps_mulc_f32(right, right, static_cast<int>(frames), _gainR, 1, 1);
         }
 #else
-        for (size_t i = 0; i < frames; ++i) {
-            left[i]  *= _gainL;
-            right[i] *= _gainR;
+        if (fabsf(_gainL - 1.0f) > 1e-4f || fabsf(_gainR - 1.0f) > 1e-4f) {
+            for (size_t i = 0; i < frames; ++i) {
+                left[i]  *= _gainL;
+                right[i] *= _gainR;
+            }
         }
 #endif
 
         const bool needDelayL = (_delaySamplesL > 0.01f);
         const bool needDelayR = (_delaySamplesR > 0.01f);
+
+        if (!needDelayL && !needDelayR && _phaseDegL == 0 && _phaseDegR == 0) {
+            return;
+        }
 
         const size_t delayIntL = static_cast<size_t>(_delaySamplesL);
         const float  fracL     = _delaySamplesL - static_cast<float>(delayIntL);

@@ -3,10 +3,13 @@
 #include <functional>
 #include <cstddef>
 #include <driver/i2s.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include "audio_config.h"
 #include "param_store.h"
 #include "audio_ring_buffer.h"
 #include "runtime_tuning.h"
+#include "sl_resample.h"
 
 using AudioCallback = std::function<void(float*, float*, size_t)>;
 
@@ -21,11 +24,17 @@ public:
 
 private:
     ParamStore& _params;
-    bool        _running{false};
+    volatile bool _running{false};
+    TaskHandle_t  _btTaskHandle{nullptr};
 
     int32_t* _rxBufAux{nullptr};
     int32_t* _rxBufBt{nullptr};
     int32_t* _txBuf{nullptr};
+
+    resampler_t* _btResampler{nullptr};
+    float* _btOutL{nullptr};
+    float* _btOutR{nullptr};
+    size_t _btOutCap{0};
 
     float* _leftAux{nullptr};
     float* _rightAux{nullptr};
@@ -50,4 +59,6 @@ private:
     void _allocBuffers();
     void _freeBuffers();
     void _writeBtFrames(size_t frames);
+    static void _btTaskTrampoline(void* arg);
+    void _runBtTask();
 };

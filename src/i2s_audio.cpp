@@ -16,6 +16,19 @@ bool I2SAudio::begin()
 {
     _allocBuffers();
 
+    _btResampler = resampler_create(kBtSampleRate, kSampleRate);
+    _btOutCap    = _btResampler ? resampler_max_out(_btResampler, kBufferFrames) : kBufferFrames;
+    _btOutL = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    _btOutR = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!_btOutL) _btOutL = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    if (!_btOutR) _btOutR = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    if (!_btResampler || !_btOutL || !_btOutR) {
+        Serial.println("[AUDIO] ERROR: Failed to set up Bluetooth resampler!");
+    } else {
+        Serial.printf("[AUDIO] Bluetooth resampler %u -> %u Hz ready (Core 0 offload)\n",
+                      (unsigned)kBtSampleRate, (unsigned)kSampleRate);
+    }
+
     if (!_btRingBuffer.allocate()) {
         Serial.println("[AUDIO] ERROR: Failed to allocate BT ring buffer!");
     }
@@ -59,7 +72,7 @@ bool I2SAudio::begin()
         .mode                 = static_cast<i2s_mode_t>(
                                     I2S_MODE_SLAVE |
                                     I2S_MODE_RX),
-        .sample_rate          = kSampleRate,
+        .sample_rate          = kBtSampleRate,
         .bits_per_sample      = I2S_BITS_PER_SAMPLE_32BIT,
         .channel_format       = I2S_CHANNEL_FMT_RIGHT_LEFT,
         .communication_format = I2S_COMM_FORMAT_STAND_I2S,
@@ -92,7 +105,47 @@ bool I2SAudio::begin()
     i2s_zero_dma_buffer(kI2SPortSlave);
 
     _running = true;
+
+    xTaskCreatePinnedToCore(
+        _btTaskTrampoline,
+        "BtResample",
+        4096,
+        this,
+        4,
+        &_btTaskHandle,
+        0
+    );
+
     return true;
+}
+
+void I2SAudio::_btTaskTrampoline(void* arg)
+{
+    static_cast<I2SAudio*>(arg)->_runBtTask();
+}
+
+void I2SAudio::_runBtTask()
+{
+    const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
+
+    while (_running) {
+        const InputSourceMode targetSource = _params.getInputMode();
+        if (targetSource != INPUT_MODE_BT && _gainBt == 0.0f) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+            continue;
+        }
+
+        size_t bytesReadBt = 0;
+        if (i2s_read(kI2SPortSlave, _rxBufBt, byteCount, &bytesReadBt, pdMS_TO_TICKS(10)) == ESP_OK &&
+            bytesReadBt > 0) {
+            size_t frames = bytesReadBt / (kChannels * sizeof(int32_t));
+            _writeBtFrames(frames);
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
+
+    vTaskDelete(nullptr);
 }
 
 void I2SAudio::process(const AudioCallback& cb)
@@ -102,33 +155,24 @@ void I2SAudio::process(const AudioCallback& cb)
     const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
     const InputSourceMode targetSource = _params.getInputMode();
 
-    size_t bytesReadAux = 0;
-    esp_err_t errAux = i2s_read(kI2SPortMaster, _rxBufAux, byteCount, &bytesReadAux, 0);
-    if (targetSource != INPUT_MODE_AUX || errAux != ESP_OK || bytesReadAux == 0) {
-        memset(_rxBufAux, 0, byteCount);
-    }
-
     static constexpr float kAuxPreamp = 2.0f;
-    if (targetSource == INPUT_MODE_AUX) {
-        for (size_t i = 0; i < kBufferFrames; ++i) {
-            float sL = static_cast<float>(_rxBufAux[i * 2    ]) * (kScale * kAuxPreamp);
-            float sR = static_cast<float>(_rxBufAux[i * 2 + 1]) * (kScale * kAuxPreamp);
-            _leftAux[i]  = fmaxf(-1.0f, fminf(1.0f, sL));
-            _rightAux[i] = fmaxf(-1.0f, fminf(1.0f, sR));
+    if (targetSource == INPUT_MODE_AUX || _gainAux > 0.0f) {
+        size_t bytesReadAux = 0;
+        esp_err_t errAux = i2s_read(kI2SPortMaster, _rxBufAux, byteCount, &bytesReadAux, 0);
+        if (errAux == ESP_OK && bytesReadAux > 0) {
+            for (size_t i = 0; i < kBufferFrames; ++i) {
+                float sL = static_cast<float>(_rxBufAux[i * 2    ]) * (kScale * kAuxPreamp);
+                float sR = static_cast<float>(_rxBufAux[i * 2 + 1]) * (kScale * kAuxPreamp);
+                _leftAux[i]  = fmaxf(-1.0f, fminf(1.0f, sL));
+                _rightAux[i] = fmaxf(-1.0f, fminf(1.0f, sR));
+            }
+        } else {
+            memset(_leftAux,  0, kBufferFrames * sizeof(float));
+            memset(_rightAux, 0, kBufferFrames * sizeof(float));
         }
     }
 
-    if (targetSource == INPUT_MODE_BT) {
-        constexpr size_t kMaxBtBlocksPerAudioBlock = 4;
-        for (size_t block = 0; block < kMaxBtBlocksPerAudioBlock; ++block) {
-            size_t bytesReadBt = 0;
-            if (i2s_read(kI2SPortSlave, _rxBufBt, byteCount, &bytesReadBt, 0) != ESP_OK ||
-                bytesReadBt == 0) {
-                break;
-            }
-            size_t frames = bytesReadBt / (kChannels * sizeof(int32_t));
-            _writeBtFrames(frames);
-        }
+    if (targetSource == INPUT_MODE_BT || _gainBt > 0.0f) {
         _btRingBuffer.read(_leftBt, _rightBt, kBufferFrames);
     }
 
@@ -206,9 +250,13 @@ void I2SAudio::process(const AudioCallback& cb)
 void I2SAudio::end()
 {
     if (_running) {
+        _running = false;
+        if (_btTaskHandle) {
+            vTaskDelay(pdMS_TO_TICKS(30));
+            _btTaskHandle = nullptr;
+        }
         i2s_driver_uninstall(kI2SPortSlave);
         i2s_driver_uninstall(kI2SPortMaster);
-        _running = false;
     }
     _freeBuffers();
 }
@@ -241,6 +289,9 @@ void I2SAudio::_allocBuffers()
 
 void I2SAudio::_freeBuffers()
 {
+    resampler_destroy(_btResampler); _btResampler = nullptr;
+    heap_caps_free(_btOutL);    _btOutL    = nullptr;
+    heap_caps_free(_btOutR);    _btOutR    = nullptr;
     heap_caps_free(_rxBufAux);  _rxBufAux  = nullptr;
     heap_caps_free(_rxBufBt);   _rxBufBt   = nullptr;
     heap_caps_free(_txBuf);     _txBuf     = nullptr;
@@ -259,7 +310,7 @@ void I2SAudio::_writeBtFrames(size_t frames)
 {
     if (frames == 0) return;
 
-    if (_btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames) {
+    for (int guard = 0; guard < 4 && _btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames; ++guard) {
         float dropL[RuntimeTuning::kBtLatencyTrimFrames], dropR[RuntimeTuning::kBtLatencyTrimFrames];
         _btRingBuffer.read(dropL, dropR, RuntimeTuning::kBtLatencyTrimFrames);
     }
@@ -270,5 +321,8 @@ void I2SAudio::_writeBtFrames(size_t frames)
         bufL[i] = static_cast<float>(_rxBufBt[i * 2    ]) * kScale;
         bufR[i] = static_cast<float>(_rxBufBt[i * 2 + 1]) * kScale;
     }
-    _btRingBuffer.write(bufL, bufR, frames);
+    if (_btResampler && _btOutL && _btOutR) {
+        size_t outN = resampler_process(_btResampler, bufL, bufR, frames, _btOutL, _btOutR, _btOutCap);
+        _btRingBuffer.write(_btOutL, _btOutR, outN);
+    }
 }

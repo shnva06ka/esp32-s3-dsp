@@ -21,11 +21,13 @@ public:
     void clear();
 
 private:
+    void _ensureAllocated();
+
     Print* _hwSerial{nullptr};
     static constexpr size_t kMaxLogs = 150;
     static constexpr size_t kLineBufSize = 256;
 
-    char   _lines[kMaxLogs][kLineBufSize];
+    char   (*_lines)[kLineBufSize]{nullptr};
     size_t _head{0};
     size_t _count{0};
 

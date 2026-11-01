@@ -1,4 +1,5 @@
 #include "wireless_console.h"
+#include <esp_heap_caps.h>
 #include <cstring>
 
 WirelessConsole Console(&Serial);
@@ -6,14 +7,27 @@ WirelessConsole Console(&Serial);
 WirelessConsole::WirelessConsole(Print* hwSerial)
     : _hwSerial(hwSerial)
 {
-    memset(_lines, 0, sizeof(_lines));
     memset(_curLine, 0, sizeof(_curLine));
+}
+
+void WirelessConsole::_ensureAllocated()
+{
+    if (_lines) return;
+    const size_t bytes = kMaxLogs * kLineBufSize;
+    _lines = static_cast<char(*)[kLineBufSize]>(
+        heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!_lines) {
+        _lines = static_cast<char(*)[kLineBufSize]>(malloc(bytes));
+    }
+    if (_lines) {
+        memset(_lines, 0, bytes);
+    }
 }
 
 void WirelessConsole::begin(unsigned long baud)
 {
-    // Buffers already cleared in constructor. 
-    // Network services (Telnet) are started dynamically in loop() after Wi-Fi is connected.
+    (void)baud;
+    _ensureAllocated();
 }
 
 void WirelessConsole::loop()
@@ -55,11 +69,13 @@ size_t WirelessConsole::write(uint8_t c)
     if (c == '\n') {
         _curLine[_curPos] = '\0';
 
-        // Store into circular buffer
-        strncpy(_lines[_head], _curLine, kLineBufSize - 1);
-        _lines[_head][kLineBufSize - 1] = '\0';
-        _head = (_head + 1) % kMaxLogs;
-        if (_count < kMaxLogs) _count++;
+        _ensureAllocated();
+        if (_lines) {
+            strncpy(_lines[_head], _curLine, kLineBufSize - 1);
+            _lines[_head][kLineBufSize - 1] = '\0';
+            _head = (_head + 1) % kMaxLogs;
+            if (_count < kMaxLogs) _count++;
+        }
 
         // Stream to active Telnet client if connected
         if (_telnetClient && _telnetClient.connected()) {
@@ -94,6 +110,8 @@ size_t WirelessConsole::write(const uint8_t *buffer, size_t size)
 
 String WirelessConsole::getRecentLogs() const
 {
+    if (!_lines || _count == 0) return String();
+
     String out;
     out.reserve(_count * 80);
 
@@ -111,7 +129,9 @@ void WirelessConsole::clear()
     _head = 0;
     _count = 0;
     _curPos = 0;
-    memset(_lines, 0, sizeof(_lines));
+    if (_lines) {
+        memset(_lines, 0, kMaxLogs * kLineBufSize);
+    }
     memset(_curLine, 0, sizeof(_curLine));
 }
 

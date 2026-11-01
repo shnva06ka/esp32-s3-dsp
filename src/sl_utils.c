@@ -109,11 +109,13 @@ void _wake_create(event_event *e) {
 
     len = sizeof(addr);
     e->fds[1] = accept(e->mfds, (struct sockaddr *)&addr, &len);
+    closesocket(e->mfds);
+    e->mfds = -1;
+
     if (e->fds[1] < 0) {
         LOG_WARN("Failed to accept wake socket: %s", strerror(last_error()));
         closesocket(e->fds[0]);
-        closesocket(e->mfds);
-        e->fds[0] = e->mfds = -1;
+        e->fds[0] = -1;
         return;
     }
 

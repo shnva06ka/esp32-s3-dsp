@@ -1,7 +1,7 @@
 /*
  * Squeezelite output subsystem ported for ESP32-S3
  * Based on squeezelite (c) Adrian Smith, Ralph Irving
- * Directly feeds synchronized 44.1 kHz stereo float PCM to the DSP/I2S pipeline
+ * Directly feeds synchronized SAMPLE_RATE (96 kHz) stereo float PCM to the DSP/I2S pipeline
  * Hardware I2S DMA clock is the master clock pacing the entire pipeline
  */
 #include "squeezelite.h"
@@ -59,10 +59,11 @@ frames_t _output_frames(frames_t avail) {
 
     // Check pre-buffer threshold
     if (output.state == OUTPUT_BUFFER) {
-        unsigned min_thresh = 132300;
+        unsigned min_thresh = (3U * SAMPLE_RATE < 144000U) ? 3U * SAMPLE_RATE : 144000U;
         unsigned thresh = (output.threshold * output.next_sample_rate / 10);
         if (thresh < min_thresh) thresh = min_thresh;
-        if (thresh > 220500) thresh = 220500;
+        unsigned max_thresh = (5U * SAMPLE_RATE < 192000U) ? 5U * SAMPLE_RATE : 192000U;
+        if (thresh > max_thresh) thresh = max_thresh;
         if (frames >= thresh) {
             output.state = OUTPUT_RUNNING;
             LOG_INFO("Pre-buffer threshold reached (%u frames) -> STARTING PLAYBACK", (unsigned)frames);
@@ -229,10 +230,10 @@ void output_init(log_level level, unsigned output_buf_size, unsigned rates[]) {
     memset(&output, 0, sizeof(output));
     output.state = OUTPUT_STOPPED;
     output.format = S32_LE;
-    output.current_sample_rate = 44100;
-    output.next_sample_rate = 44100;
+    output.current_sample_rate = SAMPLE_RATE;
+    output.next_sample_rate = SAMPLE_RATE;
     output.threshold = 30; // Default 3.0s pre-buffer
-    output.start_frames = 132300; // 3.0s pre-buffer at 44.1kHz
+    output.start_frames = (3U * SAMPLE_RATE < 144000U) ? 3U * SAMPLE_RATE : 144000U; // ~1.5-3s pre-buffer
     output.gainL = FIXED_ONE;
     output.gainR = FIXED_ONE;
     output.write_cb = &_direct_write_frames;
