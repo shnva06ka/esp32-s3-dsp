@@ -6,6 +6,8 @@ Real-time stereo audio processor built on the ESP32-S3, controlled from a web in
 
 - Three inputs: Line In, Bluetooth, Squeezebox
 - Fixed 96 kHz sample rate for DSP and I2S, with on-device resampling for lower rates
+> [!WARNING]
+> Resampler is currently broken; If using Squeezebox,force your music player to resample to 96KHz first. I'm currently implementing a fix.
 - Parametric EQ with up to 10 bands (Peaking, Shelf, Low Pass, High Pass, up to 4th order)
 - Speaker correction: subsonic filter, balance, per-channel delay, phase
 - Compressor and soft-knee limiter
