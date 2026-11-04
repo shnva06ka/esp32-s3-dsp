@@ -23,9 +23,15 @@ Squeezebox ---------/
 
 - **ESP32-S3**: audio engine, DSP, web UI, and Squeezebox client
 - **ESP32-WROOM** (optional): Bluetooth A2DP receiver, since the S3 has no Bluetooth Classic. Any I2S source can replace it.
-- **Squeezebox**: works with Logitech Media Server and compatible players such as Roon. Supports FLAC up to 96 kHz; lower rates (44.1, 48, 88.2 kHz) and 44.1 kHz Bluetooth audio are resampled to 96 kHz on Core 0.
+- **Squeezebox**: works with Logitech Media Server and compatible players such as Roon. Supports FLAC, WAV, AIFF, and PCM up to 96 kHz; lower rates (44.1, 48, 88.2 kHz) and 44.1 kHz Bluetooth audio are resampled to 96 kHz on Core 0.
 
 Tested with PCM1808 (ADC) and PCM5102A (DAC).
+
+### Hardware Requirements
+
+- **ESP32-S3 Module**: **N16R8** (16 MB Flash, 8 MB Octal OPI PSRAM) is **strictly required**. The Squeezelite streaming pipeline allocates 4 MB of ring and decode buffers in PSRAM. Modules without PSRAM or with Quad PSRAM (N8R2/N16R2) will panic on boot.
+- **Audio Converters**: PCM1808 (ADC) and PCM5102A (DAC), or any standard I2S DAC/ADC supporting 256fs MCLK (24.576 MHz generated via ESP32-S3 APLL).
+- **Bluetooth Bridge (Optional)**: ESP32-WROOM (or any classic ESP32 module) running the included bridge firmware.
 
 ## Wiring
 
@@ -88,3 +94,16 @@ The board exposes a REST API and a WebSocket at `/ws`:
 | `/console` | GET | Web-based live console |
 | `/update` | GET, POST | Firmware upload page and OTA binary endpoint |
 | `/ws` | WS | Real-time parameter sync and live 1 Hz system telemetry |
+
+## License & Credits
+
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for the full license text.
+
+### Third-Party Acknowledgements
+
+- **Squeezelite**: (c) 2012–2015 Adrian Smith, 2015–2021 Ralph Irving (GPLv3).
+- **squeezelite-esp32**: (c) Philippe G. / sle118 (GPLv3/MIT).
+- **dr_flac**: (c) 2023 David Reid (Public Domain / MIT-0).
+- **ESP32-A2DP**: (c) Phil Schatzmann (MIT).
+- **ESPAsyncWebServer & AsyncTCP**: (c) Mathieu Carbou (LGPLv3).
+- **ArduinoJson**: (c) Benoit Blanchon (MIT).

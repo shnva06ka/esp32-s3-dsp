@@ -100,6 +100,7 @@ public:
             if (prefs.isKey("init")) {
                 xSemaphoreTake(_mutex, portMAX_DELAY);
                 _eqCount  = prefs.getInt("eq_cnt", 5);
+                if (_eqCount < 1 || _eqCount > kEQBands) _eqCount = 5;
                 _preampDb = prefs.getFloat("preamp", 0.0f);
                 prefs.getBytes("eq_bands", _eq, sizeof(_eq));
                 prefs.getBytes("subsonic", &_subsonic, sizeof(_subsonic));

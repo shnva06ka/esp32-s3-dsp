@@ -12,7 +12,7 @@
 
 class SpeakerCorrection {
 public:
-    static constexpr size_t kDelayBufSize = 2048;
+    static constexpr size_t kDelayBufSize = 4096;
 
     SpeakerCorrection() {
         reset();

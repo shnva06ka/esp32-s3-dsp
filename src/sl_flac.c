@@ -102,6 +102,13 @@ static decode_state flac_decode(void) {
             return toend ? DECODE_COMPLETE : DECODE_RUNNING;
         }
 
+        if (pFlac->channels > 2) {
+            LOG_ERROR("Multichannel FLAC (%u channels) not supported (stereo/mono only)", pFlac->channels);
+            drflac_close(pFlac);
+            pFlac = NULL;
+            return DECODE_ERROR;
+        }
+
         LOG_INFO("FLAC stream opened: %u channels, %u Hz, %u bits/sample",
                  pFlac->channels, pFlac->sampleRate, pFlac->bitsPerSample);
 

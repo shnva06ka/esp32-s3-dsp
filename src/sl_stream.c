@@ -285,6 +285,9 @@ void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *h
     }
     stream.state = SEND_HEADERS;
     stream.cont_wait = cont_wait;
+    if (header_len >= MAX_HEADER) {
+        header_len = MAX_HEADER - 1;
+    }
     stream.header_len = header_len;
     if (stream.header) {
         memcpy(stream.header, header, header_len);

@@ -285,6 +285,10 @@ static void sendSETDName(const char *name) {
 }
 
 static void process_strm(u8_t *pkt, int len) {
+    if (len < (int)sizeof(struct strm_packet)) {
+        LOG_WARN("strm packet too short: %d < %d", len, (int)sizeof(struct strm_packet));
+        return;
+    }
     struct strm_packet *strm = (struct strm_packet *)pkt;
     if (strm->command == 't') {
         LOG_DEBUG("Command strm: '%c'", strm->command);
@@ -357,6 +361,9 @@ static void process_strm(u8_t *pkt, int len) {
 
     case 's': {
         unsigned header_len = (unsigned)len - sizeof(struct strm_packet);
+        if (header_len >= MAX_HEADER) {
+            header_len = MAX_HEADER - 1;
+        }
         char *header = (char *)(pkt + sizeof(struct strm_packet));
         in_addr_t ip = (in_addr_t)strm->server_ip;
         u16_t port = strm->server_port;
@@ -451,14 +458,18 @@ static void process_aude(u8_t *pkt, int len) {
 }
 
 static void process_setd(u8_t *pkt, int len) {
+    if (len < (int)sizeof(struct SETD_header)) {
+        return;
+    }
     struct SETD_header *setd = (struct SETD_header *)pkt;
     if (setd->id == 0) {
-        if (len == 5) {
+        if (len == (int)sizeof(struct SETD_header)) {
             sendSETDName(player_name);
-        } else if (len > 5) {
-            const char *name = (const char *)(pkt + sizeof(struct SETD_header));
-            strncpy(player_name, name, sizeof(player_name) - 1);
-            player_name[sizeof(player_name) - 1] = '\0';
+        } else if (len > (int)sizeof(struct SETD_header)) {
+            size_t name_len = (size_t)(len - sizeof(struct SETD_header));
+            if (name_len >= sizeof(player_name)) name_len = sizeof(player_name) - 1;
+            memcpy(player_name, pkt + sizeof(struct SETD_header), name_len);
+            player_name[name_len] = '\0';
             LOG_INFO("Updated player name to '%s'", player_name);
             sendSETDName(player_name);
         }

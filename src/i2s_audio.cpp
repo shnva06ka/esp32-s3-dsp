@@ -112,7 +112,7 @@ bool I2SAudio::begin()
     xTaskCreatePinnedToCore(
         _btTaskTrampoline,
         "BtResample",
-        4096,
+        8192,
         this,
         4,
         &_btTaskHandle,
@@ -130,12 +130,19 @@ void I2SAudio::_btTaskTrampoline(void* arg)
 void I2SAudio::_runBtTask()
 {
     const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
+    bool wasBtActive = false;
 
     while (_running) {
         const InputSourceMode targetSource = _params.getInputMode();
-        if (targetSource != INPUT_MODE_BT && _gainBt == 0.0f) {
+        const bool btActive = (targetSource == INPUT_MODE_BT || _gainBt > 0.0f);
+        if (!btActive) {
+            wasBtActive = false;
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
+        }
+        if (!wasBtActive) {
+            i2s_zero_dma_buffer(kI2SPortSlave);
+            wasBtActive = true;
         }
 
         size_t bytesReadBt = 0;
