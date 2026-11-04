@@ -6,8 +6,6 @@ Real-time stereo audio processor built on the ESP32-S3, controlled from a web in
 
 - Three inputs: Line In, Bluetooth, Squeezebox
 - Fixed 96 kHz sample rate for DSP and I2S, with on-device resampling for lower rates
-> [!WARNING]
-> Resampler is currently broken; If using Squeezebox,force your music player to resample to 96KHz first. I'm currently implementing a fix.
 - Parametric EQ with up to 10 bands (Peaking, Shelf, Low Pass, High Pass, up to 4th order)
 - Speaker correction: subsonic filter, balance, per-channel delay, phase
 - Compressor and soft-knee limiter
@@ -73,3 +71,20 @@ Set credentials in `src/wifi_credentials.h`, or use the Wi-Fi setup card in the 
 ```
 
 Once connected, open `http://dsp.local`. If no network is available, the board starts an access point named `ESP32-S3-DSP` at `http://192.168.4.1`.
+
+## API
+
+The board exposes a REST API and a WebSocket at `/ws`:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/params` | GET | DSP state, active input, stream info, and system diagnostics |
+| `/api/resampler` | GET | Resampler latency, active ratio, CPU load, and buffer stats |
+| `/api/resampler/validate` | POST | Run resampler benchmark across standard sample rates |
+| `/api/resampler/log` | POST | Enable or disable periodic serial telemetry (`enable=1` or `0`) |
+| `/api/wifi` | GET, POST | Check connection status; configure SSID and password |
+| `/api/logs` | GET | Retrieve recent console logs as plain text |
+| `/api/reboot` | POST | Reboot the ESP32-S3 |
+| `/console` | GET | Web-based live console |
+| `/update` | GET, POST | Firmware upload page and OTA binary endpoint |
+| `/ws` | WS | Real-time parameter sync and live 1 Hz system telemetry |

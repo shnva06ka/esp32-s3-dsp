@@ -7,6 +7,7 @@ WirelessConsole Console(&Serial);
 WirelessConsole::WirelessConsole(Print* hwSerial)
     : _hwSerial(hwSerial)
 {
+    _mutex = xSemaphoreCreateRecursiveMutex();
     memset(_curLine, 0, sizeof(_curLine));
 }
 
@@ -56,61 +57,59 @@ void WirelessConsole::loop()
 
 size_t WirelessConsole::write(uint8_t c)
 {
-    // 1. Output to physical USB-CDC / UART Serial
-    if (_hwSerial) {
-        _hwSerial->write(c);
-    }
-
-    // 2. Buffer line
-    if (c == '\r') {
-        return 1;
-    }
-
-    if (c == '\n') {
-        _curLine[_curPos] = '\0';
-
-        _ensureAllocated();
-        if (_lines) {
-            strncpy(_lines[_head], _curLine, kLineBufSize - 1);
-            _lines[_head][kLineBufSize - 1] = '\0';
-            _head = (_head + 1) % kMaxLogs;
-            if (_count < kMaxLogs) _count++;
-        }
-
-        // Stream to active Telnet client if connected
-        if (_telnetClient && _telnetClient.connected()) {
-            _telnetClient.println(_curLine);
-        }
-
-        // Broadcast to WebSocket clients if callback is set
-        if (_broadcast) {
-            _broadcast(_curLine);
-        }
-
-        _curPos = 0;
-        _curLine[0] = '\0';
-        return 1;
-    }
-
-    if (_curPos < kLineBufSize - 1) {
-        _curLine[_curPos++] = static_cast<char>(c);
-    }
-
-    return 1;
+    return write(&c, 1);
 }
 
 size_t WirelessConsole::write(const uint8_t *buffer, size_t size)
 {
     if (!buffer || size == 0) return 0;
-    for (size_t i = 0; i < size; ++i) {
-        write(buffer[i]);
+    if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
+
+    // 1. Output entire block atomically to USB-CDC / UART Serial
+    if (_hwSerial) {
+        _hwSerial->write(buffer, size);
     }
+
+    // 2. Buffer lines for Telnet and Web Console
+    for (size_t i = 0; i < size; ++i) {
+        uint8_t c = buffer[i];
+        if (c == '\r') continue;
+
+        if (c == '\n') {
+            _curLine[_curPos] = '\0';
+
+            _ensureAllocated();
+            if (_lines) {
+                strncpy(_lines[_head], _curLine, kLineBufSize - 1);
+                _lines[_head][kLineBufSize - 1] = '\0';
+                _head = (_head + 1) % kMaxLogs;
+                if (_count < kMaxLogs) _count++;
+            }
+
+            if (_telnetClient && _telnetClient.connected()) {
+                _telnetClient.println(_curLine);
+            }
+
+            if (_broadcast) {
+                _broadcast(_curLine);
+            }
+
+            _curPos = 0;
+            _curLine[0] = '\0';
+        } else if (_curPos < kLineBufSize - 1) {
+            _curLine[_curPos++] = static_cast<char>(c);
+        }
+    }
+
+    if (_mutex) xSemaphoreGiveRecursive(_mutex);
     return size;
 }
 
 String WirelessConsole::getRecentLogs() const
 {
     if (!_lines || _count == 0) return String();
+
+    if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
 
     String out;
     out.reserve(_count * 80);
@@ -121,11 +120,14 @@ String WirelessConsole::getRecentLogs() const
         out += _lines[idx];
         out += "\n";
     }
+
+    if (_mutex) xSemaphoreGiveRecursive(_mutex);
     return out;
 }
 
 void WirelessConsole::clear()
 {
+    if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
     _head = 0;
     _count = 0;
     _curPos = 0;
@@ -133,6 +135,7 @@ void WirelessConsole::clear()
         memset(_lines, 0, kMaxLogs * kLineBufSize);
     }
     memset(_curLine, 0, sizeof(_curLine));
+    if (_mutex) xSemaphoreGiveRecursive(_mutex);
 }
 
 extern "C" void console_log(const char* buf) {

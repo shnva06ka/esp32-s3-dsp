@@ -4,6 +4,8 @@
 #include <WiFi.h>
 #include <WiFiServer.h>
 #include <WiFiClient.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 class WirelessConsole : public Print {
 public:
@@ -24,6 +26,8 @@ private:
     void _ensureAllocated();
 
     Print* _hwSerial{nullptr};
+    SemaphoreHandle_t _mutex{nullptr};
+    size_t _writeUnlocked(uint8_t c);
     static constexpr size_t kMaxLogs = 150;
     static constexpr size_t kLineBufSize = 256;
 

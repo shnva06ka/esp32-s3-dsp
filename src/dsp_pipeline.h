@@ -1,4 +1,5 @@
 #pragma once
+#include "wireless_console.h"
 
 #include <cmath>
 #include <cstring>
@@ -237,7 +238,7 @@ private:
         char orderBuf[64];
         if (_params.getModuleOrderIfChanged(orderBuf, sizeof(orderBuf), _localOrderVersion)) {
             _updateOrder(orderBuf);
-            Serial.printf("[DSP] Updated signal processing order: %s\n", orderBuf);
+            Console.printf("[DSP] Updated signal processing order: %s\n", orderBuf);
         }
 
         for (size_t i = 0; i < _registeredCount; ++i) {

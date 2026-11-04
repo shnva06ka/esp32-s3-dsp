@@ -4,6 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ESP32-S3-DSP</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232e3440'/%3E%3Cpath d='M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12' fill='none' stroke='%2388c0d0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"/>
 <style>
 :root {
   --nord0: #2E3440; --nord1: #3B4252;
@@ -1795,11 +1796,15 @@ footer {
           </div>
           <div class="wifi-info-item">
             <span class="wifi-info-lbl">Stream Format</span>
-            <span class="wifi-info-val" id="wifi-format-val">PCM 44.1 kHz / 24-bit</span>
+            <span class="wifi-info-val" id="wifi-format-val">--</span>
           </div>
           <div class="wifi-info-item">
             <span class="wifi-info-lbl">Playback Status</span>
             <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
+          </div>
+          <div class="wifi-info-item">
+            <span class="wifi-info-lbl">Resampler Latency</span>
+            <span class="wifi-info-val" id="wifi-latency-val">None (Bypass)</span>
           </div>
         </div>
       </div>
@@ -2676,12 +2681,16 @@ function handleMsg(d) {
   }
   if (d.t === 'sys') {
     updateSysStatsUI(d);
+    if (d.resample) updateResamplerUI(d.resample);
     return;
   }
   if (d.t !== 'state') return;
 
   if (d.sys) {
     updateSysStatsUI(d.sys);
+  }
+  if (d.resample) {
+    updateResamplerUI(d.resample);
   }
 
   if (d.eq) {
@@ -3065,6 +3074,16 @@ function updateWiFiModuleVisibility() {
     const isWifi = (selectedInputSource === 3);
     wfMod.style.display = isWifi ? 'block' : 'none';
   }
+}
+
+function updateResamplerUI(rs) {
+  const latEl = document.getElementById('wifi-latency-val');
+  if (!latEl) return;
+  if (!rs || !rs.active) {
+    latEl.textContent = 'None (Bypass)';
+    return;
+  }
+  latEl.textContent = (rs.last_us !== undefined && rs.last_us > 0) ? `${rs.last_us} µs` : 'Active';
 }
 
 function updateWiFiStreamUI(wf) {
@@ -5279,6 +5298,17 @@ function submitWiFiConfig() {
     }).catch(() => {});
   } catch (_) {}
 }
+
+setInterval(() => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    fetch('/api/resampler')
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.resample) updateResamplerUI(data.resample);
+      })
+      .catch(() => {});
+  }
+}, 1000);
 
 wsConnect();
 </script>

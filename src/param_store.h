@@ -1,4 +1,5 @@
 #pragma once
+#include "wireless_console.h"
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -76,7 +77,7 @@ enum ActiveInputSource : uint8_t {
 struct WiFiStreamMetadata {
     char serverName[64]{"None"};
     char serverIp[32]{""};
-    char formatInfo[64]{"PCM 44.1kHz 16-bit"};
+    char formatInfo[64]{"--"};
     bool connected{false};
     bool streaming{false};
     bool paused{false};
@@ -138,9 +139,9 @@ public:
                 _limVersion.fetch_add(1, std::memory_order_release);
                 _inputVersion.fetch_add(1, std::memory_order_release);
                 xSemaphoreGive(_mutex);
-                Serial.println("[NVS] Loaded all DSP parameters and states from flash.");
+                Console.println("[NVS] Loaded all DSP parameters and states from flash.");
             } else {
-                Serial.println("[NVS] No saved parameters found in flash. Defaults active (all effects OFF).");
+                Console.println("[NVS] No saved parameters found in flash. Defaults active (all effects OFF).");
             }
             prefs.end();
         }
@@ -187,7 +188,7 @@ public:
         prefs.putBool("boot_lim", bLim);
         prefs.putString("mod_order", modOrder);
         prefs.end();
-        Serial.println("[NVS] Saved all DSP parameters and states to flash.");
+        Console.println("[NVS] Saved all DSP parameters and states to flash.");
     }
 
     void markDirty() {

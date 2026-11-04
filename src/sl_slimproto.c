@@ -787,7 +787,7 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
     BaseType_t rc = xTaskCreatePinnedToCore(
         slimproto_task,
         "sl_control",
-        8192,
+        4096,
         NULL,
         5,
         &slimproto_task_handle,

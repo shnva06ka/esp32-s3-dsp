@@ -207,7 +207,7 @@ void stream_init(log_level level, unsigned stream_buf_size) {
     xTaskCreatePinnedToCore(
         stream_task,
         "sl_stream",
-        8192,
+        4096,
         NULL,
         7,
         &stream_task_handle,

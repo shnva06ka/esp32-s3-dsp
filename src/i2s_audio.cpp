@@ -1,4 +1,5 @@
 #include "i2s_audio.h"
+#include "wireless_console.h"
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 #include <cmath>
@@ -18,19 +19,21 @@ bool I2SAudio::begin()
 
     _btResampler = resampler_create(kBtSampleRate, kSampleRate);
     _btOutCap    = _btResampler ? resampler_max_out(_btResampler, kBufferFrames) : kBufferFrames;
-    _btOutL = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-    _btOutR = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    _btOutL = static_cast<float*>(heap_caps_aligned_alloc(16, _btOutCap * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     if (!_btOutL) _btOutL = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    if (!_btOutL) _btOutL = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    _btOutR = static_cast<float*>(heap_caps_aligned_alloc(16, _btOutCap * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
     if (!_btOutR) _btOutR = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+    if (!_btOutR) _btOutR = static_cast<float*>(heap_caps_malloc(_btOutCap * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     if (!_btResampler || !_btOutL || !_btOutR) {
-        Serial.println("[AUDIO] ERROR: Failed to set up Bluetooth resampler!");
+        Console.println("[AUDIO] ERROR: Failed to set up Bluetooth resampler!");
     } else {
-        Serial.printf("[AUDIO] Bluetooth resampler %u -> %u Hz ready (Core 0 offload)\n",
+        Console.printf("[AUDIO] Bluetooth resampler %u -> %u Hz ready (Core 0 offload)\n",
                       (unsigned)kBtSampleRate, (unsigned)kSampleRate);
     }
 
     if (!_btRingBuffer.allocate()) {
-        Serial.println("[AUDIO] ERROR: Failed to allocate BT ring buffer!");
+        Console.println("[AUDIO] ERROR: Failed to allocate BT ring buffer!");
     }
 
     const i2s_config_t cfg_master = {
@@ -173,7 +176,14 @@ void I2SAudio::process(const AudioCallback& cb)
     }
 
     if (targetSource == INPUT_MODE_BT || _gainBt > 0.0f) {
+        size_t avail = _btRingBuffer.available();
+        uint32_t underrun = (avail < kBufferFrames) ? static_cast<uint32_t>(kBufferFrames - avail) : 0;
         _btRingBuffer.read(_leftBt, _rightBt, kBufferFrames);
+        if (_btResampler && underrun > 0) {
+            resampler_record_flow(_btResampler, underrun, 0, 0,
+                                  static_cast<uint32_t>(_btRingBuffer.available()),
+                                  static_cast<uint32_t>(_btRingBuffer.capacity()));
+        }
     }
 
     size_t wifiFramesRead = 0;
@@ -229,7 +239,7 @@ void I2SAudio::process(const AudioCallback& cb)
         _params.setActiveSource(currentActive);
         const char* name = (currentActive == ACTIVE_SRC_BT)   ? "BLUETOOTH" :
                            (currentActive == ACTIVE_SRC_AUX)  ? "LINE IN" : "SQUEEZEBOX";
-        Serial.printf("[AUDIO] Active input switched to: %s\n", name);
+        Console.printf("[AUDIO] Active input switched to: %s\n", name);
     }
 
     if (!wifiSilenceFastPath) {
@@ -310,9 +320,11 @@ void I2SAudio::_writeBtFrames(size_t frames)
 {
     if (frames == 0) return;
 
+    uint32_t droppedFrames = 0;
     for (int guard = 0; guard < 4 && _btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames; ++guard) {
         float dropL[RuntimeTuning::kBtLatencyTrimFrames], dropR[RuntimeTuning::kBtLatencyTrimFrames];
         _btRingBuffer.read(dropL, dropR, RuntimeTuning::kBtLatencyTrimFrames);
+        droppedFrames += RuntimeTuning::kBtLatencyTrimFrames;
     }
 
     float bufL[kBufferFrames];
@@ -323,6 +335,17 @@ void I2SAudio::_writeBtFrames(size_t frames)
     }
     if (_btResampler && _btOutL && _btOutR) {
         size_t outN = resampler_process(_btResampler, bufL, bufR, frames, _btOutL, _btOutR, _btOutCap);
-        _btRingBuffer.write(_btOutL, _btOutR, outN);
+        size_t written = _btRingBuffer.write(_btOutL, _btOutR, outN);
+        uint32_t overrun = (outN > written) ? static_cast<uint32_t>(outN - written) : 0;
+        resampler_record_flow(_btResampler, 0, overrun, droppedFrames,
+                              static_cast<uint32_t>(_btRingBuffer.available()),
+                              static_cast<uint32_t>(_btRingBuffer.capacity()));
     }
+}
+
+bool I2SAudio::getBtResamplerStats(resampler_stats_t* out) const
+{
+    if (!_btResampler || !out) return false;
+    resampler_get_stats(_btResampler, out);
+    return true;
 }

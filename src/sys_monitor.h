@@ -44,6 +44,7 @@ public:
     struct Stats {
         float    cpu0;
         float    cpu1;
+        float    tempC;
         uint32_t heapUsed;
         uint32_t heapTotal;
         uint32_t psramUsed;
@@ -73,6 +74,7 @@ public:
         Stats s;
         s.cpu0       = st.cpu0Usage;
         s.cpu1       = st.cpu1Usage;
+        s.tempC      = temperatureRead();
         s.heapTotal  = st.heapTotal;
         s.heapUsed   = st.heapTotal - ESP.getFreeHeap();
         s.psramTotal = st.psramTotal;

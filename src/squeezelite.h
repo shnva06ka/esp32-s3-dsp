@@ -193,6 +193,9 @@ void decode_init(log_level level, const char *include_codecs, const char *exclud
 void decode_close(void);
 void decode_flush(bool close);
 void codec_open(u8_t format, u8_t sample_size, u8_t sample_rate, u8_t channels, u8_t endianness);
+TaskHandle_t sl_decode_task_handle(void);
+#include "sl_resample.h"
+bool sl_flac_get_resampler_stats(resampler_stats_t *out);
 
 struct codec *register_pcm(void);
 struct codec *register_flac(void);
@@ -292,6 +295,9 @@ void packn(u16_t *dest, u16_t val);
 u32_t unpackN(const u32_t *src);
 u16_t unpackn(const u16_t *src);
 in_addr_t discover_server(char *default_server, int max);
+
+extern volatile unsigned sl_source_rate;
+extern volatile unsigned sl_source_bits;
 
 #ifdef __cplusplus
 }

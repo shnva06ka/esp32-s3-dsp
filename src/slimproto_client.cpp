@@ -12,6 +12,7 @@ extern struct streamstate stream;
 extern struct outputstate output;
 extern struct decodestate decode;
 extern "C" volatile unsigned sl_source_rate;
+extern "C" volatile unsigned sl_source_bits;
 
 SlimprotoClient::SlimprotoClient(ParamStore& params)
     : _params(params)
@@ -25,7 +26,7 @@ SlimprotoClient::~SlimprotoClient() {
 bool SlimprotoClient::begin() {
     if (_running) return true;
 
-    Serial.println("[SLIMPROTO] Starting Squeezelite streaming pipeline...");
+    Console.println("[SLIMPROTO] Starting Squeezelite streaming pipeline...");
 
     uint8_t mac[6];
     WiFi.macAddress(mac);
@@ -62,7 +63,7 @@ void SlimprotoClient::stop() {
         vTaskDelay(pdMS_TO_TICKS(50));
         _telemetryTaskHandle = nullptr;
     }
-    Serial.println("[SLIMPROTO] Squeezelite pipeline stopped");
+    Console.println("[SLIMPROTO] Squeezelite pipeline stopped");
 }
 
 void SlimprotoClient::_telemetryTaskTrampoline(void* arg) {
@@ -85,19 +86,17 @@ void SlimprotoClient::_runTelemetry() {
         meta.streaming  = isStream;
         meta.paused     = isPaused;
         meta.sampleRate = sl_source_rate ? sl_source_rate : (uint32_t)SAMPLE_RATE;
-        meta.bitDepth   = 24;
+        meta.bitDepth   = sl_source_bits ? sl_source_bits : 16;
         meta.pos        = output.frames_played / (uint32_t)SAMPLE_RATE;
 
         if (isStream) {
             idleSinceMs = 0;
             unsigned srcRate = sl_source_rate ? sl_source_rate : (unsigned)SAMPLE_RATE;
-            if (srcRate == (unsigned)SAMPLE_RATE) {
-                snprintf(meta.formatInfo, sizeof(meta.formatInfo), "FLAC %u.%u kHz 24-bit", srcRate / 1000, (srcRate % 1000) / 100);
-            } else {
-                snprintf(meta.formatInfo, sizeof(meta.formatInfo), "FLAC %u.%u kHz > %u kHz", srcRate / 1000, (srcRate % 1000) / 100, (unsigned)SAMPLE_RATE / 1000);
-            }
+            unsigned bits = sl_source_bits ? sl_source_bits : 16;
+            snprintf(meta.formatInfo, sizeof(meta.formatInfo), "%u.%u kHz %u-bit",
+                     srcRate / 1000, (srcRate % 1000) / 100, bits);
             if (_params.getInputMode() != INPUT_MODE_WIFI) {
-                Serial.println("[SLIMPROTO] Auto-switching input mode to Squeezebox");
+                Console.println("[SLIMPROTO] Auto-switching input mode to Squeezebox");
                 _params.setInputMode(INPUT_MODE_WIFI);
             }
         } else {
@@ -120,7 +119,7 @@ void SlimprotoClient::_runTelemetry() {
             lastPrintMs = now;
             wifi_ps_type_t ps = WIFI_PS_NONE;
             esp_wifi_get_ps(&ps);
-            Serial.printf("[SLIMPROTO STATS] state=%d | stream_buf=%u KB | out_buf=%u KB (%u frames) | played=%u s | rssi=%d dBm | ps=%d\n",
+            Console.printf("[SLIMPROTO STATS] state=%d | stream_buf=%u KB | out_buf=%u KB (%u frames) | played=%u s | rssi=%d dBm | ps=%d\n",
                           output.state,
                           (unsigned)(_buf_used(streambuf) / 1024),
                           (unsigned)(_buf_used(outputbuf) / 1024),

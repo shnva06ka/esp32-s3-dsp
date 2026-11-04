@@ -14,6 +14,8 @@
 #include "param_store.h"
 #include "sys_monitor.h"
 #include "dsp_module_id.h"
+#include "resampler_telemetry.h"
+#include "i2s_audio.h"
 
 #if __has_include("wifi_credentials.h")
 #  include "wifi_credentials.h"
@@ -60,7 +62,7 @@ public:
         _setupRoutes();
         _server.addHandler(&_ws);
         _server.begin();
-        Serial.println("[WEB] HTTP & WebSocket server started");
+        Console.println("[WEB] HTTP & WebSocket server started");
 
         OTAManager::beginArduinoOTA();
     }
@@ -104,7 +106,7 @@ public:
             IPAddress ip = (WiFi.getMode() & WIFI_MODE_STA && WiFi.status() == WL_CONNECTED)
                              ? WiFi.localIP()
                              : WiFi.softAPIP();
-            Serial.printf("[NET] Web UI accessible at: http://%u.%u.%u.%u (or http://dsp.local)\n", ip[0], ip[1], ip[2], ip[3]);
+            Console.printf("[NET] Web UI accessible at: http://%u.%u.%u.%u (or http://dsp.local)\n", ip[0], ip[1], ip[2], ip[3]);
         }
 
         if (_params.isDirty()) {
@@ -161,38 +163,38 @@ private:
             esp_wifi_set_ps(WIFI_PS_NONE);
             WiFi.setTxPower(WIFI_POWER_19_5dBm);
             WiFi.begin(targetSSID.c_str(), targetPass.c_str());
-            Serial.printf("[WEB] Connecting to Wi-Fi SSID '%s'", targetSSID.c_str());
+            Console.printf("[WEB] Connecting to Wi-Fi SSID '%s'...\n", targetSSID.c_str());
             for (uint8_t i = 0; i < 40 && WiFi.status() != WL_CONNECTED; ++i) {
                 delay(500);
-                Serial.print('.');
             }
             if (WiFi.status() == WL_CONNECTED) {
                 WiFi.setSleep(false);
                 esp_wifi_set_ps(WIFI_PS_NONE);
-                Serial.printf("\n[WEB] Wi-Fi connected! Station IP: %s (Power Save DISABLED)\n", WiFi.localIP().toString().c_str());
+                WiFi.setTxPower(WIFI_POWER_19_5dBm);
+                Console.printf("\n[WEB] Wi-Fi connected! Station IP: %s (Max Signal Quality: PS_NONE, Tx: 19.5dBm)\n", WiFi.localIP().toString().c_str());
                 if (MDNS.begin("dsp")) {
                     MDNS.addService("http", "tcp", 80);
-                    Serial.println("[NET] mDNS responder active: http://dsp.local");
+                    Console.println("[NET] mDNS responder active: http://dsp.local");
                 }
                 return;
             }
-            Serial.println("\n[WEB] Wi-Fi connection timed out");
+            Console.println("\n[WEB] Wi-Fi connection timed out");
         }
 
-        Serial.println("[WEB] Starting fallback AP 'ESP32-S3-DSP'...");
+        Console.println("[WEB] Starting fallback AP 'ESP32-S3-DSP'...");
         WiFi.mode(WIFI_AP);
         WiFi.softAP("ESP32-S3-DSP");
-        Serial.printf("[WEB] Fallback AP active! Network SSID: 'ESP32-S3-DSP' | AP IP: %s\n",
+        Console.printf("[WEB] Fallback AP active! Network SSID: 'ESP32-S3-DSP' | AP IP: %s\n",
                       WiFi.softAPIP().toString().c_str());
         if (MDNS.begin("dsp")) {
             MDNS.addService("http", "tcp", 80);
         }
-        Serial.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
+        Console.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
     }
 
     void _performWiFiReconnect() {
         _wifiReconnectRequested = false;
-        Serial.printf("\n[WEB] Attempting Wi-Fi connection to SSID '%s'...\n", _newSSID.c_str());
+        Console.printf("\n[WEB] Attempting Wi-Fi connection to SSID '%s'...\n", _newSSID.c_str());
 
         WiFi.mode(WIFI_AP_STA);
         WiFi.setSleep(false);
@@ -202,13 +204,14 @@ private:
 
         for (uint8_t i = 0; i < 25 && WiFi.status() != WL_CONNECTED; ++i) {
             delay(400);
-            Serial.print('.');
+            Console.print('.');
         }
 
         if (WiFi.status() == WL_CONNECTED) {
             WiFi.setSleep(false);
             esp_wifi_set_ps(WIFI_PS_NONE);
-            Serial.printf("\n[WEB] Connected to '%s'! Station IP: %s (Power Save DISABLED)\n", _newSSID.c_str(), WiFi.localIP().toString().c_str());
+            WiFi.setTxPower(WIFI_POWER_19_5dBm);
+            Console.printf("\n[WEB] Connected to '%s'! Station IP: %s (Max Signal Quality: PS_NONE, Tx: 19.5dBm)\n", _newSSID.c_str(), WiFi.localIP().toString().c_str());
 
             Preferences prefs;
             if (prefs.begin("wifi_cfg", false)) {
@@ -220,7 +223,7 @@ private:
             MDNS.end();
             if (MDNS.begin("dsp")) {
                 MDNS.addService("http", "tcp", 80);
-                Serial.println("[NET] mDNS active: http://dsp.local");
+                Console.println("[NET] mDNS active: http://dsp.local");
             }
 
             StaticJsonDocument<256> doc;
@@ -233,7 +236,7 @@ private:
             serializeJson(doc, out);
             _ws.textAll(out);
         } else {
-            Serial.println("\n[WEB] Wi-Fi connection failed! Remaining in current mode.");
+            Console.println("\n[WEB] Wi-Fi connection failed! Remaining in current mode.");
             StaticJsonDocument<256> doc;
             doc["t"] = "wifi_status";
             doc["status"] = "failed";
@@ -254,6 +257,17 @@ private:
             AsyncWebServerResponse* res = req->beginResponse(200, "text/html", PAGE_INDEX_HTML_GZ, PAGE_INDEX_HTML_GZ_LEN);
             res->addHeader("Content-Encoding", "gzip");
             res->addHeader("Cache-Control", "no-cache");
+            req->send(res);
+        });
+
+        _server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest* req) {
+            static const char s_favicon[] PROGMEM =
+                "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>"
+                "<rect width='24' height='24' rx='5' fill='#2e3440'/>"
+                "<path d='M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12' fill='none' stroke='#88c0d0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/>"
+                "</svg>";
+            AsyncWebServerResponse* res = req->beginResponse(200, "image/svg+xml", s_favicon);
+            res->addHeader("Cache-Control", "public, max-age=86400");
             req->send(res);
         });
 
@@ -289,6 +303,25 @@ private:
 
         OTAManager::setupWebRoutes(_server);
 
+        _server.on("/api/resampler", HTTP_GET, [this](AsyncWebServerRequest* req) {
+            StaticJsonDocument<1024> doc;
+            _appendResamplerJson(doc);
+            String out;
+            serializeJson(doc, out);
+            req->send(200, "application/json", out);
+        });
+
+        _server.on("/api/resampler/validate", HTTP_POST, [](AsyncWebServerRequest* req) {
+            resampler_run_validation();
+            req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Validation executed on serial log\"}");
+        });
+
+        _server.on("/api/resampler/log", HTTP_POST, [](AsyncWebServerRequest* req) {
+            bool en = req->hasParam("enable") ? (req->getParam("enable")->value() == "1") : true;
+            ResamplerTelemetry::setLoggingEnabled(en);
+            req->send(200, "application/json", en ? "{\"status\":\"ok\",\"logging\":true}" : "{\"status\":\"ok\",\"logging\":false}");
+        });
+
         _server.on("/console", HTTP_GET, [](AsyncWebServerRequest* req) {
             req->send(200, "text/html", s_consoleHtml);
         });
@@ -312,14 +345,14 @@ private:
                     AwsEventType type, void* arg, uint8_t* data, size_t len) {
         switch (type) {
             case WS_EVT_CONNECT:
-                Serial.printf("[WS] Client #%u connected from %s\n",
+                Console.printf("[WS] Client #%u connected from %s\n",
                               client->id(), client->remoteIP().toString().c_str());
                 client->setCloseClientOnQueueFull(false);
                 client->text(_buildStateJson());
                 client->text(_buildSysJson());
                 break;
             case WS_EVT_DISCONNECT:
-                Serial.printf("[WS] Client #%u disconnected\n", client->id());
+                Console.printf("[WS] Client #%u disconnected\n", client->id());
                 break;
             case WS_EVT_DATA: {
                 auto* info = static_cast<AwsFrameInfo*>(arg);
@@ -628,17 +661,68 @@ private:
         sysObj["idle_base0"] = s.idleBaseline0;
         sysObj["idle_base1"] = s.idleBaseline1;
 
+        _appendResamplerJson(doc);
+
         String out;
         serializeJson(doc, out);
         return out;
     }
 
+    template <typename TDoc>
+    void _appendResamplerJson(TDoc& doc) {
+        resampler_stats_t btStats{}, flacStats{};
+        bool hasBt = ResamplerTelemetry::getBtStats(&btStats);
+        bool hasFlac = ResamplerTelemetry::getFlacStats(&flacStats);
+        auto diag = ResamplerTelemetry::getSystemDiag();
+
+        JsonObject rObj = doc.createNestedObject("resample");
+        bool active = (hasBt && !btStats.bypass && btStats.total_calls > 0) ||
+                      (hasFlac && !flacStats.bypass && flacStats.total_calls > 0);
+        rObj["active"] = active;
+
+        const resampler_stats_t* st = (hasBt && !btStats.bypass && btStats.total_calls > 0) ? &btStats :
+                                      ((hasFlac && !flacStats.bypass && flacStats.total_calls > 0) ? &flacStats : (hasBt ? &btStats : (hasFlac ? &flacStats : nullptr)));
+        if (st) {
+            rObj["in_rate"]    = st->in_rate;
+            rObj["out_rate"]   = st->out_rate;
+            char rStr[32];
+            snprintf(rStr, sizeof(rStr), "%u/%u", st->ratio_L, st->ratio_M);
+            rObj["ratio"]      = rStr;
+            rObj["phases"]     = st->phases;
+            rObj["mem"]        = st->is_psram ? "PSRAM" : "DRAM";
+            rObj["calls"]      = st->total_calls;
+            rObj["in_frames"]  = st->in_frames_total;
+            rObj["out_frames"] = st->out_frames_total;
+            rObj["last_us"]    = st->last_duration_us;
+            rObj["avg_us"]     = st->avg_duration_us;
+            rObj["max_us"]     = st->max_duration_us;
+            rObj["worst_us"]   = st->recent_worst_us;
+            rObj["cpu_pct"]    = roundf(st->cpu_util_pct * 10.0f) / 10.0f;
+            rObj["drift"]      = st->frame_mismatch;
+            rObj["dropped"]    = st->dropped_frames;
+            rObj["underruns"]  = st->underruns;
+            rObj["overruns"]   = st->overruns;
+            rObj["buf_occ"]    = st->buf_occupancy_frames;
+            rObj["buf_cap"]    = st->buf_capacity_frames;
+            rObj["alloc_fails"]= st->alloc_failures;
+        }
+
+        JsonObject diagObj = doc.createNestedObject("diag");
+        diagObj["rst_reason"]  = diag.resetReason;
+        diagObj["temp_c"]      = roundf(diag.temperatureC * 10.0f) / 10.0f;
+        diagObj["stack_bt"]    = diag.btStackHighWaterBytes;
+        diagObj["stack_audio"] = diag.audioStackHighWaterBytes;
+        diagObj["stack_web"]   = diag.webStackHighWaterBytes;
+        diagObj["stack_decode"]= diag.decodeStackHighWaterBytes;
+    }
+
     String _buildSysJson() {
         auto s = SystemMonitor::getStats();
-        StaticJsonDocument<384> doc;
+        StaticJsonDocument<1024> doc;
         doc["t"]         = "sys";
         doc["cpu0"]      = roundf(s.cpu0 * 10.0f) / 10.0f;
         doc["cpu1"]      = roundf(s.cpu1 * 10.0f) / 10.0f;
+        doc["temp_c"]    = roundf(s.tempC * 10.0f) / 10.0f;
         doc["heap_u"]    = s.heapUsed;
         doc["heap_t"]    = s.heapTotal;
         doc["psram_u"]   = s.psramUsed;
@@ -652,6 +736,7 @@ private:
         doc["wifi_con"]  = (WiFi.status() == WL_CONNECTED);
         doc["wifi_ssid"] = (WiFi.status() == WL_CONNECTED) ? WiFi.SSID() : (WiFi.getMode() == WIFI_AP ? "ESP32-S3-DSP (AP)" : "Disconnected");
         doc["wifi_ip"]   = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+        _appendResamplerJson(doc);
 
         String out;
         serializeJson(doc, out);

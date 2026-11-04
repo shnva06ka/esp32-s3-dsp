@@ -60,11 +60,9 @@ static void decode_task(void *arg) {
 
         if (!ran) {
             vTaskDelay(pdMS_TO_TICKS(2));
-        } else if (space < (outputbuf->size / 4)) {
-            /* Output buffer is >75% full: yield 1 ms so idle task & lower-priority tasks run */
-            vTaskDelay(pdMS_TO_TICKS(1));
         } else {
-            taskYIELD();
+            /* Always yield 1 ms so IDLE0 feeds TWDT and webTask/network remain responsive */
+            vTaskDelay(pdMS_TO_TICKS(1));
         }
     }
 
@@ -92,7 +90,7 @@ void decode_init(log_level level, const char *include_codecs, const char *exclud
     xTaskCreatePinnedToCore(
         decode_task,
         "sl_decode",
-        16384,
+        8192,
         NULL,
         4,
         &decode_task_handle,
@@ -151,4 +149,8 @@ void codec_open(u8_t format, u8_t sample_size, u8_t sample_rate, u8_t channels, 
 
     UNLOCK_D;
     LOG_ERROR("Codec for '%c' not found!", format);
+}
+
+TaskHandle_t sl_decode_task_handle(void) {
+    return decode_task_handle;
 }

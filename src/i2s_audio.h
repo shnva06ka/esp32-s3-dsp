@@ -22,6 +22,9 @@ public:
     void process(const AudioCallback& cb);
     void end();
 
+    bool getBtResamplerStats(resampler_stats_t* out) const;
+    TaskHandle_t getBtTaskHandle() const { return _btTaskHandle; }
+
 private:
     ParamStore& _params;
     volatile bool _running{false};

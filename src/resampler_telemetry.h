@@ -104,13 +104,12 @@ public:
         bool hasFlac = (flacStats && !flacStats->bypass && flacStats->total_calls > 0);
 
         if (hasBt) {
-            Serial.printf("[RESAMPLE-BT] %u->%u Hz (%u/%u, P=%u, %s, %s) | "
+            Serial.printf("[RESAMPLE-BT] %u->%u Hz (%u/%u, P=%u, %s) | "
                           "proc: %u us (avg %u, max %u, worst %u) | CPU: %.1f%% | "
                           "Ring: %u/%u (%u%%) | U/O/D: %u/%u/%u | Stack: Bt=%u Aud=%u | Temp: %.1fC | Reset: %s\n",
                           btStats->in_rate, btStats->out_rate,
                           btStats->ratio_L, btStats->ratio_M, btStats->phases,
                           btStats->is_psram ? "PSRAM" : "DRAM",
-                          btStats->dsp_mode == 0 ? "Scalar" : "Xtensa",
                           btStats->last_duration_us, btStats->avg_duration_us,
                           btStats->max_duration_us, btStats->recent_worst_us,
                           btStats->cpu_util_pct,
@@ -122,13 +121,12 @@ public:
         }
 
         if (hasFlac) {
-            Serial.printf("[RESAMPLE-FLAC] %u->%u Hz (%u/%u, P=%u, %s, %s) | "
+            Serial.printf("[RESAMPLE-FLAC] %u->%u Hz (%u/%u, P=%u, %s) | "
                           "proc: %u us (avg %u, max %u, worst %u) | CPU: %.1f%% | "
                           "OutBuf: %u/%u | U/O/D: %u/%u/%u | Stack: Dec=%u Aud=%u\n",
                           flacStats->in_rate, flacStats->out_rate,
                           flacStats->ratio_L, flacStats->ratio_M, flacStats->phases,
                           flacStats->is_psram ? "PSRAM" : "DRAM",
-                          flacStats->dsp_mode == 0 ? "Scalar" : "Xtensa",
                           flacStats->last_duration_us, flacStats->avg_duration_us,
                           flacStats->max_duration_us, flacStats->recent_worst_us,
                           flacStats->cpu_util_pct,
