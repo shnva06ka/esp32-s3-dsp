@@ -60,21 +60,31 @@ private:
     static inline void _processStage(float* left, float* right, size_t frames,
                                      const float* c, float* wL, float* wR) {
         for (size_t i = 0; i < frames; ++i) {
-            float d0L = left[i] - c[3] * wL[0] - c[4] * wL[1];
-            left[i]   = c[0] * d0L + c[1] * wL[0] + c[2] * wL[1];
+            float inL = left[i];
+            if (!std::isfinite(inL)) inL = 0.0f;
+            float d0L = inL - c[3] * wL[0] - c[4] * wL[1];
+            if (fabsf(d0L) < 1e-15f) d0L = 0.0f;
+            float outL = c[0] * d0L + c[1] * wL[0] + c[2] * wL[1];
+            if (!std::isfinite(outL)) { outL = 0.0f; d0L = 0.0f; wL[0] = 0.0f; wL[1] = 0.0f; }
+            left[i]   = outL;
             wL[1] = wL[0];
             wL[0] = d0L;
 
-            float d0R = right[i] - c[3] * wR[0] - c[4] * wR[1];
-            right[i]  = c[0] * d0R + c[1] * wR[0] + c[2] * wR[1];
+            float inR = right[i];
+            if (!std::isfinite(inR)) inR = 0.0f;
+            float d0R = inR - c[3] * wR[0] - c[4] * wR[1];
+            if (fabsf(d0R) < 1e-15f) d0R = 0.0f;
+            float outR = c[0] * d0R + c[1] * wR[0] + c[2] * wR[1];
+            if (!std::isfinite(outR)) { outR = 0.0f; d0R = 0.0f; wR[0] = 0.0f; wR[1] = 0.0f; }
+            right[i]  = outR;
             wR[1] = wR[0];
             wR[0] = d0R;
         }
     }
 
-    float _coeffs[kEQBands][2][5];
-    float _zL[kEQBands][2][2];
-    float _zR[kEQBands][2][2];
+    float _coeffs[kEQBands][2][5]{};
+    float _zL[kEQBands][2][2]{};
+    float _zR[kEQBands][2][2]{};
     bool  _hasSecondStage[kEQBands]{};
     bool  _enabled[kEQBands]{};
 

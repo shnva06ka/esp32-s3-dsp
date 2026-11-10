@@ -6,6 +6,7 @@
 #include <Preferences.h>
 #include <atomic>
 #include <cstring>
+#include <cmath>
 #include "audio_config.h"
 
 enum EQFilterType : uint8_t {
@@ -115,10 +116,47 @@ public:
                 _eqCount  = prefs.getInt("eq_cnt", 5);
                 if (_eqCount < 1 || _eqCount > kEQBands) _eqCount = 5;
                 _preampDb = prefs.getFloat("preamp", 0.0f);
-                prefs.getBytes("eq_bands", _eq, sizeof(_eq));
-                prefs.getBytes("subsonic", &_subsonic, sizeof(_subsonic));
-                prefs.getBytes("comp", &_comp, sizeof(_comp));
-                prefs.getBytes("lim", &_lim, sizeof(_lim));
+                if (!std::isfinite(_preampDb) || _preampDb < -18.0f || _preampDb > 18.0f) _preampDb = 0.0f;
+
+                if (prefs.getBytes("eq_bands", _eq, sizeof(_eq)) != sizeof(_eq)) {
+                    _loadDefaults();
+                } else {
+                    for (int b = 0; b < kEQBands; ++b) {
+                        if (!std::isfinite(_eq[b].freq) || _eq[b].freq < 10.0f || _eq[b].freq > 22000.0f) _eq[b].freq = 1000.0f;
+                        if (!std::isfinite(_eq[b].gain) || _eq[b].gain < -24.0f || _eq[b].gain > 24.0f) _eq[b].gain = 0.0f;
+                        if (!std::isfinite(_eq[b].q) || _eq[b].q < 0.05f || _eq[b].q > 10.0f) _eq[b].q = 0.707f;
+                        if (_eq[b].type > EQ_FILTER_FLAT_HIGH_PASS) _eq[b].type = EQ_FILTER_PEAK;
+                        if (_eq[b].order < 1 || _eq[b].order > 4) _eq[b].order = 2;
+                    }
+                }
+
+                if (prefs.getBytes("subsonic", &_subsonic, sizeof(_subsonic)) != sizeof(_subsonic)) {
+                    _subsonic = { 80.0f, 2, false };
+                } else {
+                    if (!std::isfinite(_subsonic.freq) || _subsonic.freq < 10.0f || _subsonic.freq > 200.0f) _subsonic.freq = 80.0f;
+                    if (_subsonic.order != 2 && _subsonic.order != 4) _subsonic.order = 2;
+                    if (!std::isfinite(_subsonic.balance) || _subsonic.balance < -100.0f || _subsonic.balance > 100.0f) _subsonic.balance = 0.0f;
+                    if (!std::isfinite(_subsonic.delayMsL) || _subsonic.delayMsL < -20.0f || _subsonic.delayMsL > 20.0f) _subsonic.delayMsL = 0.0f;
+                    if (!std::isfinite(_subsonic.delayMsR) || _subsonic.delayMsR < -20.0f || _subsonic.delayMsR > 20.0f) _subsonic.delayMsR = 0.0f;
+                }
+
+                if (prefs.getBytes("comp", &_comp, sizeof(_comp)) != sizeof(_comp)) {
+                    _comp = { -18.0f, 4.0f, 5.0f, 150.0f, 0.0f, false };
+                } else {
+                    if (!std::isfinite(_comp.threshold) || _comp.threshold < -60.0f || _comp.threshold > 0.0f) _comp.threshold = -18.0f;
+                    if (!std::isfinite(_comp.ratio) || _comp.ratio < 1.0f || _comp.ratio > 20.0f) _comp.ratio = 4.0f;
+                    if (!std::isfinite(_comp.attackMs) || _comp.attackMs < 0.1f || _comp.attackMs > 500.0f) _comp.attackMs = 5.0f;
+                    if (!std::isfinite(_comp.releaseMs) || _comp.releaseMs < 10.0f || _comp.releaseMs > 2000.0f) _comp.releaseMs = 150.0f;
+                    if (!std::isfinite(_comp.makeupGain) || _comp.makeupGain < -24.0f || _comp.makeupGain > 24.0f) _comp.makeupGain = 0.0f;
+                }
+
+                if (prefs.getBytes("lim", &_lim, sizeof(_lim)) != sizeof(_lim)) {
+                    _lim = { -0.5f, 3.0f, false };
+                } else {
+                    if (!std::isfinite(_lim.ceilingDb) || _lim.ceilingDb < -30.0f || _lim.ceilingDb > 0.0f) _lim.ceilingDb = -0.5f;
+                    if (!std::isfinite(_lim.kneeDb) || _lim.kneeDb < 0.1f || _lim.kneeDb > 12.0f) _lim.kneeDb = 3.0f;
+                }
+
                 uint8_t savedInput = prefs.getUChar("input", 1);
                 if (savedInput == INPUT_MODE_WIFI || savedInput == 0 || savedInput > 3) {
                     savedInput = INPUT_MODE_AUX;
@@ -179,7 +217,6 @@ public:
         bool            bLim     = _bootLim;
         char            modOrder[64];
         memcpy(modOrder, _moduleOrder, sizeof(modOrder));
-        _dirty = false;
         xSemaphoreGive(_mutex);
 
         Preferences prefs;
@@ -202,6 +239,11 @@ public:
         prefs.putBool("boot_lim", bLim);
         prefs.putString("mod_order", modOrder);
         prefs.end();
+
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        _dirty = false;
+        xSemaphoreGive(_mutex);
+
         Console.println("[NVS] Saved all DSP parameters and states to flash.");
     }
 
@@ -334,7 +376,10 @@ public:
 
     EQBandParams getEQBand(int band) const {
         xSemaphoreTake(_mutex, portMAX_DELAY);
-        auto p = _eq[band];
+        EQBandParams p{};
+        if (band >= 0 && band < kEQBands) {
+            p = _eq[band];
+        }
         xSemaphoreGive(_mutex);
         return p;
     }
@@ -342,7 +387,18 @@ public:
     void setEQBand(int band, const EQBandParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         if (band >= 0 && band < kEQBands) {
-            _eq[band] = p;
+            EQBandParams sanitized = p;
+            if (!std::isfinite(sanitized.freq) || sanitized.freq < 10.0f) sanitized.freq = 10.0f;
+            if (sanitized.freq > 22000.0f) sanitized.freq = 22000.0f;
+            if (!std::isfinite(sanitized.gain)) sanitized.gain = 0.0f;
+            if (sanitized.gain < -24.0f) sanitized.gain = -24.0f;
+            if (sanitized.gain > 24.0f) sanitized.gain = 24.0f;
+            if (!std::isfinite(sanitized.q) || sanitized.q < 0.05f) sanitized.q = 0.05f;
+            if (sanitized.q > 10.0f) sanitized.q = 10.0f;
+            if (sanitized.type > EQ_FILTER_FLAT_HIGH_PASS) sanitized.type = EQ_FILTER_PEAK;
+            if (sanitized.order < 1 || sanitized.order > 4) sanitized.order = 2;
+
+            _eq[band] = sanitized;
             if (band >= _eqCount) _eqCount = band + 1;
             _eqVersion.fetch_add(1, std::memory_order_release);
             _dirty = true;
@@ -360,6 +416,7 @@ public:
 
     void setPreamp(float db) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
+        if (!std::isfinite(db)) db = 0.0f;
         if (db < -18.0f) db = -18.0f;
         if (db >  18.0f) db =  18.0f;
         _preampDb = db;
@@ -438,6 +495,18 @@ public:
     void setSubsonic(const SubsonicParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _subsonic = p;
+        if (!std::isfinite(_subsonic.freq) || _subsonic.freq < 10.0f) _subsonic.freq = 10.0f;
+        if (_subsonic.freq > 200.0f) _subsonic.freq = 200.0f;
+        if (_subsonic.order != 2 && _subsonic.order != 4) _subsonic.order = 2;
+        if (!std::isfinite(_subsonic.balance)) _subsonic.balance = 0.0f;
+        if (_subsonic.balance < -100.0f) _subsonic.balance = -100.0f;
+        if (_subsonic.balance >  100.0f) _subsonic.balance =  100.0f;
+        if (!std::isfinite(_subsonic.delayMsL)) _subsonic.delayMsL = 0.0f;
+        if (_subsonic.delayMsL < -20.0f) _subsonic.delayMsL = -20.0f;
+        if (_subsonic.delayMsL >  20.0f) _subsonic.delayMsL =  20.0f;
+        if (!std::isfinite(_subsonic.delayMsR)) _subsonic.delayMsR = 0.0f;
+        if (_subsonic.delayMsR < -20.0f) _subsonic.delayMsR = -20.0f;
+        if (_subsonic.delayMsR >  20.0f) _subsonic.delayMsR =  20.0f;
         _subsonicVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
@@ -463,6 +532,17 @@ public:
     void setCompander(const CompanderParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _comp = p;
+        if (!std::isfinite(_comp.threshold) || _comp.threshold < -60.0f) _comp.threshold = -60.0f;
+        if (_comp.threshold > 0.0f) _comp.threshold = 0.0f;
+        if (!std::isfinite(_comp.ratio) || _comp.ratio < 1.0f) _comp.ratio = 1.0f;
+        if (_comp.ratio > 20.0f) _comp.ratio = 20.0f;
+        if (!std::isfinite(_comp.attackMs) || _comp.attackMs < 0.1f) _comp.attackMs = 0.1f;
+        if (_comp.attackMs > 500.0f) _comp.attackMs = 500.0f;
+        if (!std::isfinite(_comp.releaseMs) || _comp.releaseMs < 10.0f) _comp.releaseMs = 10.0f;
+        if (_comp.releaseMs > 2000.0f) _comp.releaseMs = 2000.0f;
+        if (!std::isfinite(_comp.makeupGain)) _comp.makeupGain = 0.0f;
+        if (_comp.makeupGain < -24.0f) _comp.makeupGain = -24.0f;
+        if (_comp.makeupGain >  24.0f) _comp.makeupGain =  24.0f;
         _compVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
@@ -488,6 +568,10 @@ public:
     void setLimiter(const LimiterParams& p) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _lim = p;
+        if (!std::isfinite(_lim.ceilingDb) || _lim.ceilingDb < -30.0f) _lim.ceilingDb = -30.0f;
+        if (_lim.ceilingDb > 0.0f) _lim.ceilingDb = 0.0f;
+        if (!std::isfinite(_lim.kneeDb) || _lim.kneeDb < 0.1f) _lim.kneeDb = 0.1f;
+        if (_lim.kneeDb > 12.0f) _lim.kneeDb = 12.0f;
         _limVersion.fetch_add(1, std::memory_order_release);
         _dirty = true;
         _lastDirtyTime = millis();
@@ -507,12 +591,14 @@ public:
         return _inputMode.load(std::memory_order_relaxed);
     }
 
-    void setInputMode(InputSourceMode m) {
+    void setInputMode(InputSourceMode m, bool persist = true) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         _inputMode.store(m, std::memory_order_relaxed);
         _inputVersion.fetch_add(1, std::memory_order_release);
-        _dirty = true;
-        _lastDirtyTime = millis();
+        if (persist) {
+            _dirty = true;
+            _lastDirtyTime = millis();
+        }
         xSemaphoreGive(_mutex);
     }
 

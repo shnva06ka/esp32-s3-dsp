@@ -59,7 +59,7 @@ private:
     static constexpr float kScale = 1.0f / 2147483648.0f;
     static constexpr float kFadeStep = 1.0f / (static_cast<float>(kSampleRate) * 0.050f);
 
-    void _allocBuffers();
+    bool _allocBuffers();
     void _freeBuffers();
     void _writeBtFrames(size_t frames);
     static void _btTaskTrampoline(void* arg);

@@ -34,7 +34,7 @@ public:
         _subsonic.setParams(p);
 
         float bal = p.balance;
-        if (bal < -100.0f) bal = -100.0f;
+        if (!std::isfinite(bal) || bal < -100.0f) bal = -100.0f;
         if (bal >  100.0f) bal =  100.0f;
 
         if (bal <= 0.0f) {
@@ -52,13 +52,28 @@ public:
         constexpr float Fs = static_cast<float>(kSampleRate);
         float dMsL = (p.delayMsL < -20.0f) ? -20.0f : ((p.delayMsL > 20.0f) ? 20.0f : p.delayMsL);
         float dMsR = (p.delayMsR < -20.0f) ? -20.0f : ((p.delayMsR > 20.0f) ? 20.0f : p.delayMsR);
+        if (!std::isfinite(dMsL)) dMsL = 0.0f;
+        if (!std::isfinite(dMsR)) dMsR = 0.0f;
 
         float minD = (dMsL < dMsR) ? dMsL : dMsR;
         float effL = (minD < 0.0f) ? (dMsL - minD) : dMsL;
         float effR = (minD < 0.0f) ? (dMsR - minD) : dMsR;
 
+        bool hadDelay = (_delaySamplesL > 0.01f || _delaySamplesR > 0.01f);
+
         _delaySamplesL = effL * (Fs / 1000.0f);
         _delaySamplesR = effR * (Fs / 1000.0f);
+
+        constexpr float maxDelaySamples = static_cast<float>(kDelayBufSize - 2);
+        if (_delaySamplesL > maxDelaySamples) _delaySamplesL = maxDelaySamples;
+        if (_delaySamplesR > maxDelaySamples) _delaySamplesR = maxDelaySamples;
+
+        bool hasDelay = (_delaySamplesL > 0.01f || _delaySamplesR > 0.01f);
+        if (!hadDelay && hasDelay) {
+            memset(_delayBufL, 0, sizeof(_delayBufL));
+            memset(_delayBufR, 0, sizeof(_delayBufR));
+            _delayWriteIdx = 0;
+        }
 
         _phaseDegL = _quantizePhase(p.phaseL);
         _phaseDegR = _quantizePhase(p.phaseR);

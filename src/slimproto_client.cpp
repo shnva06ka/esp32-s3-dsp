@@ -97,14 +97,14 @@ void SlimprotoClient::_runTelemetry() {
                      srcRate / 1000, (srcRate % 1000) / 100, bits);
             if (_params.getInputMode() != INPUT_MODE_WIFI) {
                 Console.println("[SLIMPROTO] Auto-switching input mode to Squeezebox");
-                _params.setInputMode(INPUT_MODE_WIFI);
+                _params.setInputMode(INPUT_MODE_WIFI, false);
             }
         } else {
             snprintf(meta.formatInfo, sizeof(meta.formatInfo), "Idle");
             if (!isPaused && _params.getInputMode() == INPUT_MODE_WIFI && output.state == OUTPUT_OFF) {
                 if (idleSinceMs == 0) idleSinceMs = millis();
                 if (millis() - idleSinceMs >= 3000) {
-                    _params.setInputMode(INPUT_MODE_AUX);
+                    _params.setInputMode(INPUT_MODE_AUX, false);
                     idleSinceMs = 0;
                 }
             } else {

@@ -112,6 +112,17 @@ public:
         return toRead;
     }
 
+    size_t skip(size_t frames) {
+        if (!_left || !_right || frames == 0) return 0;
+        size_t avail = available();
+        size_t toSkip = (frames < avail) ? frames : avail;
+        if (toSkip > 0) {
+            size_t r = _readIdx.load(std::memory_order_relaxed);
+            _readIdx.store((r + toSkip) % CapacityFrames, std::memory_order_release);
+        }
+        return toSkip;
+    }
+
     void clear() {
         _readIdx.store(0, std::memory_order_relaxed);
         _writeIdx.store(0, std::memory_order_relaxed);

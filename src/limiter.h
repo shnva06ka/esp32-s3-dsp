@@ -11,19 +11,26 @@ public:
         _update({ -0.5f, 3.0f, true });
     }
 
+    void reset() {}
+
     void setParams(const LimiterParams& p) { _update(p); }
 
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
         for (size_t i = 0; i < frames; ++i) {
-            const float peakL = fabsf(left[i]);
-            const float peakR = fabsf(right[i]);
+            float sL = left[i];
+            float sR = right[i];
+            if (!std::isfinite(sL)) { sL = 0.0f; left[i] = 0.0f; }
+            if (!std::isfinite(sR)) { sR = 0.0f; right[i] = 0.0f; }
+
+            const float peakL = fabsf(sL);
+            const float peakR = fabsf(sR);
             const float peak  = (peakL > peakR) ? peakL : peakR;
 
-            if (peak <= _lowerLin) continue;
+            if (peak <= _lowerLin || peak <= 1e-9f) continue;
 
-            float gain;
+            float gain = 1.0f;
             if (peak >= _upperLin) {
                 gain = _ceilingLin / peak;
             } else {
@@ -32,6 +39,9 @@ public:
                 const float gainDb = -0.5f * _kneeDb * t * t;
                 gain = powf(10.0f, gainDb * 0.05f);
             }
+
+            if (!std::isfinite(gain) || gain < 0.0f) gain = 1.0f;
+            if (gain > 1.0f) gain = 1.0f;
 
             left[i]  *= gain;
             right[i] *= gain;
@@ -52,8 +62,8 @@ private:
 
     void _update(const LimiterParams& p) {
         _enabled    = p.enabled;
-        _ceilingDb  = p.ceilingDb;
-        _kneeDb     = (p.kneeDb < 0.01f) ? 0.01f : p.kneeDb;
+        _ceilingDb  = (p.ceilingDb < -30.0f) ? -30.0f : ((p.ceilingDb > 0.0f) ? 0.0f : p.ceilingDb);
+        _kneeDb     = (p.kneeDb < 0.1f) ? 0.1f : ((p.kneeDb > 12.0f) ? 12.0f : p.kneeDb);
         _invKneeDb  = 1.0f / _kneeDb;
         _halfKnee   = _kneeDb * 0.5f;
         _lowerDb    = _ceilingDb - _halfKnee;

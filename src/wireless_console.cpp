@@ -41,15 +41,28 @@ void WirelessConsole::loop()
             _telnetServer->setNoDelay(true);
         }
         if (_telnetServer->hasClient()) {
+            if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
             if (!_telnetClient || !_telnetClient.connected()) {
                 if (_telnetClient) _telnetClient.stop();
                 _telnetClient = _telnetServer->available();
                 _telnetClient.println("\n=== Connected to ESP32-S3-DSP Live Console (Telnet) ===");
-                _telnetClient.print(getRecentLogs());
+                if (_lines && _count > 0) {
+                    size_t start = (_count < kMaxLogs) ? 0 : _head;
+                    for (size_t i = 0; i < _count; ++i) {
+                        size_t idx = (start + i) % kMaxLogs;
+                        _telnetClient.println(_lines[idx]);
+                    }
+                }
             } else {
                 WiFiClient newClient = _telnetServer->available();
                 newClient.println("ESP32-S3-DSP: another telnet session is active. Closing.");
                 newClient.stop();
+            }
+            if (_mutex) xSemaphoreGiveRecursive(_mutex);
+        }
+        if (_telnetClient && _telnetClient.connected()) {
+            while (_telnetClient.available()) {
+                _telnetClient.read();
             }
         }
     }
@@ -107,9 +120,12 @@ size_t WirelessConsole::write(const uint8_t *buffer, size_t size)
 
 String WirelessConsole::getRecentLogs() const
 {
-    if (!_lines || _count == 0) return String();
-
     if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
+
+    if (!_lines || _count == 0) {
+        if (_mutex) xSemaphoreGiveRecursive(_mutex);
+        return String();
+    }
 
     String out;
     out.reserve(_count * 80);

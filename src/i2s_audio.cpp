@@ -15,7 +15,11 @@ I2SAudio::I2SAudio(ParamStore& params)
 
 bool I2SAudio::begin()
 {
-    _allocBuffers();
+    if (!_allocBuffers()) {
+        Console.println("[AUDIO] ERROR: Failed to allocate audio buffers!");
+        _freeBuffers();
+        return false;
+    }
 
     _btResampler = resampler_create(kBtSampleRate, kSampleRate);
     _btOutCap    = _btResampler ? resampler_max_out(_btResampler, kBufferFrames) : kBufferFrames;
@@ -34,6 +38,8 @@ bool I2SAudio::begin()
 
     if (!_btRingBuffer.allocate()) {
         Console.println("[AUDIO] ERROR: Failed to allocate BT ring buffer!");
+        _freeBuffers();
+        return false;
     }
 
     const i2s_config_t cfg_master = {
@@ -170,11 +176,17 @@ void I2SAudio::process(const AudioCallback& cb)
         size_t bytesReadAux = 0;
         esp_err_t errAux = i2s_read(kI2SPortMaster, _rxBufAux, byteCount, &bytesReadAux, 0);
         if (errAux == ESP_OK && bytesReadAux > 0) {
-            for (size_t i = 0; i < kBufferFrames; ++i) {
+            size_t framesRead = bytesReadAux / (kChannels * sizeof(int32_t));
+            if (framesRead > kBufferFrames) framesRead = kBufferFrames;
+            for (size_t i = 0; i < framesRead; ++i) {
                 float sL = static_cast<float>(_rxBufAux[i * 2    ]) * (kScale * kAuxPreamp);
                 float sR = static_cast<float>(_rxBufAux[i * 2 + 1]) * (kScale * kAuxPreamp);
                 _leftAux[i]  = fmaxf(-1.0f, fminf(1.0f, sL));
                 _rightAux[i] = fmaxf(-1.0f, fminf(1.0f, sR));
+            }
+            for (size_t i = framesRead; i < kBufferFrames; ++i) {
+                _leftAux[i]  = 0.0f;
+                _rightAux[i] = 0.0f;
             }
         } else {
             memset(_leftAux,  0, kBufferFrames * sizeof(float));
@@ -183,9 +195,17 @@ void I2SAudio::process(const AudioCallback& cb)
     }
 
     if (targetSource == INPUT_MODE_BT || _gainBt > 0.0f) {
+        if (_btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames) {
+            _btRingBuffer.skip(RuntimeTuning::kBtLatencyTrimFrames);
+        }
+
         size_t avail = _btRingBuffer.available();
         uint32_t underrun = (avail < kBufferFrames) ? static_cast<uint32_t>(kBufferFrames - avail) : 0;
-        _btRingBuffer.read(_leftBt, _rightBt, kBufferFrames);
+        size_t readFrames = _btRingBuffer.read(_leftBt, _rightBt, kBufferFrames);
+        for (size_t i = readFrames; i < kBufferFrames; ++i) {
+            _leftBt[i]  = 0.0f;
+            _rightBt[i] = 0.0f;
+        }
         if (_btResampler && underrun > 0) {
             resampler_record_flow(_btResampler, underrun, 0, 0,
                                   static_cast<uint32_t>(_btRingBuffer.available()),
@@ -196,6 +216,10 @@ void I2SAudio::process(const AudioCallback& cb)
     size_t wifiFramesRead = 0;
     if (targetSource == INPUT_MODE_WIFI || _gainWifi > 0.0f) {
         wifiFramesRead = squeezelite_output_frames(_leftWifi, _rightWifi, kBufferFrames);
+        for (size_t i = wifiFramesRead; i < kBufferFrames; ++i) {
+            _leftWifi[i]  = 0.0f;
+            _rightWifi[i] = 0.0f;
+        }
     } else {
         memset(_leftWifi,  0, kBufferFrames * sizeof(float));
         memset(_rightWifi, 0, kBufferFrames * sizeof(float));
@@ -244,9 +268,6 @@ void I2SAudio::process(const AudioCallback& cb)
     if (currentActive != _lastActiveSource) {
         _lastActiveSource = currentActive;
         _params.setActiveSource(currentActive);
-        const char* name = (currentActive == ACTIVE_SRC_BT)   ? "BLUETOOTH" :
-                           (currentActive == ACTIVE_SRC_AUX)  ? "LINE IN" : "SQUEEZEBOX";
-        Console.printf("[AUDIO] Active input switched to: %s\n", name);
     }
 
     if (!wifiSilenceFastPath) {
@@ -278,7 +299,7 @@ void I2SAudio::end()
     _freeBuffers();
 }
 
-void I2SAudio::_allocBuffers()
+bool I2SAudio::_allocBuffers()
 {
     const size_t intBufBytes   = kBufferFrames * kChannels * sizeof(int32_t);
     const size_t floatBufBytes = kBufferFrames * sizeof(float);
@@ -302,6 +323,10 @@ void I2SAudio::_allocBuffers()
     _rightWifi = static_cast<float*>  (dramAlloc(floatBufBytes));
     _leftMix   = static_cast<float*>  (dramAlloc(floatBufBytes));
     _rightMix  = static_cast<float*>  (dramAlloc(floatBufBytes));
+
+    return (_rxBufAux && _rxBufBt && _txBuf &&
+            _leftAux && _rightAux && _leftBt && _rightBt &&
+            _leftWifi && _rightWifi && _leftMix && _rightMix);
 }
 
 void I2SAudio::_freeBuffers()
@@ -327,13 +352,6 @@ void I2SAudio::_writeBtFrames(size_t frames)
 {
     if (frames == 0) return;
 
-    uint32_t droppedFrames = 0;
-    for (int guard = 0; guard < 4 && _btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames; ++guard) {
-        float dropL[RuntimeTuning::kBtLatencyTrimFrames], dropR[RuntimeTuning::kBtLatencyTrimFrames];
-        _btRingBuffer.read(dropL, dropR, RuntimeTuning::kBtLatencyTrimFrames);
-        droppedFrames += RuntimeTuning::kBtLatencyTrimFrames;
-    }
-
     float bufL[kBufferFrames];
     float bufR[kBufferFrames];
     for (size_t i = 0; i < frames; ++i) {
@@ -344,7 +362,7 @@ void I2SAudio::_writeBtFrames(size_t frames)
         size_t outN = resampler_process(_btResampler, bufL, bufR, frames, _btOutL, _btOutR, _btOutCap);
         size_t written = _btRingBuffer.write(_btOutL, _btOutR, outN);
         uint32_t overrun = (outN > written) ? static_cast<uint32_t>(outN - written) : 0;
-        resampler_record_flow(_btResampler, 0, overrun, droppedFrames,
+        resampler_record_flow(_btResampler, 0, overrun, 0,
                               static_cast<uint32_t>(_btRingBuffer.available()),
                               static_cast<uint32_t>(_btRingBuffer.capacity()));
     }
