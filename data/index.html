@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
 <title>ESP32-S3-DSP</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232e3440'/%3E%3Cpath d='M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12' fill='none' stroke='%2388c0d0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"/>
 <script>
@@ -76,14 +76,19 @@
   --cv-dim: #353C49; --cv-curve: #ECEFF4; --cv-node-stroke: #ECEFF4; --cv-tip: rgba(26, 30, 37, 0.94);
   --cv-tip-grid: #2B313C; --cv-tip-text: #9AA5BA; --cv-tip-text-strong: #ECEFF4; --cv-off: #4A5262;
 }
-:root[data-theme="dark"] .band-card {
+:root[data-theme="dark"] .band-card:not(.band-bypassed):not(.eq-row-desktop) {
   --nord0: #2E3440; --nord1: #3B4252; --nord2: #434C5E; --nord3: #4C566A;
   --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4;
   --muted: #3B4252; --text: #2E3440; --on-accent: #FFFFFF;
   --border: #CBD5E1; --border-strong: #4C566A; --card-bg: #FFFFFF; --surface-hover: #DAE0EA;
 }
+:root[data-theme="dark"] .band-card.eq-row-desktop:not(.band-bypassed) .eq-row-num,
+:root[data-theme="dark"] .band-card.eq-row-desktop:not(.band-bypassed) .drag-grip,
+:root[data-theme="dark"] .band-card.eq-row-desktop:not(.band-bypassed) .eq-row-lbl {
+  color: #1A1E25;
+}
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -99,6 +104,7 @@ html {
   scrollbar-gutter: stable;
   overflow-y: scroll;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -106,6 +112,8 @@ body {
   color: var(--text);
   font-size: 12px;
   line-height: 1.4;
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 select {
@@ -262,8 +270,6 @@ select::-ms-expand {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 8px;
   margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
 }
 .sys-stat-card {
   background: var(--nord6);
@@ -678,7 +684,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 .eq-preset-box {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
   background: var(--nord5);
   border: 1px solid var(--border);
@@ -692,39 +698,97 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   font-weight: 800;
   color: var(--nord0);
   letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
-.btn-preset {
+.preset-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.preset-dropdown-btn {
   text-transform: uppercase;
+  font-family: var(--mono);
   font-size: 11px;
-  font-weight: 700;
-  padding: 4px 10px;
+  font-weight: 800;
+  height: 30px;
+  min-width: 148px;
+  padding: 0 12px;
   background: var(--card-bg);
   color: var(--nord0);
   border: 1px solid var(--border-strong);
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
-.btn-preset:hover {
+.preset-dropdown-btn:hover {
   background: var(--surface-hover);
-}
-.btn-preset.active {
-  background: var(--accent);
-  color: var(--on-accent);
   border-color: var(--nord0);
+}
+.preset-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 170px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
+  z-index: 400;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 700;
+  user-select: none;
+}
+.preset-dropdown-wrap.open .preset-dropdown-menu {
+  display: block;
+}
+.preset-dropdown-menu .gm-opt {
+  padding: 6px 12px;
+  color: var(--nord0);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.preset-dropdown-menu .gm-opt:hover {
+  background: var(--nord5);
+}
+.preset-dropdown-menu .gm-opt.selected {
+  color: var(--nord10);
+}
+.preset-dropdown-menu .gm-sep {
+  height: 1px;
+  background: var(--border-strong);
+  margin: 4px 0;
+}
+.preset-del-x {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.preset-del-x:hover {
+  color: var(--danger);
 }
 .btn-preset-action {
   text-transform: uppercase;
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
-  padding: 4px 8px;
-  background: var(--nord5);
+  height: 30px;
+  padding: 0 10px;
+  background: var(--card-bg);
   color: var(--nord0);
   border: 1px solid var(--border-strong);
-  border-radius: 2px;
+  border-radius: 4px;
   cursor: pointer;
-  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .btn-preset-action:hover {
   background: var(--surface-hover);
@@ -786,7 +850,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   min-width: 54px;
   max-width: 54px;
   flex: 0 0 54px;
-  margin-top: 6px;
+  margin-top: 0;
   height: 290px;
   min-height: 290px;
   max-height: 290px;
@@ -820,15 +884,18 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   padding: 4px 0;
 }
 .preamp-slider {
-  -webkit-appearance: slider-vertical;
-  writing-mode: bt-lr;
-  width: 22px;
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
   height: 200px;
   cursor: pointer;
   accent-color: var(--nord0);
   background: transparent;
   border: none;
   outline: none;
+  touch-action: none;
 }
 
 #bands-container {
@@ -844,8 +911,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   overflow-x: auto;
   overflow-y: hidden;
   overflow-y: clip;
-  padding: 6px 0 8px 0;
-  scroll-behavior: smooth;
+  padding: 18px 0 20px 0;
   position: relative;
 }
 #bands-container::-webkit-scrollbar {
@@ -883,12 +949,12 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   background: var(--nord5);
   border: 3px solid var(--border-strong);
   border-radius: 8px;
-  padding: 6px 8px 10px;
+  padding: 14px 8px 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 6px;
-  transition: border-color 0.15s, opacity 0.15s, background 0.15s;
+  transition: border-color 0.15s, opacity 0.15s, background 0.15s, width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease, flex-basis 0.18s ease;
   user-select: none;
   position: relative;
   z-index: 1;
@@ -902,11 +968,10 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   opacity: 0.45;
 }
 
-
 .band-dragger-titlebar {
   width: 100%;
-  height: 24px;
-  display: flex;
+  height: 20px;
+  display: none;
   align-items: center;
   justify-content: center;
   position: relative;
@@ -915,6 +980,53 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   cursor: grab;
   user-select: none;
   touch-action: none;
+}
+.band-reorder-overlay,
+.band-select-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.band-reorder-pill {
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: none;
+  color: var(--nord0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.band-select-big-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 2.5px solid var(--nord0);
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--nord0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.band-select-big-box svg {
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s, transform 0.15s;
+}
+#bands-container.select-mode .band-card.selected .band-select-big-box {
+  background: var(--nord11);
+  border-color: var(--nord11);
+  color: #FFFFFF;
+  transform: scale(1.06);
+}
+#bands-container.select-mode .band-card.selected .band-select-big-box svg {
+  opacity: 1;
+  transform: scale(1);
 }
 .band-dragger-titlebar:active {
   cursor: grabbing;
@@ -930,17 +1042,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   opacity: 0.9;
 }
 .band-select-checkbox {
-  display: none;
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: var(--nord11);
-}
-#bands-container.select-mode .band-select-checkbox {
-  display: block;
-}
-#bands-container.select-mode .drag-grip {
-  display: none;
+  display: none !important;
 }
 #bands-container.select-mode .band-card {
   cursor: pointer;
@@ -948,6 +1050,69 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 #bands-container.select-mode .band-card.selected {
   border-color: var(--nord11) !important;
   box-shadow: 0 0 0 2px var(--nord11);
+}
+body.reorder-bands .band-card:not(.eq-row-desktop),
+#bands-container.select-mode .band-card:not(.eq-row-desktop) {
+  width: 118px;
+  min-width: 118px;
+  max-width: 118px;
+  flex: 0 0 118px;
+  overflow: hidden;
+}
+body.reorder-bands .band-card:not(.eq-row-desktop) {
+  cursor: grab;
+  touch-action: none;
+}
+#bands-container.select-mode .band-card:not(.eq-row-desktop) {
+  cursor: pointer;
+}
+body.reorder-bands .band-card:not(.eq-row-desktop) .band-type-row,
+body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-main-grid,
+body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-bottom-row,
+#bands-container.select-mode .band-card:not(.eq-row-desktop) .band-type-row,
+#bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-main-grid,
+#bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-bottom-row {
+  opacity: 0.16;
+  pointer-events: none !important;
+}
+body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
+  display: flex;
+}
+#bands-container.select-mode .band-card:not(.eq-row-desktop) .band-select-overlay {
+  display: flex;
+}
+
+@keyframes band-enter-row {
+  0% { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes band-exit-row {
+  0% { opacity: 1; transform: scale(1); max-height: 44px; }
+  100% { opacity: 0; transform: scale(0.97); max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-width: 0; padding-top: 0; padding-bottom: 0; }
+}
+@keyframes band-enter-card {
+  0% { opacity: 0; transform: scale(0.88); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes band-exit-card {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.82); width: 0; min-width: 0; max-width: 0; flex-basis: 0; margin-left: -8px; padding-left: 0; padding-right: 0; border-width: 0; }
+}
+.band-card.eq-row-desktop.band-enter-anim {
+  animation: band-enter-row 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.band-card.eq-row-desktop.band-exit-anim {
+  animation: band-exit-row 0.18s ease-in forwards;
+  overflow: hidden;
+  pointer-events: none;
+}
+.band-card:not(.eq-row-desktop).band-enter-anim {
+  animation: band-enter-card 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.band-card:not(.eq-row-desktop).band-exit-anim {
+  animation: band-exit-card 0.18s ease-in forwards;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .eq-actions-card {
@@ -962,7 +1127,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
   user-select: none;
 }
 .btn-card-action {
@@ -984,7 +1149,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   font-size: 11px;
   transition: all 0.15s ease;
   box-sizing: border-box;
-  padding: 12px 6px;
+  padding: 6px 4px;
   text-align: center;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1062,9 +1227,425 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   padding: 4px 0;
   font-family: var(--mono);
 }
-.band-type-menu-wrap:hover .band-type-dropdown,
+.band-card:not(.eq-row-desktop) .band-type-menu-wrap:hover .band-type-dropdown,
 .band-type-menu-wrap.open .band-type-dropdown {
   display: block;
+}
+
+body.is-scrubbing-val,
+body.is-scrubbing-val * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+.eq-preamp-desk {
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+  background: var(--nord5);
+  border: 2px solid var(--border-strong);
+  border-radius: 5px;
+  padding: 0 10px 0 0;
+  margin-bottom: 6px;
+}
+.eq-preamp-desk .eq-preamp-desk-title {
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--nord0);
+  background: rgba(0, 0, 0, 0.05);
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 3px 0 0 3px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.eq-preamp-desk .eq-preamp-gain-field {
+  width: 136px;
+  min-width: 136px;
+  max-width: 136px;
+  flex: 0 0 136px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.eq-preamp-desk .eq-preamp-auto-field {
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  flex: 0 0 170px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.eq-preamp-auto-btn {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  height: 30px;
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.eq-preamp-auto-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--nord0);
+}
+.eq-row-lbl {
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  user-select: none;
+}
+.eq-scrub-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  flex: 0 0 100px;
+  height: 30px;
+  padding: 0 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: ns-resize;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+.eq-scrub-box:hover,
+.eq-scrub-box.scrubbing,
+.eq-scrub-box:focus-within {
+  border-color: var(--nord0);
+}
+.eq-scrub-input {
+  field-sizing: content;
+  width: auto;
+  min-width: 22px;
+  max-width: 62px;
+  border: none;
+  background: transparent;
+  color: var(--nord0);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  outline: none !important;
+  cursor: ns-resize;
+  padding: 0;
+}
+.eq-scrub-input:focus {
+  cursor: text;
+}
+.eq-scrub-unit {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-left: 0;
+  flex-shrink: 0;
+  user-select: none;
+}
+.eq-scrub-unit:empty {
+  display: none;
+}
+#bands-container:has(.band-card.eq-row-desktop) #eq-preamp-col {
+  display: none;
+}
+#bands-container:has(.band-card.eq-row-desktop) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  overflow: visible;
+  padding: 0;
+}
+@media (max-width: 680px) {
+  .eq-preamp-desk {
+    display: none;
+  }
+}
+.band-card.eq-row-desktop {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 0 auto;
+  height: 44px;
+  min-height: 44px;
+  max-height: 44px;
+  padding: 0 10px 0 0;
+  background: var(--nord5);
+  border: 2px solid var(--border-strong);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 18px;
+}
+.band-card.eq-row-desktop:hover,
+.band-card.eq-row-desktop:focus-within,
+.band-card.eq-row-desktop:has(.band-type-menu-wrap.open) {
+  border-color: var(--nord0) !important;
+  z-index: 80;
+}
+.band-card.eq-row-desktop .band-dragger-titlebar.eq-row-dragger {
+  width: 56px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 3px 0 0 3px;
+  cursor: grab;
+  flex-shrink: 0;
+}
+.band-card.eq-row-desktop .eq-row-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--nord0);
+  background: transparent;
+  flex-shrink: 0;
+}
+.band-card.eq-row-desktop .eq-row-type {
+  width: 136px;
+  flex-shrink: 0;
+}
+.band-card.eq-row-desktop .band-type-menu-btn {
+  max-width: none;
+  width: 100%;
+  height: 30px;
+  justify-content: center;
+  text-align: center;
+  padding: 0 10px;
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.band-card.eq-row-desktop .band-type-menu-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--nord0);
+}
+.band-card.eq-row-desktop .type-btn-caret {
+  display: none !important;
+}
+.band-card.eq-row-desktop .band-type-dropdown {
+  width: 150px;
+  left: 0;
+  transform: none;
+  margin-top: 3px;
+}
+.band-card.eq-row-desktop .eq-row-field {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  flex: 0 0 170px;
+}
+.band-card.eq-row-desktop .eq-row-lbl {
+  flex: 1 1 auto;
+  text-align: right;
+}
+.band-card.eq-row-desktop .eq-row-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.band-card.eq-row-desktop .band-bypass-btn {
+  width: auto;
+  height: 30px;
+  padding: 0 10px;
+  gap: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid var(--border-strong) !important;
+  background: var(--card-bg) !important;
+  color: var(--nord0) !important;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.band-card.eq-row-desktop .band-bypass-btn:hover {
+  border-color: var(--nord0) !important;
+  background: var(--surface-hover) !important;
+}
+.band-card.eq-row-desktop.band-bypassed .band-bypass-btn {
+  border-color: var(--nord11) !important;
+  color: var(--nord11) !important;
+}
+.band-card.eq-row-desktop .band-delete-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border: 1px solid var(--border-strong) !important;
+  background: var(--card-bg) !important;
+  color: var(--nord0) !important;
+  border-radius: 4px;
+}
+.band-card.eq-row-desktop .band-delete-btn:hover:not(:disabled) {
+  border-color: var(--nord0) !important;
+  background: var(--surface-hover) !important;
+  color: var(--danger) !important;
+}
+.band-card.eq-row-desktop .band-delete-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.band-card.eq-row-desktop .eq-row-select-cb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  background: var(--card-bg);
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.band-card.eq-row-desktop .eq-row-select-cb:hover {
+  border-color: var(--nord0);
+  background: var(--surface-hover);
+}
+.band-card.eq-row-desktop .eq-row-select-cb:checked {
+  background: var(--nord11);
+  border-color: var(--nord11);
+}
+.band-card.eq-row-desktop .eq-row-select-cb:checked::after {
+  content: "";
+  width: 6px;
+  height: 12px;
+  border: solid #FFFFFF;
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+.eq-add-row-btn {
+  width: 100%;
+  height: 36px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 5px;
+  background: var(--nord5);
+  color: var(--nord0);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.eq-add-row-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: var(--nord0);
+}
+.eq-add-row-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.eq-delete-row-btn {
+  width: 100%;
+  height: 0;
+  min-height: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  margin-top: -6px;
+  padding: 0;
+  border: 0px dashed #BF616A;
+  border-radius: 5px;
+  background: rgba(191, 97, 106, 0.12);
+  color: #BF616A;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  transition: height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+              max-height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+              opacity 0.18s ease,
+              border-width 0.15s ease,
+              background-color 0.15s ease,
+              color 0.15s ease;
+}
+.eq-delete-row-btn.visible {
+  height: 36px;
+  max-height: 36px;
+  opacity: 1;
+  margin-top: 0;
+  border-width: 1.5px;
+  pointer-events: auto;
+}
+.eq-delete-row-btn:hover:not(:disabled) {
+  background: #BF616A;
+  color: #FFFFFF;
+  border-style: solid;
+}
+.eq-delete-row-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .band-menu-opt {
@@ -1171,15 +1752,18 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   width: 100%;
 }
 .band-vslider {
-  -webkit-appearance: slider-vertical;
-  writing-mode: bt-lr;
-  width: 22px;
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
   height: 122px;
   cursor: pointer;
   accent-color: var(--nord0);
   background: transparent;
   border: none;
   outline: none;
+  touch-action: none;
 }
 .preamp-slider::-webkit-slider-runnable-track,
 .band-vslider::-webkit-slider-runnable-track {
@@ -1210,13 +1794,13 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   -webkit-appearance: none;
   appearance: none;
   width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  height: 30px;
+  border-radius: 9999px;
   background: #2E3440 !important;
   border: 2px solid #ECEFF4 !important;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   cursor: pointer;
-  transform: translateX(6px);
+  margin-left: -6px;
 }
 .preamp-slider::-webkit-slider-thumb:hover,
 .band-vslider::-webkit-slider-thumb:hover {
@@ -1226,8 +1810,8 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 .preamp-slider::-moz-range-thumb,
 .band-vslider::-moz-range-thumb {
   width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  height: 30px;
+  border-radius: 9999px;
   background: #2E3440 !important;
   border: 2px solid #ECEFF4 !important;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
@@ -1371,7 +1955,6 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   padding: 4px 6px;
 }
 
-
 .boot-cfg-container {
   display: flex;
   flex-direction: column;
@@ -1437,11 +2020,39 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   opacity: 1;
 }
 
-
+.wifi-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 18, 24, 0.65);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease, visibility 0s linear 0.2s;
+}
+.wifi-modal-backdrop .wifi-cfg-panel {
+  transform: translateY(10px) scale(0.96);
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+.wifi-modal-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.2s ease, visibility 0s linear 0s;
+}
+.wifi-modal-backdrop.open .wifi-cfg-panel {
+  transform: translateY(0) scale(1);
+}
 .wifi-cfg-panel {
-  margin-top: 14px;
+  width: 100%;
+  max-width: 460px;
+  margin: 0;
   background: var(--card-bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1449,14 +2060,29 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  cursor: pointer;
+  padding: 14px 20px;
   user-select: none;
-  background: transparent;
-  transition: background 0.15s ease;
-}
-.wifi-cfg-header:hover {
   background: var(--card-header);
+}
+.wifi-modal-close {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.wifi-modal-close:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--nord0);
 }
 .wifi-cfg-title-row {
   display: flex;
@@ -1506,21 +2132,13 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   color: var(--nord9);
 }
 .wifi-cfg-body {
-  padding: 4px 14px 14px;
-  animation: tab-in 0.2s ease-out;
-}
-.wifi-cfg-desc {
-  font-size: 12px;
-  color: var(--nord3);
-  margin-bottom: 12px;
-  line-height: 1.4;
+  padding: 26px 20px 24px;
 }
 .wifi-cfg-inputs {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: 1fr;
   align-items: end;
-  gap: 10px 12px;
-  max-width: 640px;
+  gap: 16px;
 }
 .wifi-input-group {
   display: flex;
@@ -1575,7 +2193,10 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
+  margin-top: 6px;
 }
 .btn-wifi-connect {
   padding: 9px 22px;
@@ -1611,7 +2232,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 body, .module-box, .module-header, .band-card, .btn-preset, .wifi-cfg-panel, .input-card {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
-/* ---- Motion & interaction polish ---- */
+
 @keyframes body-in {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: none; }
@@ -1644,26 +2265,27 @@ select:focus-visible, input:focus-visible {
 .card-val-badge { align-items: center; text-align: center; }
 .card-val-badge .badge-lbl { width: 100%; text-align: center; }
 .card-val-badge input.badge-val-input { text-align: center; -moz-appearance: textfield; appearance: textfield; }
-.theme-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
-.theme-toggle-btn {
-  text-transform: uppercase;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--nord0);
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+.sys-actions-grid { margin-top: 0; }
+body.processing-off #dsp-modules-container {
+  filter: grayscale(1);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
 }
-.theme-toggle-btn:hover { background: var(--surface-hover); border-color: var(--border-strong); }
-.theme-toggle-btn .theme-icon-sun { display: none; }
-:root[data-theme="dark"] .theme-toggle-btn .theme-icon-sun { display: inline-block; }
-:root[data-theme="dark"] .theme-toggle-btn .theme-icon-moon { display: none; }
+body.processing-off .reorder-bar,
+body.processing-off .btn-action-reorder,
+body.processing-off .module-dragger .drag-grip-dots,
+body.processing-off .band-dragger-titlebar .drag-grip {
+  display: none !important;
+}
+body.processing-off .module-dragger,
+body.processing-off .band-dragger-titlebar {
+  pointer-events: none !important;
+  cursor: default !important;
+}
+#theme-toggle-btn .theme-icon-sun { display: none; }
+:root[data-theme="dark"] #theme-toggle-btn .theme-icon-sun { display: inline-block; }
+:root[data-theme="dark"] #theme-toggle-btn .theme-icon-moon { display: none; }
 .reorder-bar, .btn-action-reorder { display: none; }
 .btn-card-action.active-reorder {
   border-style: solid;
@@ -1678,13 +2300,32 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 .backup-msg.visible { opacity: 1; }
 .backup-msg.error { color: var(--danger); }
 
+.mobile-only-el { display: none; }
+
 @media (max-width: 680px) {
+  html, body {
+    touch-action: pan-x pan-y;
+  }
   body {
     padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
   }
+  main {
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
+  main > *,
+  #dsp-modules-container,
+  #dsp-modules-container > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+  @keyframes tab-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
   .mobile-tabs {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: 6px;
     position: fixed;
     left: 0;
@@ -1692,13 +2333,31 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     bottom: 0;
     top: auto;
     z-index: 800;
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 12px calc(6px + env(safe-area-inset-bottom, 0px));
     margin: 0;
     background: var(--card-bg);
     border-top: 1px solid var(--border-strong);
   }
+  .mobile-tabs::before {
+    content: "";
+    position: absolute;
+    top: 8px;
+    bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+    left: 12px;
+    width: calc((100% - 30px) / 2);
+    background: var(--card-header);
+    border-radius: 999px;
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
+    z-index: 0;
+  }
+  main[data-tab="dsp"] .mobile-tabs::before {
+    transform: translateX(calc(100% + 6px));
+  }
   .mobile-tab {
-  text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+    text-transform: uppercase;
     padding: 10px 0;
     font-size: 13px;
     font-weight: 700;
@@ -1708,32 +2367,67 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     border: 1px solid transparent;
     border-radius: 6px;
     cursor: pointer;
-    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+    transition: color 0.2s ease;
   }
   .mobile-tab.active {
     color: var(--nord0);
-    background: var(--surface-hover);
-    border-color: var(--border-strong);
   }
-  main[data-tab="system"] [data-tabpanel="dsp"],
-  main[data-tab="dsp"] [data-tabpanel="system"] { display: none !important; }
-  #mod-input {
+  main[data-tab="system"] [data-tabpanel]:not([data-tabpanel="system"]),
+  main[data-tab="dsp"] [data-tabpanel]:not([data-tabpanel="dsp"]) { display: none !important; }
+  .wifi-open-btn { display: none !important; }
+  .mobile-only-el { display: block; }
+  .submodule-separator.mobile-only-el { margin: 0 0 12px; }
+  .wifi-modal-backdrop {
+    position: static;
+    inset: auto;
+    background: transparent;
+    z-index: auto;
+    display: block;
+    padding: 0;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: none;
+  }
+  .wifi-modal-backdrop .wifi-cfg-panel {
+    max-width: 100%;
+    transform: none;
+    transition: none;
     background: transparent;
     border: none;
     border-radius: 0;
     overflow: visible;
   }
-  #mod-input > .module-header {
+  .wifi-cfg-header {
     display: none;
   }
-  #mod-input > .module-body {
+  .wifi-cfg-body {
+    padding: 0;
+  }
+  #mod-input,
+  #mod-boot-cfg {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+  #mod-input > .module-header,
+  #mod-boot-cfg > .module-header {
+    display: none;
+  }
+  #mod-input > .module-body,
+  #mod-boot-cfg > .module-body {
     display: block !important;
+    padding: 0;
+    height: auto !important;
+  }
+  #mod-boot-cfg .boot-cfg-container {
     padding: 0;
   }
   .reorder-bar {
     display: flex;
     gap: 8px;
-    justify-content: flex-end;
+    justify-content: center;
   }
   .reorder-bar .btn-card-action {
   text-transform: uppercase;
@@ -1746,25 +2440,49 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     display: flex;
   }
   #bands-container {
-    scroll-snap-type: x proximity;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
   }
-  .band-card:not(.sorting),
-  .eq-actions-card {
-    scroll-snap-align: start;
-  }
-  .module-dragger, .band-dragger-titlebar { pointer-events: none; }
+  .module-dragger { pointer-events: none; }
   body:not(.reorder-modules) .module-dragger .drag-grip-dots { display: none; }
-  body:not(.reorder-bands) .band-dragger-titlebar .drag-grip { visibility: hidden; }
-  body.reorder-modules .module-dragger,
-  body.reorder-bands .band-dragger-titlebar { pointer-events: auto; }
   body.reorder-modules .module-dragger {
+    pointer-events: auto;
     background: var(--accent-soft);
     outline: 2px solid var(--nord8);
     outline-offset: -2px;
   }
-  body.reorder-bands .band-dragger-titlebar { background: rgba(136, 192, 208, 0.35); border-radius: 6px; }
-  main[data-tab] [data-tabpanel] { animation: tab-in 0.22s ease-out; }
+  body.reorder-bands .band-card:not(.eq-row-desktop),
+  #bands-container.select-mode .band-card:not(.eq-row-desktop) {
+    width: 118px;
+    min-width: 118px;
+    max-width: 118px;
+    flex: 0 0 118px;
+    overflow: hidden;
+  }
+  body.reorder-bands .band-card:not(.eq-row-desktop) {
+    cursor: grab;
+    touch-action: none;
+  }
+  #bands-container.select-mode .band-card:not(.eq-row-desktop) {
+    cursor: pointer;
+  }
+  body.reorder-bands .band-card:not(.eq-row-desktop) .band-type-row,
+  body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-main-grid,
+  body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-bottom-row,
+  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-type-row,
+  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-main-grid,
+  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-bottom-row {
+    opacity: 0.16;
+    pointer-events: none !important;
+  }
+  body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
+    display: flex;
+  }
+  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-select-overlay {
+    display: flex;
+  }
+  main[data-tab="system"] [data-tabpanel="system"],
+  main[data-tab="dsp"] [data-tabpanel="dsp"] { animation: tab-fade 0.18s ease-out; }
   .input-selector-grid {
     grid-template-columns: 1fr;
   }
@@ -1779,6 +2497,55 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   .eq-bands-box {
     justify-content: space-between;
     width: 100%;
+  }
+  :root:not([data-theme="dark"]) .preamp-slider::-webkit-slider-thumb,
+  :root:not([data-theme="dark"]) .band-vslider::-webkit-slider-thumb {
+    background: #FFFFFF !important;
+    border-color: #2E3440 !important;
+  }
+  :root:not([data-theme="dark"]) .preamp-slider::-webkit-slider-thumb:hover,
+  :root:not([data-theme="dark"]) .band-vslider::-webkit-slider-thumb:hover {
+    background: #ECEFF4 !important;
+    border-color: #2E3440 !important;
+  }
+  :root:not([data-theme="dark"]) .preamp-slider::-moz-range-thumb,
+  :root:not([data-theme="dark"]) .band-vslider::-moz-range-thumb {
+    background: #FFFFFF !important;
+    border-color: #2E3440 !important;
+  }
+  :root:not([data-theme="dark"]) .preamp-slider::-moz-range-thumb:hover,
+  :root:not([data-theme="dark"]) .band-vslider::-moz-range-thumb:hover {
+    background: #ECEFF4 !important;
+    border-color: #2E3440 !important;
+  }
+  :root:not([data-theme="dark"]) .band-card:not(.eq-row-desktop) .band-type-menu-btn {
+    background: #FFFFFF;
+    color: #2E3440;
+    border: 1px solid #4C566A;
+  }
+  :root:not([data-theme="dark"]) .band-card:not(.eq-row-desktop) .band-type-menu-btn:hover {
+    background: #ECEFF4;
+  }
+  :root:not([data-theme="dark"]) .card-val-badge {
+    background: #FFFFFF;
+    color: #2E3440;
+    border: 1px solid #4C566A;
+  }
+  :root:not([data-theme="dark"]) .card-val-badge .badge-lbl {
+    color: #4C566A;
+  }
+  :root:not([data-theme="dark"]) .card-val-badge input.badge-val-input {
+    color: #2E3440;
+  }
+  :root:not([data-theme="dark"]) .badge-unit {
+    color: #5E81AC;
+  }
+  :root:not([data-theme="dark"]) .knob .knob-disc {
+    fill: #FFFFFF;
+    stroke: #4C566A;
+  }
+  :root:not([data-theme="dark"]) .knob .knob-notch {
+    stroke: #2E3440;
   }
 }</style>
 </head>
@@ -1805,6 +2572,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
       <span class="collapse-icon">▼</span>
     </div>
     <div class="module-body">
+      <div class="submodule-title">Inputs</div>
       <div class="input-selector-grid">
         <button class="input-card active" id="btn-src-1" onclick="setInputSource(1)" type="button">
           <div class="input-card-main">
@@ -1843,6 +2611,49 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <div class="input-card-title">Squeezebox</div>
           </div>
           <span class="input-card-badge" id="badge-src-3">STANDBY</span>
+        </button>
+      </div>
+
+      <div class="submodule-separator"></div>
+
+      <div class="submodule-title">System</div>
+      <div class="input-selector-grid sys-actions-grid">
+        <button class="input-card active" id="dsp-all-toggle-btn" onclick="toggleAllDSP()" type="button" aria-pressed="true">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+                <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+              </svg>
+            </div>
+            <div class="input-card-title" id="dsp-all-toggle-label">Processing</div>
+          </div>
+        </button>
+
+        <button class="input-card" id="theme-toggle-btn" type="button" aria-pressed="false">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg class="theme-icon-moon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+              <svg class="theme-icon-sun" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            </div>
+            <div class="input-card-title" id="theme-toggle-label">Dark theme</div>
+          </div>
+        </button>
+
+        <button class="input-card wifi-open-btn" id="wifi-open-btn" onclick="openWiFiModal()" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                <line x1="12" y1="20" x2="12.01" y2="20"/>
+              </svg>
+            </div>
+            <div class="input-card-title">Web UI</div>
+          </div>
         </button>
       </div>
 
@@ -1887,52 +2698,46 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           </div>
         </div>
       </div>
+    </div>
+  </section>
 
-      <div class="theme-row">
-        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-pressed="false">
-          <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-          <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-          <span id="theme-toggle-label">Dark mode</span>
-        </button>
-      </div>
-
-      <div class="wifi-cfg-panel">
-        <div class="wifi-cfg-header" onclick="toggleWiFiConfig(event)">
-          <div class="wifi-cfg-title-row">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
-              <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
-              <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-              <line x1="12" y1="20" x2="12.01" y2="20"/>
-            </svg>
-            <span class="wifi-cfg-title">Wi-Fi</span>
-            <span class="wifi-cfg-badge" id="wifi-cfg-cur-status">Checking...</span>
-          </div>
-          <span class="wifi-cfg-toggle-btn" id="wifi-cfg-arrow">▼</span>
+  <div class="wifi-modal-backdrop" id="wifi-modal" data-tabpanel="system" onclick="closeWiFiModal(event)">
+    <div class="wifi-cfg-panel" onclick="event.stopPropagation()">
+      <div class="wifi-cfg-header">
+        <div class="wifi-cfg-title-row">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+            <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+            <line x1="12" y1="20" x2="12.01" y2="20"/>
+          </svg>
+          <span class="wifi-cfg-title">Wi-Fi Setup</span>
         </div>
-        <div class="wifi-cfg-body" id="wifi-cfg-body" style="display: none;">
-          <div class="wifi-cfg-desc">Join a 2.4 GHz network, then open <strong>http://dsp.local</strong>.</div>
-          <div class="wifi-cfg-inputs">
-            <div class="wifi-input-group">
-              <label for="wifi-input-ssid">Network</label>
-              <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="SSID" autocomplete="off" autocorrect="off" autocapitalize="none">
+        <button type="button" class="wifi-modal-close" onclick="closeWiFiModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="wifi-cfg-body" id="wifi-cfg-body">
+        <div class="submodule-separator mobile-only-el"></div>
+        <div class="submodule-title mobile-only-el">Wi-Fi</div>
+        <div class="wifi-cfg-inputs">
+          <div class="wifi-input-group">
+            <label for="wifi-input-ssid">Network</label>
+            <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="SSID" autocomplete="off" autocorrect="off" autocapitalize="none">
+          </div>
+          <div class="wifi-input-group">
+            <label for="wifi-input-pass">Password</label>
+            <div class="wifi-pass-wrap">
+              <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Password" autocomplete="off">
+              <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show or hide password" aria-label="Show or hide password">👁</button>
             </div>
-            <div class="wifi-input-group">
-              <label for="wifi-input-pass">Password</label>
-              <div class="wifi-pass-wrap">
-                <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Password" autocomplete="off">
-                <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show or hide password" aria-label="Show or hide password">👁</button>
-              </div>
-            </div>
-            <div class="wifi-actions-row">
-              <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Connect</button>
-              <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
-            </div>
+          </div>
+          <div class="wifi-actions-row">
+            <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
+            <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Connect</button>
           </div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 
   <section class="module-box" id="mod-wifi-meta" data-tabpanel="system" style="display: none;">
     <div class="module-header static-header">
@@ -1948,20 +2753,12 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
       <div class="wifi-stream-card">
         <div class="wifi-stream-meta-grid">
           <div class="wifi-info-item">
-            <span class="wifi-info-lbl">Server Endpoint</span>
-            <span class="wifi-info-val" id="wifi-server-val">Searching for server...</span>
-          </div>
-          <div class="wifi-info-item">
             <span class="wifi-info-lbl">Stream Format</span>
             <span class="wifi-info-val" id="wifi-format-val">--</span>
           </div>
           <div class="wifi-info-item">
             <span class="wifi-info-lbl">Playback Status</span>
             <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
-          </div>
-          <div class="wifi-info-item">
-            <span class="wifi-info-lbl">Resampler Latency</span>
-            <span class="wifi-info-val" id="wifi-latency-val">None (Bypass)</span>
           </div>
         </div>
       </div>
@@ -2006,31 +2803,48 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
       <div class="eq-toolbar-row">
         <div class="eq-preset-box">
           <span class="preset-label">Preset:</span>
-          <button class="btn-preset active" id="btn-pre-flat_5" onclick="applyPreset('flat_5')">Flat 5 Bands</button>
-          <button class="btn-preset" id="btn-pre-flat_10" onclick="applyPreset('flat_10')">Flat 10 Bands</button>
-          <button class="btn-preset" id="btn-pre-low" onclick="applyPreset('low_boost')">Low Boost</button>
-          <button class="btn-preset" id="btn-pre-high" onclick="applyPreset('high_boost')">High Boost</button>
-          <span id="custom-presets-list" style="display:inline-flex;gap:6px;"></span>
+          <div class="preset-dropdown-wrap" id="preset-dropdown-wrap">
+            <button type="button" class="preset-dropdown-btn" id="preset-dropdown-btn" onclick="togglePresetDropdown(event)">
+              <span id="preset-dropdown-label">Flat 5 Bands</span>
+            </button>
+            <div class="preset-dropdown-menu" id="preset-dropdown-menu"></div>
+          </div>
           <button class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
           <button class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
           <input type="file" id="preset-file-input" accept=".json" style="display:none" onchange="importPresetFile(event)">
         </div>
       </div>
 
-      <div class="eq-body-layout">
-        <div class="preamp-col" id="eq-preamp-col">
-          <div class="preamp-slider-wrap">
-            <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
+      <div class="eq-preamp-desk" id="eq-preamp-desk-row">
+        <div class="eq-preamp-desk-title" id="eq-preamp-title">Preamp</div>
+        <div class="eq-row-field eq-preamp-gain-field">
+          <span class="eq-row-lbl">Gain</span>
+          <div class="eq-scrub-box" id="scrub-box-preamp-desk" title="Click to type, drag up/down to adjust">
+            <input type="text" inputmode="decimal" id="preamp-num-desk" class="eq-scrub-input" value="0.0">
+            <span class="eq-scrub-unit">dB</span>
           </div>
-          <div class="card-val-badge">
-            <span class="badge-lbl">PREAMP</span>
-            <div class="badge-input-row">
-              <input type="number" id="preamp-num" class="badge-val-input" min="-18" max="18" step="0.1" value="0.0">
+        </div>
+        <div class="eq-row-field eq-preamp-auto-field">
+          <button type="button" class="eq-preamp-auto-btn" id="btn-preamp-auto" onclick="autoPreamp()" title="Set preamp to negative of peak EQ gain">
+            <span>Auto</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="eq-body-layout">
+        <div id="bands-container">
+          <div class="preamp-col" id="eq-preamp-col">
+            <div class="preamp-slider-wrap">
+              <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
+            </div>
+            <div class="card-val-badge">
+              <span class="badge-lbl">PREAMP</span>
+              <div class="badge-input-row">
+                <input type="number" id="preamp-num" class="badge-val-input" min="-18" max="18" step="0.1" value="0.0">
+              </div>
             </div>
           </div>
         </div>
-
-        <div id="bands-container"></div>
       </div>
     </div>
   </section>
@@ -2275,15 +3089,18 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
       </div>
     </div>
   </section>
-  </div> <section class="module-box" id="mod-boot-cfg" data-tabpanel="dsp">
+  </div>
+
+  <section class="module-box" id="mod-boot-cfg" data-tabpanel="system">
     <div class="module-header" onclick="toggleModuleCollapse('boot-cfg')">
       <div class="module-title-area">
-        <span class="module-title">Startup &amp; Backup</span>
+        <span class="module-title">Config</span>
       </div>
       <span class="collapse-icon">▼</span>
     </div>
     <div class="module-body" id="body-boot-cfg">
       <div class="boot-cfg-container">
+        <div class="submodule-separator mobile-only-el"></div>
         <div class="submodule-title">Startup</div>
         <div class="boot-cfg-mode-row">
           <label class="boot-radio-label">
@@ -2332,7 +3149,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   </main>
 
 <script>
-/* ---- Theme (Nord light / dark) ---- */
+
 const cvCache = {};
 function cv(name) {
   return cvCache[name] || (cvCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim());
@@ -2351,22 +3168,25 @@ function bandCardBorder(hsl, hex) {
   const tBtn = document.getElementById('theme-toggle-btn');
   const tLbl = document.getElementById('theme-toggle-label');
   if (tBtn) tBtn.setAttribute('aria-pressed', name === 'dark' ? 'true' : 'false');
-  if (tLbl) tLbl.textContent = name === 'dark' ? 'Dark mode: On' : 'Dark mode: Off';
+  if (tLbl) tLbl.textContent = name === 'dark' ? 'Light theme' : 'Dark theme';
   if (persist) { try { localStorage.setItem('esp32_dsp_theme', name); } catch (_) {} }
+  if (typeof bands !== 'undefined' && document.getElementById('band-card-0')) {
+    bands.forEach((_, idx) => syncBandCardUI(idx));
+  }
 }
 const FS = 44100;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
-  '#BF616A', // Nord11 Red
-  '#D08770', // Nord12 Orange
-  '#EBCB8B', // Nord13 Yellow
-  '#A3BE8C', // Nord14 Green
-  '#B48EAD', // Nord15 Purple
-  '#C2677C', // Aurora Coral Rose
-  '#DB9760', // Aurora Tangerine
-  '#8CA870', // Aurora Olive Green
-  '#68B092', // Aurora Emerald
-  '#9B6FB0'  // Aurora Violet
+  '#BF616A',
+  '#D08770',
+  '#EBCB8B',
+  '#A3BE8C',
+  '#B48EAD',
+  '#C2677C',
+  '#DB9760',
+  '#8CA870',
+  '#68B092',
+  '#9B6FB0'
 ];
 
 function getBandColor(b, index) {
@@ -2402,11 +3222,11 @@ let eqPreamp  = 0.0;
 let currentPreset = 'flat_5';
 
 let bands = [
-  { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true, color: BAND_COLORS[0] }, // Low Shelf
-  { band: 1, freq: 500.0,   gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[1] }, // Peaking
-  { band: 2, freq: 1000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[2] }, // Peaking
-  { band: 3, freq: 4000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[3] }, // Peaking
-  { band: 4, freq: 10000.0, gain: 0.0, q: 0.707, type: 2, order: 2, enabled: true, color: BAND_COLORS[4] }  // High Shelf
+  { band: 0, freq: 100.0,   gain: 0.0, q: 0.707, type: 1, order: 2, enabled: true, color: BAND_COLORS[0] },
+  { band: 1, freq: 500.0,   gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[1] },
+  { band: 2, freq: 1000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[2] },
+  { band: 3, freq: 4000.0,  gain: 0.0, q: 0.707, type: 0, order: 2, enabled: true, color: BAND_COLORS[3] },
+  { band: 4, freq: 10000.0, gain: 0.0, q: 0.707, type: 2, order: 2, enabled: true, color: BAND_COLORS[4] }
 ];
 
 const PRESETS = {
@@ -2446,13 +3266,31 @@ const PRESETS = {
 };
 PRESETS.flat = PRESETS.flat_5;
 
+const BUILTIN_PRESET_LABELS = {
+  flat_5: 'Flat 5 Bands',
+  flat_10: 'Flat 10 Bands',
+  low_boost: 'Low Boost',
+  high_boost: 'High Boost'
+};
+
+function togglePresetDropdown(event) {
+  if (event) event.stopPropagation();
+  const wrap = document.getElementById('preset-dropdown-wrap');
+  if (!wrap) return;
+  wrap.classList.toggle('open');
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#preset-dropdown-wrap')) {
+    document.getElementById('preset-dropdown-wrap')?.classList.remove('open');
+  }
+});
+
 function applyPreset(name) {
   if (name === 'flat') name = 'flat_5';
   if (!PRESETS[name]) return;
   currentPreset = name;
-  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-  const btn = document.getElementById(`btn-pre-${name === 'low_boost' ? 'low' : (name === 'high_boost' ? 'high' : (name === 'flat_10' ? 'flat_10' : 'flat_5'))}`);
-  if (btn) btn.classList.add('active');
+  document.getElementById('preset-dropdown-wrap')?.classList.remove('open');
 
   bands = PRESETS[name].map((p, idx) => ({
     band: idx,
@@ -2465,6 +3303,7 @@ function applyPreset(name) {
     color: BAND_COLORS[idx % BAND_COLORS.length]
   }));
 
+  renderCustomPresets();
   rebuildBandsUI();
   drawResponse();
 
@@ -2502,11 +3341,8 @@ function saveCurrentPreset() {
     customPresets.push(presetData);
   }
   localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+  currentPreset = name.trim();
   renderCustomPresets();
-
-  document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-  const activeBtn = document.querySelector(`[data-custom-preset="${CSS.escape(name.trim())}"]`);
-  if (activeBtn) activeBtn.classList.add('active');
 
   const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2554,8 +3390,6 @@ function importPresetFile(event) {
         };
       });
 
-      document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-
       const presetName = data.name || file.name.replace(/\.[^/.]+$/, "");
       let customPresets = [];
       try {
@@ -2570,10 +3404,8 @@ function importPresetFile(event) {
         customPresets.push(customEntry);
       }
       localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+      currentPreset = presetName;
       renderCustomPresets();
-
-      const importedBtn = document.querySelector(`[data-custom-preset="${CSS.escape(presetName)}"]`);
-      if (importedBtn) importedBtn.classList.add('active');
 
       rebuildBandsUI();
       drawResponse();
@@ -2589,24 +3421,47 @@ function importPresetFile(event) {
 }
 
 function renderCustomPresets() {
-  const container = document.getElementById('custom-presets-list');
-  if (!container) return;
-  container.innerHTML = '';
+  const menu = document.getElementById('preset-dropdown-menu');
+  const lbl = document.getElementById('preset-dropdown-label');
+  if (lbl) {
+    lbl.textContent = BUILTIN_PRESET_LABELS[currentPreset] || currentPreset || 'Flat 5 Bands';
+  }
+  if (!menu) return;
+  menu.innerHTML = '';
+
+  Object.entries(BUILTIN_PRESET_LABELS).forEach(([key, title]) => {
+    const opt = document.createElement('div');
+    opt.className = 'gm-opt' + (currentPreset === key ? ' selected' : '');
+    opt.setAttribute('data-preset', key);
+    opt.textContent = title;
+    opt.onclick = (e) => {
+      e.stopPropagation();
+      applyPreset(key);
+    };
+    menu.appendChild(opt);
+  });
 
   let customPresets = [];
   try {
     customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
   } catch (_) { customPresets = []; }
 
+  if (customPresets.length > 0) {
+    const sep = document.createElement('div');
+    sep.className = 'gm-sep';
+    menu.appendChild(sep);
+  }
+
   customPresets.forEach((p, idx) => {
-    const btn = document.createElement('button');
-    btn.className = 'btn-preset';
-    btn.setAttribute('data-custom-preset', p.name);
-    btn.textContent = p.name;
-    btn.title = `Apply "${p.name}" (Right-click to delete)`;
-    btn.onclick = () => {
-      document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+    const opt = document.createElement('div');
+    opt.className = 'gm-opt' + (currentPreset === p.name ? ' selected' : '');
+    opt.setAttribute('data-custom-preset', p.name);
+    opt.textContent = p.name;
+    opt.title = `Apply "${p.name}" (Right-click to delete)`;
+    opt.onclick = (e) => {
+      e.stopPropagation();
+      currentPreset = p.name;
+      document.getElementById('preset-dropdown-wrap')?.classList.remove('open');
       if (typeof p.preamp === 'number') {
         eqPreamp = p.preamp;
         updatePreampUI();
@@ -2627,42 +3482,156 @@ function renderCustomPresets() {
           enabled: b.enabled !== undefined ? b.enabled : true
         };
       });
+      renderCustomPresets();
       rebuildBandsUI();
       drawResponse();
       bands.forEach((_, i) => sendBand(i));
     };
 
-    btn.oncontextmenu = (e) => {
+    opt.oncontextmenu = (e) => {
       e.preventDefault();
+      e.stopPropagation();
       if (confirm(`Delete preset "${p.name}"?`)) {
         customPresets.splice(idx, 1);
         localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+        if (currentPreset === p.name) currentPreset = 'flat_5';
         renderCustomPresets();
       }
     };
 
-    container.appendChild(btn);
+    menu.appendChild(opt);
   });
 }
 
 let isPreampDragging = false;
 
+function attachScrubInput(boxEl, inputEl, opts) {
+  if (!boxEl || !inputEl) return;
+  let startY = 0;
+  let startVal = 0;
+  let dragging = false;
+
+  const getCfg = () => (opts.getConfig ? opts.getConfig() : opts);
+
+  boxEl.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    if (document.activeElement === inputEl) return;
+    e.preventDefault();
+    startY = e.clientY;
+    startVal = opts.getVal();
+    dragging = false;
+
+    const onMove = ev => {
+      const dy = startY - ev.clientY;
+      if (!dragging && Math.abs(dy) > 3) {
+        dragging = true;
+        boxEl.classList.add('scrubbing');
+        document.body.classList.add('is-scrubbing-val');
+        if (document.activeElement === inputEl) inputEl.blur();
+      }
+      if (!dragging) return;
+
+      const cfg = getCfg();
+      const min = cfg.min;
+      const max = cfg.max;
+      const step = cfg.step || 0;
+      const logScale = !!cfg.logScale;
+      const pixels = cfg.pixels || 160;
+      const sens = ev.shiftKey ? pixels * 5 : pixels;
+      const deltaNorm = dy / sens;
+
+      let v;
+      if (logScale) {
+        const logMin = Math.log10(min);
+        const logMax = Math.log10(max);
+        const clampedStart = Math.max(min, Math.min(max, startVal));
+        const startNorm = (Math.log10(clampedStart) - logMin) / (logMax - logMin);
+        const nextNorm = Math.max(0, Math.min(1, startNorm + deltaNorm));
+        v = Math.pow(10, logMin + nextNorm * (logMax - logMin));
+      } else {
+        const startNorm = (startVal - min) / (max - min);
+        const nextNorm = Math.max(0, Math.min(1, startNorm + deltaNorm));
+        v = min + nextNorm * (max - min);
+      }
+
+      if (step > 0) {
+        v = Math.round(v / step) * step;
+      }
+      v = Math.max(min, Math.min(max, v));
+      if (opts.onSlide) opts.onSlide(v);
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      boxEl.classList.remove('scrubbing');
+      document.body.classList.remove('is-scrubbing-val');
+      if (dragging) {
+        if (opts.onApply) opts.onApply(opts.getVal());
+      } else {
+        inputEl.focus();
+        inputEl.select();
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  });
+
+  inputEl.addEventListener('focus', () => {
+    setTimeout(() => {
+      if (document.activeElement === inputEl) inputEl.select();
+    }, 0);
+  });
+
+  const commitTyped = () => {
+    const cfg = getCfg();
+    let v = parseFloat(inputEl.value);
+    if (isNaN(v)) v = opts.getVal();
+    if (cfg.step > 0) {
+      v = Math.round(v / cfg.step) * cfg.step;
+    }
+    v = Math.max(cfg.min, Math.min(cfg.max, v));
+    if (opts.onApply) opts.onApply(v);
+  };
+
+  inputEl.addEventListener('change', commitTyped);
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitTyped();
+      inputEl.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      const cfg = getCfg();
+      const cur = opts.getVal();
+      inputEl.value = cfg.format ? cfg.format(cur) : cur;
+      inputEl.blur();
+    }
+  });
+}
+
 function initPreamp() {
-  const slider = document.getElementById('preamp-slider');
-  const input  = document.getElementById('preamp-num');
+  const slider    = document.getElementById('preamp-slider');
+  const input     = document.getElementById('preamp-num');
+  const deskBox   = document.getElementById('scrub-box-preamp-desk');
+  const deskInput = document.getElementById('preamp-num-desk');
   if (!slider || !input) return;
 
   slider.addEventListener('input', e => {
     isPreampDragging = true;
     eqPreamp = Math.max(-18, Math.min(18, parseFloat(e.target.value) || 0));
     input.value = eqPreamp.toFixed(1);
-    requestDrawResponse(); // Local visual preview only while sliding!
+    if (deskInput) deskInput.value = eqPreamp.toFixed(1);
+    requestDrawResponse();
   });
 
   slider.addEventListener('change', () => {
     isPreampDragging = false;
     wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
-    requestDrawResponse(); // Apply to ESP32 on mouse release!
+    requestDrawResponse();
   });
 
   input.addEventListener('change', e => {
@@ -2672,17 +3641,40 @@ function initPreamp() {
     eqPreamp = v;
     slider.value = v;
     input.value = v.toFixed(1);
+    if (deskInput) deskInput.value = v.toFixed(1);
     wsTx({ t: 'eq_preamp', preamp: Math.round(v * 100) / 100 });
     requestDrawResponse();
   });
 
+  if (deskBox && deskInput) {
+    attachScrubInput(deskBox, deskInput, {
+      min: -18, max: 18, step: 0.1, logScale: false, pixels: 150,
+      format: v => v.toFixed(1),
+      getVal: () => eqPreamp,
+      onSlide: v => {
+        isPreampDragging = true;
+        eqPreamp = v;
+        updatePreampUI();
+        requestDrawResponse();
+      },
+      onApply: v => {
+        isPreampDragging = false;
+        eqPreamp = v;
+        updatePreampUI();
+        wsTx({ t: 'eq_preamp', preamp: Math.round(v * 100) / 100 });
+        requestDrawResponse();
+      }
+    });
+  }
 }
 
 function updatePreampUI() {
-  const slider = document.getElementById('preamp-slider');
-  const input  = document.getElementById('preamp-num');
-  if (slider) slider.value = eqPreamp;
-  if (input)  input.value  = eqPreamp.toFixed(1);
+  const slider    = document.getElementById('preamp-slider');
+  const input     = document.getElementById('preamp-num');
+  const deskInput = document.getElementById('preamp-num-desk');
+  if (slider)    slider.value    = eqPreamp;
+  if (input)     input.value     = eqPreamp.toFixed(1);
+  if (deskInput) deskInput.value = eqPreamp.toFixed(1);
 }
 
 let subsonicParams = {
@@ -2699,7 +3691,7 @@ let limParams = {
   enabled: false, ceiling: -0.5, knee: 3.0
 };
 
-let bandKnobs = []; // Array of { fKnob, qKnob }
+let bandKnobs = [];
 let subsonicKnobs = {};
 let compKnobs = {};
 let limKnobs  = {};
@@ -2709,11 +3701,6 @@ let ws = null, wsRetry = null;
 function wsConnect() {
   clearTimeout(wsRetry);
 
-  if (location.protocol === 'file:') {
-    setDot('ok', 'Offline Demo');
-    return;
-  }
-
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   try {
     ws = new WebSocket(proto + '//' + location.host + '/ws');
@@ -2721,20 +3708,19 @@ function wsConnect() {
       setDot('ok', 'Connected');
       wsTx({ t: 'getState' });
     };
-    ws.onclose = e => {
-      console.log('[WS] Disconnected, code:', e.code, 'reason:', e.reason);
-      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Reconnecting...');
+    ws.onclose = () => {
+      setDot('err', 'Reconnecting...');
       ws = null;
       wsRetry = setTimeout(wsConnect, 1500);
     };
     ws.onerror = () => {
-      setDot('err', location.hostname === 'localhost' ? 'Offline Demo' : 'Error');
+      setDot('err', 'Error');
     };
     ws.onmessage = e => {
       try { handleMsg(JSON.parse(e.data)); } catch (_) {}
     };
   } catch (e) {
-    setDot('err', 'Offline Demo');
+    setDot('err', 'Connection Error');
   }
 }
 
@@ -2745,20 +3731,11 @@ function wsTx(obj) {
 }
 
 function setDot(cls, txt) {
-  const dot = document.getElementById('ws-dot');
-  const lbl = document.getElementById('ws-lbl');
-  if (dot) dot.className = cls;
-  if (lbl) lbl.textContent = txt;
-
   const overlay = document.getElementById('conn-overlay');
   if (overlay) {
-    if (location.protocol === 'file:') {
-      overlay.style.display = 'none';
-    } else {
-      overlay.style.display = (cls === 'ok') ? 'none' : 'flex';
-      const desc = document.getElementById('conn-desc');
-      if (desc) desc.textContent = (cls === 'ok') ? '' : txt;
-    }
+    overlay.style.display = (cls === 'ok') ? 'none' : 'flex';
+    const desc = document.getElementById('conn-desc');
+    if (desc) desc.textContent = (cls === 'ok') ? '' : txt;
   }
 }
 
@@ -2809,23 +3786,25 @@ function updateSysStatsUI(s) {
     }
   }
   if (s.wifi_ssid !== undefined) {
-    const badge = document.getElementById('wifi-cfg-cur-status');
-    if (badge) {
-      if (s.wifi_con) {
-        badge.className = 'wifi-cfg-badge';
-        badge.textContent = `Connected: ${s.wifi_ssid}`;
-      } else {
-        badge.className = 'wifi-cfg-badge ap-mode';
-        badge.textContent = s.wifi_ssid;
-      }
+    if (s.wifi_con) {
+      setWiFiBadges('wifi-cfg-badge', `Connected: ${s.wifi_ssid}`);
+    } else {
+      setWiFiBadges('wifi-cfg-badge ap-mode', s.wifi_ssid);
     }
+  }
+}
+
+function setWiFiBadges(cls, text) {
+  const el = document.getElementById('wifi-cfg-cur-status');
+  if (el) {
+    el.className = cls;
+    el.textContent = text;
   }
 }
 
 function handleMsg(d) {
   if (d.t === 'wifi_status') {
     const statusMsg = document.getElementById('wifi-cfg-msg');
-    const badge = document.getElementById('wifi-cfg-cur-status');
     if (d.status === 'connected') {
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg success';
@@ -2840,10 +3819,7 @@ function handleMsg(d) {
         link.textContent = 'http://dsp.local';
         statusMsg.append('Connected to ', strong, ` · ${d.ip || ''} · `, link);
       }
-      if (badge) {
-        badge.className = 'wifi-cfg-badge';
-        badge.textContent = `Connected: ${d.ssid || d.ip || 'OK'}`;
-      }
+      setWiFiBadges('wifi-cfg-badge', `Connected: ${d.ssid || d.ip || 'OK'}`);
     } else if (d.status === 'failed') {
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg error';
@@ -2863,16 +3839,12 @@ function handleMsg(d) {
   }
   if (d.t === 'sys') {
     updateSysStatsUI(d);
-    if (d.resample) updateResamplerUI(d.resample);
     return;
   }
   if (d.t !== 'state') return;
 
   if (d.sys) {
     updateSysStatsUI(d.sys);
-  }
-  if (d.resample) {
-    updateResamplerUI(d.resample);
   }
 
   if (d.eq) {
@@ -2902,7 +3874,7 @@ function handleMsg(d) {
       });
 
       const root = document.getElementById('bands-container');
-      const needsFullRebuild = (incomingBands.length !== bands.length) || (root && root.children.length === 0);
+      const needsFullRebuild = (incomingBands.length !== bands.length) || (root && root.querySelectorAll('.band-card').length === 0);
 
       if (needsFullRebuild) {
         bands = incomingBands;
@@ -3062,7 +4034,6 @@ function updateDraggerNumbers() {
   });
 }
 
-/* Live-swap sortable: dragged item follows the pointer, siblings swap in real time (FLIP animated). */
 function makeLiveSortable(opts) {
   const { container, itemSelector, handle, item, axis, onStart, onCommit, edge } = opts;
   const horiz = axis === 'x';
@@ -3112,18 +4083,7 @@ function makeLiveSortable(opts) {
       item.style.transform = tx(p - grab - item[posProp]);
     };
 
-    const onMove = (ev) => {
-      ev.preventDefault();
-      lastEv = ev;
-      if (horiz) {
-        const r = rectC();
-        if (ev.clientX < r.left + 60) container.scrollLeft -= 10;
-        else if (ev.clientX > r.right - 60) container.scrollLeft += 10;
-      } else {
-        if (ev.clientY < 70) window.scrollBy(0, -8);
-        else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 8);
-      }
-      // Center of the dragged item in container coordinates.
+    const checkSwapsAndPlace = (ev) => {
       const center = ptr(ev) - grab + item[sizeProp] / 2;
       for (let guard = 0; guard < 8; guard++) {
         const prev = item.previousElementSibling;
@@ -3137,12 +4097,82 @@ function makeLiveSortable(opts) {
       place();
     };
 
+    let autoScrollTimer = null;
+    let lastScrollTs = 0;
+    let scrollFrac = 0;
+    const stepAutoScroll = () => {
+      autoScrollTimer = null;
+      if (horiz) {
+        const now = performance.now();
+        const dt = lastScrollTs ? Math.min(50, now - lastScrollTs) : 16.67;
+        lastScrollTs = now;
+        const r = rectC();
+        const edgeZone = 48;
+        let speedPxPerSec = 0;
+        if (lastEv.clientX < r.left + edgeZone) {
+          const ratio = Math.min(1, (r.left + edgeZone - lastEv.clientX) / edgeZone);
+          speedPxPerSec = -(70 + ratio * 150);
+        } else if (lastEv.clientX > r.right - edgeZone) {
+          const ratio = Math.min(1, (lastEv.clientX - (r.right - edgeZone)) / edgeZone);
+          speedPxPerSec = 70 + ratio * 150;
+        }
+        if (speedPxPerSec !== 0) {
+          scrollFrac += speedPxPerSec * (dt / 1000);
+          const delta = Math.trunc(scrollFrac);
+          scrollFrac -= delta;
+          if (delta !== 0) {
+            const prevScroll = container.scrollLeft;
+            container.scrollLeft += delta;
+            if (container.scrollLeft !== prevScroll) {
+              checkSwapsAndPlace(lastEv);
+            }
+          }
+          const canScrollLeft = speedPxPerSec < 0 && container.scrollLeft > 0;
+          const canScrollRight = speedPxPerSec > 0 && container.scrollLeft < container.scrollWidth - container.clientWidth;
+          if (canScrollLeft || canScrollRight) {
+            autoScrollTimer = setTimeout(stepAutoScroll, 16);
+          }
+        }
+      }
+    };
+
+    const onMove = (ev) => {
+      ev.preventDefault();
+      lastEv = ev;
+      if (horiz) {
+        const r = rectC();
+        const edgeZone = 48;
+        if (ev.clientX < r.left + edgeZone || ev.clientX > r.right - edgeZone) {
+          if (!autoScrollTimer) {
+            lastScrollTs = performance.now();
+            scrollFrac = 0;
+            autoScrollTimer = setTimeout(stepAutoScroll, 16);
+          }
+        } else if (autoScrollTimer) {
+          clearTimeout(autoScrollTimer);
+          autoScrollTimer = null;
+          lastScrollTs = 0;
+          scrollFrac = 0;
+        }
+      } else {
+        if (ev.clientY < 70) window.scrollBy(0, -8);
+        else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 8);
+      }
+      checkSwapsAndPlace(ev);
+    };
+
     const onUp = () => {
+      if (autoScrollTimer) {
+        clearTimeout(autoScrollTimer);
+        autoScrollTimer = null;
+      }
+      lastScrollTs = 0;
+      scrollFrac = 0;
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
       try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
-      // Settle into the final slot.
+
       item.style.transition = reduced ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
       item.style.transform = '';
       let done = false;
@@ -3212,8 +4242,8 @@ function applyModuleOrder(orderList) {
   lastSentModuleOrder = getCurrentModuleOrder().join(',');
 }
 
-let selectedInputSource = 1; // 1: AUX, 2: BT, 3: WIFI
-let activeInputSource   = 1; // 1: AUX, 2: BT, 3: WIFI
+let selectedInputSource = 1;
+let activeInputSource   = 1;
 
 function setInputSource(src) {
   selectedInputSource = src;
@@ -3253,21 +4283,10 @@ function updateWiFiModuleVisibility() {
   }
 }
 
-function updateResamplerUI(rs) {
-  const latEl = document.getElementById('wifi-latency-val');
-  if (!latEl) return;
-  if (!rs || !rs.active) {
-    latEl.textContent = 'None (Bypass)';
-    return;
-  }
-  latEl.textContent = (rs.last_us !== undefined && rs.last_us > 0) ? `${rs.last_us} µs` : 'Active';
-}
-
 function updateWiFiStreamUI(wf) {
   if (!wf) return;
   const dotEl    = document.getElementById('wifi-status-dot');
   const textEl   = document.getElementById('wifi-status-text');
-  const serverEl = document.getElementById('wifi-server-val');
   const formatEl = document.getElementById('wifi-format-val');
   const stateEl  = document.getElementById('wifi-state-val');
 
@@ -3277,14 +4296,12 @@ function updateWiFiStreamUI(wf) {
       dotEl.style.borderColor = wf.streaming ? 'var(--nord14)' : 'var(--nord10)';
     }
     if (textEl) textEl.textContent = wf.streaming ? (wf.paused ? 'PAUSED' : 'STREAMING') : 'CONNECTED';
-    if (serverEl) serverEl.textContent = wf.server || wf.server_ip || 'Connected';
   } else {
     if (dotEl) {
       dotEl.style.backgroundColor = 'var(--muted)';
       dotEl.style.borderColor = 'var(--muted)';
     }
     if (textEl) textEl.textContent = 'SEARCHING';
-    if (serverEl) serverEl.textContent = 'Searching for server...';
   }
 
   if (formatEl && wf.format) formatEl.textContent = wf.format;
@@ -3297,22 +4314,6 @@ function updateWiFiStreamUI(wf) {
       stateEl.textContent = 'Listening on Port 3483';
     }
   }
-}
-
-function polarToCartesian(cx, cy, r, angleInRad) {
-  return {
-    x: cx + r * Math.cos(angleInRad),
-    y: cy + r * Math.sin(angleInRad)
-  };
-}
-
-function describeArc(cx, cy, r, startAngle, endAngle) {
-  let diff = endAngle - startAngle;
-  if (diff <= 0.001) return '';
-  const start = polarToCartesian(cx, cy, r, startAngle);
-  const end   = polarToCartesian(cx, cy, r, endAngle);
-  const largeArcFlag = diff > Math.PI ? 1 : 0;
-  return `M ${start.x.toFixed(2)} ${start.y.toFixed(2)} A ${r} ${r} 0 ${largeArcFlag} 1 ${end.x.toFixed(2)} ${end.y.toFixed(2)}`;
 }
 
 class Knob {
@@ -3409,13 +4410,17 @@ class Knob {
       else if (this.onEnd) this.onEnd(this.value);
     };
 
+    const isKnobLocked = () => !!svg.closest('body.reorder-bands .band-card:not(.eq-row-desktop), #bands-container.select-mode .band-card:not(.eq-row-desktop)');
+
     svg.addEventListener('mousedown', e => {
+      if (isKnobLocked()) return;
       this._md(e.clientY);
       window.addEventListener('mousemove', this._onMove, { passive: true });
       window.addEventListener('mouseup', this._onUp);
     });
 
     svg.addEventListener('wheel', e => {
+      if (isKnobLocked()) return;
       e.preventDefault();
       if (this.step && this.step > 0) {
         this.set(this.value - Math.sign(e.deltaY) * this.step, true);
@@ -3431,6 +4436,7 @@ class Knob {
     }, { passive: false });
 
     svg.addEventListener('touchstart', e => {
+      if (isKnobLocked()) return;
       e.preventDefault();
       this._md(e.touches[0].clientY);
       window.addEventListener('touchmove', this._onTouchMove, { passive: false });
@@ -3552,7 +4558,7 @@ function singleBiquadMag(type, freq, gain, q, f) {
   let a0 = 1, a1 = 0, a2 = 0;
 
   switch (type) {
-    case 1: { // Low Shelf
+    case 1: {
       const A = Math.pow(10, gain / 40);
       const twoSqrtAAlpha = 2 * Math.sqrt(A) * al;
       b0 =    A * ((A + 1) - (A - 1) * cw0 + twoSqrtAAlpha);
@@ -3563,7 +4569,7 @@ function singleBiquadMag(type, freq, gain, q, f) {
       a2 =         (A + 1) + (A - 1) * cw0 - twoSqrtAAlpha;
       break;
     }
-    case 2: { // High Shelf
+    case 2: {
       const A = Math.pow(10, gain / 40);
       const twoSqrtAAlpha = 2 * Math.sqrt(A) * al;
       b0 =    A * ((A + 1) + (A - 1) * cw0 + twoSqrtAAlpha);
@@ -3574,7 +4580,7 @@ function singleBiquadMag(type, freq, gain, q, f) {
       a2 =         (A + 1) - (A - 1) * cw0 - twoSqrtAAlpha;
       break;
     }
-    case 3: { // Low Pass
+    case 3: {
       b0 = (1 - cw0) * 0.5;
       b1 =  1 - cw0;
       b2 = (1 - cw0) * 0.5;
@@ -3583,7 +4589,7 @@ function singleBiquadMag(type, freq, gain, q, f) {
       a2 =  1 - al;
       break;
     }
-    case 4: { // High Pass
+    case 4: {
       b0 =  (1 + cw0) * 0.5;
       b1 = -(1 + cw0);
       b2 =  (1 + cw0) * 0.5;
@@ -3592,7 +4598,7 @@ function singleBiquadMag(type, freq, gain, q, f) {
       a2 =  1 - al;
       break;
     }
-    case 0: // Peaking
+    case 0:
     default: {
       const A = Math.pow(10, gain / 40);
       b0 =  1 + al * A;
@@ -3659,7 +4665,7 @@ function bandMagAt(b, f) {
 
   if ((type === 0 || type === 1 || type === 2) && Math.abs(b.gain) < 0.001) return 0;
 
-  if (type === 3) { // Low Pass
+  if (type === 3) {
     if (order === 1) {
       return Math.max(-60, Math.min(30, eval1stOrderLP(b.freq, f)));
     }
@@ -3675,7 +4681,7 @@ function bandMagAt(b, f) {
     return Math.max(-60, Math.min(30, m));
   }
 
-  if (type === 4) { // High Pass
+  if (type === 4) {
     if (order === 1) {
       return Math.max(-60, Math.min(30, eval1stOrderHP(b.freq, f)));
     }
@@ -3697,6 +4703,37 @@ function bandMagAt(b, f) {
 
 function totalMagAt(f) {
   return eqPreamp + bands.reduce((s, b) => s + bandMagAt(b, f), 0);
+}
+
+function getEqCombinedPeakGain() {
+  let maxGain = -Infinity;
+  const N_SAMPLES = 800;
+  for (let k = 0; k <= N_SAMPLES; k++) {
+    const f = F0 * Math.pow(F1 / F0, k / N_SAMPLES);
+    const mag = bands.reduce((s, b) => s + bandMagAt(b, f), 0);
+    if (mag > maxGain) maxGain = mag;
+  }
+  bands.forEach(b => {
+    if (b.enabled && b.freq >= F0 && b.freq <= F1) {
+      const mag = bands.reduce((s, b2) => s + bandMagAt(b2, b.freq), 0);
+      if (mag > maxGain) maxGain = mag;
+    }
+  });
+  return maxGain;
+}
+
+function autoPreamp() {
+  const peak = getEqCombinedPeakGain();
+  if (!Number.isFinite(peak)) return;
+  let target = -peak;
+  target = Math.round(target * 10) / 10;
+  if (Math.abs(target) < 0.05) target = 0.0;
+  target = Math.max(-18, Math.min(18, target));
+
+  eqPreamp = target;
+  updatePreampUI();
+  wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+  requestDrawResponse();
 }
 
 let drawResponseRafId = null;
@@ -3753,7 +4790,6 @@ function drawResponse() {
 
   const zY = db2y(0, H);
 
-  // Per-band filled areas between band curve and 0dB line
   bands.forEach((b, i) => {
     if (!b.enabled) return;
     const isShelfOrPeak = (b.type === 0 || b.type === 1 || b.type === 2 || b.type === undefined);
@@ -3769,7 +4805,6 @@ function drawResponse() {
       bPts.push({ x, y });
     }
 
-    // Fill area between curve and 0dB line with band color
     c.beginPath();
     c.moveTo(bPts[0].x, zY);
     bPts.forEach(p => c.lineTo(p.x, p.y));
@@ -3778,7 +4813,6 @@ function drawResponse() {
     c.fillStyle = eqEnabled ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${isDarkTheme() ? 0.10 : 0.22})` : 'rgba(160, 174, 192, 0.08)';
     c.fill();
 
-    // Outline stroke for individual band curve
     c.beginPath();
     bPts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
     c.strokeStyle = eqEnabled ? (bandColor + (isDarkTheme() ? '66' : 'B0')) : cv('--cv-dim');
@@ -3792,7 +4826,6 @@ function drawResponse() {
     pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
   }
 
-  // Draw overall total EQ composite response line
   c.beginPath();
   pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
   c.strokeStyle = eqEnabled ? cv('--cv-curve') : cv('--cv-label');
@@ -3856,7 +4889,6 @@ function drawResponse() {
 
 new ResizeObserver(drawResponse).observe(fCanvas);
 
-// ---- Interactive EQ graph points: left-drag = freq/gain, middle-drag = Q/slope, right-click = menu ----
 const graphTip = document.createElement('div');
 graphTip.id = 'graph-tip';
 document.getElementById('canvas-wrap').appendChild(graphTip);
@@ -3974,10 +5006,6 @@ function applyGraphPos(d, x, y, rect) {
   showGraphTip(d.i, f2x(b.freq, rect.width), db2y(totalMagAt(b.freq), rect.height));
 }
 
-function stepGraphSmooth() {
-  // Smoothing removed
-}
-
 fCanvas.addEventListener('pointerdown', (e) => {
   if (window.innerWidth <= 680) return;
   if (e.button !== 0 && e.button !== 1) return;
@@ -4052,7 +5080,6 @@ fCanvas.addEventListener('pointerup', endGraphDrag);
 window.addEventListener('pointerup', endGraphDrag);
 fCanvas.addEventListener('pointercancel', endGraphDrag);
 fCanvas.addEventListener('pointerleave', () => { if (!graphDrag) graphTip.style.display = 'none'; });
-
 
 let dragSourceIndex = null;
 let activeGainSliderBand = null;
@@ -4147,12 +5174,12 @@ function updateBandCardParamStates(i) {
   if (!card) return;
 
   const gainCol = card.querySelector(`#gain-col-${i}`);
-  const qUnit = card.querySelector(`#q-col-${i}`);
   const gSlider = card.querySelector(`#slider-g-${i}`);
   const gNumInput = card.querySelector(`#num-g-${i}`);
   const btnLabel = card.querySelector(`#type-btn-label-${i}`);
   const qBadgeLbl = card.querySelector(`#lbl-q-${i}`);
   const qNumInput = card.querySelector(`#num-q-${i}`);
+  const qUnitSpan = card.querySelector(`#unit-q-${i}`);
 
   if (btnLabel) {
     btnLabel.textContent = getBandTypeLabel(b.type);
@@ -4166,16 +5193,23 @@ function updateBandCardParamStates(i) {
   }
 
   const isPassFilter = (b.type === 3 || b.type === 4);
+  const isDeskRow = card.classList.contains('eq-row-desktop');
   if (isPassFilter) {
     if (gainCol) {
-      gainCol.style.opacity = '0.3';
-      gainCol.style.pointerEvents = 'none';
+      if (isDeskRow) {
+        gainCol.style.display = 'none';
+      } else {
+        gainCol.style.display = '';
+        gainCol.style.opacity = '0.3';
+        gainCol.style.pointerEvents = 'none';
+      }
     }
     b.gain = 0;
     if (gNumInput) gNumInput.value = "0.0";
     if (gSlider) gSlider.value = 0;
 
     if (qBadgeLbl) qBadgeLbl.textContent = 'SLOPE';
+    if (qUnitSpan) qUnitSpan.textContent = 'dB/oct';
     if (qNumInput) {
       qNumInput.min = '6';
       qNumInput.max = '24';
@@ -4190,10 +5224,12 @@ function updateBandCardParamStates(i) {
     }
   } else {
     if (gainCol) {
+      gainCol.style.display = isDeskRow ? 'inline-flex' : '';
       gainCol.style.opacity = '1';
       gainCol.style.pointerEvents = 'auto';
     }
     if (qBadgeLbl) qBadgeLbl.textContent = 'Q';
+    if (qUnitSpan) qUnitSpan.textContent = '';
     if (qNumInput) {
       qNumInput.min = '0.1';
       qNumInput.max = '8.0';
@@ -4212,27 +5248,71 @@ function updateBandCardParamStates(i) {
 let isSelectMode = false;
 let selectedBandIndices = new Set();
 
-function toggleSelectMode() {
-  if (isSelectMode) exitSelectMode();
-  else enterSelectMode();
+function isMobileViewport() {
+  return mobileMQ.matches || document.documentElement.clientWidth <= 680 || document.body.clientWidth <= 680;
+}
+
+function syncMobileCardInteractiveState() {
+  const isReordering = document.body.classList.contains('reorder-bands');
+  const lockControls = isReordering || isSelectMode;
+  document.querySelectorAll('#bands-container .band-card:not(.eq-row-desktop)').forEach((card) => {
+    card.querySelectorAll('button, input, select, textarea').forEach(el => {
+      if (lockControls) {
+        el.disabled = true;
+      } else {
+        if (el.classList.contains('band-delete-btn')) {
+          el.disabled = bands.length <= 1;
+        } else {
+          el.disabled = false;
+        }
+      }
+    });
+  });
+}
+
+function updateDesktopDeleteBtnUI() {
+  const delDeskBtn = document.getElementById('btn-delete-bands-desk');
+  if (!delDeskBtn) return;
+  const count = selectedBandIndices.size;
+  if (count > 0) {
+    delDeskBtn.classList.add('visible');
+    delDeskBtn.disabled = count >= bands.length;
+  } else {
+    delDeskBtn.classList.remove('visible');
+    delDeskBtn.disabled = false;
+  }
 }
 
 function enterSelectMode() {
+  const root = document.getElementById('bands-container');
+  const distFromRight = root ? Math.max(0, (root.scrollWidth - root.clientWidth) - root.scrollLeft) : null;
+  if (document.body.classList.contains('reorder-bands')) {
+    document.body.classList.remove('reorder-bands');
+  }
   isSelectMode = true;
   selectedBandIndices.clear();
-  const container = document.getElementById('bands-container');
-  if (container) container.classList.add('select-mode');
-  updateActionCardButtons();
+  if (root) root.classList.add('select-mode');
+  syncMobileCardInteractiveState();
+  updateSelectionUI();
+  if (root && distFromRight !== null && distFromRight < 160) {
+    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
+  }
 }
 
 function exitSelectMode() {
+  const root = document.getElementById('bands-container');
+  const distFromRight = root ? Math.max(0, (root.scrollWidth - root.clientWidth) - root.scrollLeft) : null;
   isSelectMode = false;
   selectedBandIndices.clear();
-  const container = document.getElementById('bands-container');
-  if (container) container.classList.remove('select-mode');
+  if (root) root.classList.remove('select-mode');
   document.querySelectorAll('.band-card').forEach(c => c.classList.remove('selected'));
-  document.querySelectorAll('.band-select-checkbox').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.band-select-checkbox, .eq-row-select-cb').forEach(cb => { cb.checked = false; });
+  syncMobileCardInteractiveState();
   updateActionCardButtons();
+  updateDesktopDeleteBtnUI();
+  if (root && distFromRight !== null && distFromRight < 160) {
+    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
+  }
 }
 
 function toggleBandSelection(index) {
@@ -4248,7 +5328,7 @@ function toggleBandSelection(index) {
 function updateSelectionUI() {
   bands.forEach((_, i) => {
     const card = document.getElementById(`band-card-${i}`);
-    const cb = card ? card.querySelector('.band-select-checkbox') : null;
+    const cb = card ? card.querySelector('.band-select-checkbox, .eq-row-select-cb') : null;
     const isSel = selectedBandIndices.has(i);
     if (card) {
       if (isSel) card.classList.add('selected');
@@ -4257,12 +5337,14 @@ function updateSelectionUI() {
     if (cb) cb.checked = isSel;
   });
   updateActionCardButtons();
+  updateDesktopDeleteBtnUI();
 }
 
 function updateActionCardButtons() {
   const btnTop = document.getElementById('btn-action-top');
   const btnBottom = document.getElementById('btn-action-bottom');
   const btnReorder = document.getElementById('btn-action-reorder');
+  const btnAuto = document.getElementById('btn-action-auto');
   if (!btnTop || !btnBottom) return;
 
   const reordering = document.body.classList.contains('reorder-bands');
@@ -4277,12 +5359,13 @@ function updateActionCardButtons() {
     btnBottom.disabled = (count === 0 || count >= bands.length);
     btnBottom.classList.add('btn-danger');
     if (btnReorder) btnReorder.style.display = 'none';
+    if (btnAuto) btnAuto.style.display = 'none';
   } else {
-    btnTop.innerHTML = '<span>Add band</span>';
+    btnTop.innerHTML = '<span>Add</span>';
     btnTop.disabled = reordering || bands.length >= MAX_BANDS;
     btnTop.classList.remove('btn-danger');
 
-    btnBottom.innerHTML = '<span>Select band</span>';
+    btnBottom.innerHTML = '<span>Select</span>';
     btnBottom.disabled = reordering || bands.length <= 1;
     btnBottom.classList.remove('btn-danger');
 
@@ -4290,6 +5373,10 @@ function updateActionCardButtons() {
       btnReorder.style.display = '';
       btnReorder.innerHTML = reordering ? '<span>Done</span>' : '<span>Reorder</span>';
       btnReorder.classList.toggle('active-reorder', reordering);
+    }
+    if (btnAuto) {
+      btnAuto.style.display = '';
+      btnAuto.disabled = reordering;
     }
   }
 }
@@ -4316,6 +5403,18 @@ function deleteSelectedBands() {
     return;
   }
 
+  const wasDeskDeleteVisible = !!document.getElementById('btn-delete-bands-desk')?.classList.contains('visible');
+  const toDeleteAsc = Array.from(selectedBandIndices).sort((a, b) => a - b);
+  const exitingClones = toDeleteAsc.map(idx => {
+    const el = document.getElementById(`band-card-${idx}`);
+    if (!el) return null;
+    const clone = el.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.classList.remove('band-enter-anim', 'selected');
+    clone.classList.add('band-exit-anim');
+    return { index: idx, node: clone };
+  }).filter(Boolean);
+
   const toDelete = Array.from(selectedBandIndices).sort((a, b) => b - a);
   toDelete.forEach(idx => {
     bands.splice(idx, 1);
@@ -4323,16 +5422,273 @@ function deleteSelectedBands() {
   });
 
   exitSelectMode();
-  rebuildBandsUI();
+  rebuildBandsUI({ exitingClones, animateHideDeskDelete: wasDeskDeleteVisible });
   bands.forEach((_, idx) => sendBand(idx));
   requestDrawResponse();
 }
 
-function rebuildBandsUI() {
+function rebuildBandsUI(opts = {}) {
   const root = document.getElementById('bands-container');
   if (!root) return;
+  const prevScrollLeft = root.scrollLeft;
+  const preampCol = document.getElementById('eq-preamp-col');
+  if (preampCol && preampCol.parentNode === root) {
+    root.removeChild(preampCol);
+  }
   root.innerHTML = '';
+  if (preampCol) {
+    root.appendChild(preampCol);
+  }
   bandKnobs = [];
+
+  const isDesktop = !isMobileViewport();
+
+  if (isDesktop) {
+    bands.forEach((b, i) => {
+      b.band = i;
+      if (b.type === undefined) b.type = 0;
+      if (b.order === undefined) b.order = 2;
+      if (b.type === 5) { b.type = 3; b.order = 4; }
+      else if (b.type === 6) { b.type = 4; b.order = 4; }
+
+      const bandColor = getBandColor(b, i);
+      b.color = bandColor;
+      const hsl = hexToHsl(bandColor);
+      const cardBg = bandCardBg(hsl);
+      const isPass = (b.type === 3 || b.type === 4);
+      const currentLabel = getBandTypeLabel(b.type);
+
+      const row = document.createElement('div');
+      row.className = 'band-card eq-row-desktop' + (b.enabled ? '' : ' band-bypassed') + (opts.enteringIndex === i ? ' band-enter-anim' : '');
+      row.id = `band-card-${i}`;
+
+      row.innerHTML = `
+        <div class="band-dragger-titlebar eq-row-dragger" id="band-dragger-${i}" title="Drag to reorder band">
+          <svg class="drag-grip" width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
+            <circle cx="3" cy="3" r="1.3"/><circle cx="7" cy="3" r="1.3"/>
+            <circle cx="3" cy="8" r="1.3"/><circle cx="7" cy="8" r="1.3"/>
+            <circle cx="3" cy="13" r="1.3"/><circle cx="7" cy="13" r="1.3"/>
+          </svg>
+          <span class="eq-row-num" id="band-num-${i}">${i + 1}</span>
+        </div>
+        <div class="band-type-row eq-row-type">
+          <div class="band-type-menu-wrap" id="band-type-wrap-${i}">
+            <button type="button" class="band-type-menu-btn" id="type-btn-${i}" onclick="toggleBandMenu(${i}, event)">
+              <span id="type-btn-label-${i}">${currentLabel}</span>
+            </button>
+            <div class="band-type-dropdown" id="band-type-menu-${i}">
+              <div class="band-menu-opt ${b.type === 0 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 0)">Peaking</div>
+              <div class="band-menu-opt ${b.type === 1 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 1)">Low Shelf</div>
+              <div class="band-menu-opt ${b.type === 2 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 2)">High Shelf</div>
+              <div class="band-menu-opt ${b.type === 3 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 3)">Low Pass</div>
+              <div class="band-menu-opt ${b.type === 4 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 4)">High Pass</div>
+            </div>
+          </div>
+        </div>
+        <div class="eq-row-field" id="f-col-${i}">
+          <span class="eq-row-lbl">Frequency</span>
+          <div class="eq-scrub-box" id="scrub-box-f-${i}" title="Click to type, drag up/down to adjust">
+            <input type="text" inputmode="decimal" id="num-f-${i}" class="eq-scrub-input" value="${Math.round(b.freq)}">
+            <span class="eq-scrub-unit">Hz</span>
+          </div>
+        </div>
+        <div class="eq-row-field" id="gain-col-${i}" ${isPass ? 'style="display:none;"' : ''}>
+          <span class="eq-row-lbl">Gain</span>
+          <div class="eq-scrub-box" id="scrub-box-g-${i}" title="Click to type, drag up/down to adjust">
+            <input type="text" inputmode="decimal" id="num-g-${i}" class="eq-scrub-input" value="${b.gain.toFixed(1)}">
+            <span class="eq-scrub-unit">dB</span>
+          </div>
+        </div>
+        <div class="eq-row-field" id="q-col-${i}">
+          <span class="eq-row-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
+          <div class="eq-scrub-box" id="scrub-box-q-${i}" title="Click to type, drag up/down to adjust">
+            <input type="text" inputmode="decimal" id="num-q-${i}" class="eq-scrub-input" value="${isPass ? ((b.order || 2) * 6) : b.q.toFixed(2)}">
+            <span class="eq-scrub-unit" id="unit-q-${i}">${isPass ? 'dB/oct' : ''}</span>
+          </div>
+        </div>
+        <div class="eq-row-actions">
+          <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" type="button">
+            <span>Bypass</span>
+          </button>
+          <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" onclick="removeBand(${i})" type="button" ${bands.length <= 1 ? 'disabled' : ''}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+          <input type="checkbox" class="eq-row-select-cb" id="band-select-desk-${i}" title="Select Band" ${selectedBandIndices.has(i) ? 'checked' : ''}>
+        </div>
+      `;
+
+      const applyDesktopRowStyle = () => {
+        if (b.enabled) {
+          row.style.backgroundColor = cardBg;
+          row.style.borderColor = bandCardBorder(hsl, bandColor);
+          row.style.borderWidth = '2px';
+          row.classList.remove('band-bypassed');
+        } else {
+          row.style.backgroundColor = 'var(--nord5)';
+          row.style.borderColor = 'var(--border-strong)';
+          row.style.borderWidth = '2px';
+          row.classList.add('band-bypassed');
+        }
+      };
+
+      applyDesktopRowStyle();
+      root.appendChild(row);
+
+      const deskCb = row.querySelector(`#band-select-desk-${i}`);
+      if (deskCb) {
+        deskCb.addEventListener('change', (e) => {
+          e.stopPropagation();
+          if (deskCb.checked) selectedBandIndices.add(i);
+          else selectedBandIndices.delete(i);
+          row.classList.toggle('selected', deskCb.checked);
+          updateDesktopDeleteBtnUI();
+        });
+      }
+
+      const draggerBar = row.querySelector(`#band-dragger-${i}`);
+      makeLiveSortable({
+        container: root,
+        itemSelector: '.band-card.eq-row-desktop',
+        handle: draggerBar,
+        item: row,
+        axis: 'y',
+        onCommit: (cards) => {
+          const ids = cards.map(c => parseInt(c.id.replace('band-card-', ''), 10));
+          const reordered = ids.map(id => bands[id]);
+          bands.splice(0, bands.length, ...reordered);
+          bands.forEach((bd, idx) => {
+            bd.band = idx;
+            sendBand(idx);
+          });
+          rebuildBandsUI();
+          requestDrawResponse();
+        }
+      });
+
+      const numF = row.querySelector(`#num-f-${i}`);
+      const boxF = row.querySelector(`#scrub-box-f-${i}`);
+      attachScrubInput(boxF, numF, {
+        min: 20, max: 20000, step: 1, logScale: true, pixels: 180,
+        format: v => String(Math.round(v)),
+        getVal: () => b.freq,
+        onSlide: v => {
+          b.freq = v;
+          numF.value = Math.round(v);
+          sendBandThrottled(i);
+          requestDrawResponse();
+        },
+        onApply: v => {
+          b.freq = v;
+          numF.value = Math.round(v);
+          sendBandThrottled(i, true);
+          requestDrawResponse();
+        }
+      });
+
+      const numG = row.querySelector(`#num-g-${i}`);
+      const boxG = row.querySelector(`#scrub-box-g-${i}`);
+      attachScrubInput(boxG, numG, {
+        min: -18, max: 18, step: 0.1, logScale: false, pixels: 150,
+        format: v => v.toFixed(1),
+        getVal: () => b.gain,
+        onSlide: v => {
+          b.gain = v;
+          numG.value = v.toFixed(1);
+          activeGainSliderBand = i;
+          sendBandThrottled(i);
+          requestDrawResponse();
+        },
+        onApply: v => {
+          b.gain = v;
+          numG.value = v.toFixed(1);
+          activeGainSliderBand = null;
+          sendBandThrottled(i, true);
+          requestDrawResponse();
+        }
+      });
+
+      const numQ = row.querySelector(`#num-q-${i}`);
+      const boxQ = row.querySelector(`#scrub-box-q-${i}`);
+      attachScrubInput(boxQ, numQ, {
+        getConfig: () => (b.type === 3 || b.type === 4)
+          ? { min: 6, max: 24, step: 6, logScale: false, pixels: 110, format: v => String(Math.round(v / 6) * 6) }
+          : { min: 0.1, max: 8.0, step: 0.01, logScale: false, pixels: 150, format: v => v.toFixed(2) },
+        getVal: () => (b.type === 3 || b.type === 4) ? ((b.order || 2) * 6) : b.q,
+        onSlide: v => {
+          if (b.type === 3 || b.type === 4) {
+            b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+            numQ.value = b.order * 6;
+          } else {
+            b.q = v;
+            numQ.value = v.toFixed(2);
+          }
+          sendBandThrottled(i);
+          requestDrawResponse();
+        },
+        onApply: v => {
+          if (b.type === 3 || b.type === 4) {
+            b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+            numQ.value = b.order * 6;
+          } else {
+            b.q = v;
+            numQ.value = v.toFixed(2);
+          }
+          sendBandThrottled(i, true);
+          requestDrawResponse();
+        }
+      });
+
+      row.querySelector(`#band-bypass-${i}`).addEventListener('click', e => {
+        e.stopPropagation();
+        b.enabled = !b.enabled;
+        applyDesktopRowStyle();
+        sendBand(i);
+        requestDrawResponse();
+      });
+
+      bandKnobs.push({ fKnob: null, qKnob: null });
+      updateBandCardParamStates(i);
+    });
+
+    if (Array.isArray(opts.exitingClones)) {
+      const currentRows = [...root.querySelectorAll('.band-card.eq-row-desktop')];
+      opts.exitingClones.forEach(({ index, node }) => {
+        const ref = currentRows[index] || null;
+        if (ref) root.insertBefore(node, ref);
+        else root.appendChild(node);
+        setTimeout(() => node.remove(), 190);
+      });
+    }
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'eq-add-row-btn';
+    addBtn.id = 'btn-add-band-desk';
+    addBtn.disabled = bands.length >= MAX_BANDS;
+    addBtn.innerHTML = '<span>+ Add Band</span>';
+    addBtn.addEventListener('click', () => addBand());
+    root.appendChild(addBtn);
+
+    const delDeskBtn = document.createElement('button');
+    delDeskBtn.type = 'button';
+    const showDel = selectedBandIndices.size > 0;
+    delDeskBtn.className = 'eq-delete-row-btn' + ((showDel || opts.animateHideDeskDelete) ? ' visible' : '');
+    delDeskBtn.id = 'btn-delete-bands-desk';
+    delDeskBtn.disabled = selectedBandIndices.size >= bands.length;
+    delDeskBtn.innerHTML = '<span>Delete</span>';
+    delDeskBtn.addEventListener('click', () => deleteSelectedBands());
+    root.appendChild(delDeskBtn);
+    if (opts.animateHideDeskDelete && !showDel) {
+      void delDeskBtn.offsetHeight;
+      delDeskBtn.classList.remove('visible');
+    }
+
+    requestDrawResponse();
+    return;
+  }
 
   bands.forEach((b, i) => {
     b.band = i;
@@ -4347,18 +5703,19 @@ function rebuildBandsUI() {
     const cardBg = bandCardBg(hsl);
 
     const card = document.createElement('div');
-    card.className = 'band-card' + (b.enabled ? '' : ' band-bypassed');
+    card.className = 'band-card' + (b.enabled ? '' : ' band-bypassed') + (selectedBandIndices.has(i) ? ' selected' : '') + (opts.enteringIndex === i ? ' band-enter-anim' : '');
     card.id = `band-card-${i}`;
 
     card.addEventListener('click', (e) => {
-      if (isSelectMode && !e.target.closest('button, input, svg')) {
+      if (isSelectMode) {
+        e.preventDefault();
+        e.stopPropagation();
         toggleBandSelection(i);
       }
     });
 
     const draggerBar = document.createElement('div');
     draggerBar.className = 'band-dragger-titlebar';
-    draggerBar.title = 'Drag to reorder band position';
 
     const chk = document.createElement('input');
     chk.type = 'checkbox';
@@ -4369,21 +5726,39 @@ function rebuildBandsUI() {
       toggleBandSelection(i);
     });
     draggerBar.appendChild(chk);
-
-    const grip = document.createElement('span');
-    grip.className = 'drag-grip';
-    grip.textContent = ':::';
-    draggerBar.appendChild(grip);
-
     card.appendChild(draggerBar);
+
+    const reorderOverlay = document.createElement('div');
+    reorderOverlay.className = 'band-reorder-overlay';
+    reorderOverlay.innerHTML = `
+      <div class="band-reorder-pill">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="7 8 3 12 7 16"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <polyline points="17 8 21 12 17 16"/>
+        </svg>
+      </div>
+    `;
+    card.appendChild(reorderOverlay);
+
+    const selectOverlay = document.createElement('div');
+    selectOverlay.className = 'band-select-overlay';
+    selectOverlay.innerHTML = `
+      <div class="band-select-big-box">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+    `;
+    card.appendChild(selectOverlay);
 
     makeLiveSortable({
       container: root,
       itemSelector: '.band-card',
-      handle: draggerBar,
+      handle: card,
       item: card,
       axis: 'x',
-      ignore: (e) => isSelectMode || !!e.target.closest('.band-select-checkbox'),
+      ignore: (e) => !document.body.classList.contains('reorder-bands') || isSelectMode || !!e.target.closest('.band-select-checkbox'),
       onCommit: (cards) => {
         const ids = cards.map(c => parseInt(c.id.replace('band-card-', ''), 10));
         const reordered = ids.map(id => bands[id]);
@@ -4641,23 +6016,38 @@ function rebuildBandsUI() {
     updateBandCardParamStates(i);
   });
 
+  if (Array.isArray(opts.exitingClones)) {
+    const currentCards = [...root.querySelectorAll('.band-card')];
+    opts.exitingClones.forEach(({ index, node }) => {
+      const ref = currentCards[index] || null;
+      if (ref) root.insertBefore(node, ref);
+      else root.appendChild(node);
+      setTimeout(() => node.remove(), 190);
+    });
+  }
+
   const actionCard = document.createElement('div');
   actionCard.className = 'eq-actions-card';
   actionCard.id = 'eq-actions-card';
   actionCard.innerHTML = `
     <button type="button" class="btn-card-action" id="btn-action-top" onclick="handleActionTopClick()">
-      <span>Add band</span>
+      <span>Add</span>
     </button>
     <button type="button" class="btn-card-action" id="btn-action-bottom" onclick="handleActionBottomClick()">
-      <span>Select band</span>
+      <span>Select</span>
     </button>
     <button type="button" class="btn-card-action btn-action-reorder" id="btn-action-reorder" onclick="toggleBandReorder()">
       <span>Reorder</span>
     </button>
+    <button type="button" class="btn-card-action btn-action-auto" id="btn-action-auto" onclick="autoPreamp()">
+      <span>Auto</span>
+    </button>
   `;
   root.appendChild(actionCard);
 
+  syncMobileCardInteractiveState();
   updateActionCardButtons();
+  root.scrollLeft = prevScrollLeft;
   requestDrawResponse();
 }
 
@@ -4685,20 +6075,21 @@ function syncBandCardUI(i) {
   const bandColor = getBandColor(b, i);
   const hsl = hexToHsl(bandColor);
   const cardBg = bandCardBg(hsl);
+  const isDeskRow = card.classList.contains('eq-row-desktop');
 
   if (b.enabled) {
     card.style.backgroundColor = cardBg;
     card.style.borderColor = bandCardBorder(hsl, bandColor);
-    card.style.borderWidth = '3px';
-    if (bypassBtn) {
+    card.style.borderWidth = isDeskRow ? '2px' : '3px';
+    if (bypassBtn && !isDeskRow) {
       bypassBtn.style.color = bandCardBorder(hsl, bandColor);
     }
     card.classList.remove('band-bypassed');
   } else {
     card.style.backgroundColor = 'var(--nord5)';
     card.style.borderColor = 'var(--border-strong)';
-    card.style.borderWidth = '3px';
-    if (bypassBtn) {
+    card.style.borderWidth = isDeskRow ? '2px' : '3px';
+    if (bypassBtn && !isDeskRow) {
       bypassBtn.style.color = 'var(--muted)';
     }
     card.classList.add('band-bypassed');
@@ -4739,10 +6130,10 @@ function addBand() {
     color: chosenColor
   };
   bands.push(newBand);
-  rebuildBandsUI();
+  rebuildBandsUI({ enteringIndex: newIndex });
 
   const container = document.getElementById('bands-container');
-  if (container) {
+  if (container && isMobileViewport()) {
     container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
   }
 
@@ -4758,8 +6149,18 @@ function addBand() {
 
 function removeBand(index) {
   if (bands.length <= 1) return;
+  const el = document.getElementById(`band-card-${index}`);
+  const exitingClones = [];
+  if (el) {
+    const clone = el.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.classList.remove('band-enter-anim', 'selected');
+    clone.classList.add('band-exit-anim');
+    exitingClones.push({ index, node: clone });
+  }
+  selectedBandIndices.clear();
   bands.splice(index, 1);
-  rebuildBandsUI();
+  rebuildBandsUI({ exitingClones });
   wsTx({ t: 'remove_band', band: index });
   bands.forEach((_, i) => sendBand(i));
   requestDrawResponse();
@@ -4781,14 +6182,47 @@ function updateBypassUI(mod, enabled) {
   }
 }
 
+let dspProcessingEnabled = true;
+let savedProcessingCollapsed = null;
+
+function updateProcessingToggleUI() {
+  const btn = document.getElementById('dsp-all-toggle-btn');
+  const lbl = document.getElementById('dsp-all-toggle-label');
+  if (btn) {
+    btn.setAttribute('aria-pressed', dspProcessingEnabled ? 'true' : 'false');
+    btn.classList.toggle('active', dspProcessingEnabled);
+  }
+  if (lbl) lbl.textContent = 'Processing';
+  document.body.classList.toggle('processing-off', !dspProcessingEnabled);
+}
+
+function toggleAllDSP() {
+  dspProcessingEnabled = !dspProcessingEnabled;
+  updateProcessingToggleUI();
+
+  if (!dspProcessingEnabled) {
+    if (document.body.classList.contains('reorder-modules')) setModuleReorder(false);
+    if (document.body.classList.contains('reorder-bands')) setBandReorder(false);
+    const boxes = [...document.querySelectorAll('#dsp-modules-container .module-box[data-module]')];
+    savedProcessingCollapsed = new Map(boxes.map(b => [b, isModuleCollapsed(b)]));
+    boxes.forEach(b => setModuleCollapsed(b, true));
+  } else if (savedProcessingCollapsed) {
+    savedProcessingCollapsed.forEach((wasCollapsed, b) => setModuleCollapsed(b, wasCollapsed));
+    savedProcessingCollapsed = null;
+  }
+
+  wsTx({ t: 'eq_toggle', enabled: dspProcessingEnabled ? eqEnabled : false });
+  sendSubsonic();
+  sendCompander();
+  sendLimiter();
+}
+
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 function isModuleCollapsed(box) {
   return box.classList.contains('collapsed') || box.classList.contains('is-collapsing');
 }
 
-/* Glitch-free open/close using inline height/padding CSS transitions so height stays at 0px
-   until .collapsed applies, and reverses cleanly if clicked mid-transition. */
 function setModuleCollapsed(box, want) {
   if (isModuleCollapsed(box) === want) return;
   const body = box.querySelector(':scope > .module-body');
@@ -4912,8 +6346,17 @@ function toggleModuleCollapse(mod) {
   setModuleCollapsed(box, !isModuleCollapsed(box));
 }
 
-/* ---- Mobile reorder mode: draggers stay disabled until the user opts in ---- */
 const mobileMQ = window.matchMedia('(max-width: 680px)');
+['gesturestart', 'gesturechange', 'gestureend'].forEach(ev => {
+  document.addEventListener(ev, (e) => {
+    if (isMobileViewport()) e.preventDefault();
+  }, { passive: false });
+});
+['touchstart', 'touchmove'].forEach(ev => {
+  document.addEventListener(ev, (e) => {
+    if (isMobileViewport() && e.touches && e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+});
 let savedCollapsed = null;
 
 function setModuleReorder(on) {
@@ -4934,9 +6377,15 @@ function setModuleReorder(on) {
 }
 
 function setBandReorder(on) {
+  const root = document.getElementById('bands-container');
+  const distFromRight = root ? Math.max(0, (root.scrollWidth - root.clientWidth) - root.scrollLeft) : null;
   if (on && isSelectMode) exitSelectMode();
   document.body.classList.toggle('reorder-bands', on);
+  syncMobileCardInteractiveState();
   updateActionCardButtons();
+  if (root && distFromRight !== null && distFromRight < 160) {
+    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
+  }
 }
 
 function toggleBandReorder() {
@@ -4950,10 +6399,13 @@ document.getElementById('reorder-modules-btn').addEventListener('click', () => {
 });
 mobileMQ.addEventListener('change', (e) => {
   fCanvas.style.touchAction = e.matches ? 'pan-y' : 'none';
+  if (!e.matches) {
+    if (isSelectMode) exitSelectMode();
+    if (document.body.classList.contains('reorder-modules')) setModuleReorder(false);
+    setBandReorder(false);
+  }
+  rebuildBandsUI();
   requestDrawResponse();
-  if (e.matches) return;
-  if (document.body.classList.contains('reorder-modules')) setModuleReorder(false);
-  setBandReorder(false);
 });
 function toggleEQModule(checked) {
   if (typeof checked === 'boolean') {
@@ -4963,7 +6415,7 @@ function toggleEQModule(checked) {
   }
   updateBypassUI('eq', eqEnabled);
   drawResponse();
-  wsTx({ t: 'eq_toggle', enabled: eqEnabled });
+  wsTx({ t: 'eq_toggle', enabled: dspProcessingEnabled ? eqEnabled : false });
 }
 
 function toggleSubsonicModule(checked) {
@@ -5201,7 +6653,7 @@ function sendSubsonic() {
     t: 'subsonic',
     freq: subsonicParams.freq,
     order: subsonicParams.order,
-    enabled: subsonicParams.enabled,
+    enabled: dspProcessingEnabled ? subsonicParams.enabled : false,
     balance: subsonicParams.balance,
     delayL: subsonicParams.delayL,
     delayR: subsonicParams.delayR,
@@ -5367,7 +6819,7 @@ function sendCompander() {
     attackMs: compParams.attackMs,
     releaseMs: compParams.releaseMs,
     makeup: compParams.makeup,
-    enabled: compParams.enabled
+    enabled: dspProcessingEnabled ? compParams.enabled : false
   });
 }
 
@@ -5427,7 +6879,7 @@ function sendLimiter() {
     t: 'limiter',
     ceiling: limParams.ceiling,
     knee: limParams.knee,
-    enabled: limParams.enabled
+    enabled: dspProcessingEnabled ? limParams.enabled : false
   });
 }
 
@@ -5445,12 +6897,6 @@ document.getElementById('theme-toggle-btn')?.addEventListener('click', () => {
   rebuildBandsUI();
   requestDrawResponse();
 });
-if (mobileMQ.matches) {
-  const wfBody = document.getElementById('wifi-cfg-body');
-  const wfArrow = document.getElementById('wifi-cfg-arrow');
-  if (wfBody) wfBody.style.display = 'block';
-  if (wfArrow) wfArrow.textContent = '▲';
-}
 setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', false);
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
   let saved = null;
@@ -5476,8 +6922,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-
-/* ---- Mobile tabs (System / DSP) ---- */
 (function initMobileTabs() {
   const main = document.querySelector('main[data-tab]');
   const tabs = [...document.querySelectorAll('.mobile-tab')];
@@ -5495,7 +6939,6 @@ document.addEventListener('click', (e) => {
   tabs.forEach(b => b.addEventListener('click', () => select(b.dataset.tab)));
 })();
 
-/* ---- Import / Export of the full DSP configuration ---- */
 const CONFIG_VERSION = 1;
 
 function backupNotice(text, isError) {
@@ -5635,15 +7078,22 @@ function importConfig(event) {
   reader.onerror = () => { backupNotice('Could not read file', true); input.value = ''; };
   reader.readAsText(file);
 }
-function toggleWiFiConfig(e) {
-  if (e) e.stopPropagation();
-  const body = document.getElementById('wifi-cfg-body');
-  const btn = document.getElementById('wifi-cfg-arrow');
-  if (!body) return;
-  const isHidden = (body.style.display === 'none');
-  body.style.display = isHidden ? 'block' : 'none';
-  if (btn) btn.textContent = isHidden ? '▲' : '▼';
+function openWiFiModal() {
+  const modal = document.getElementById('wifi-modal');
+  if (!modal) return;
+  modal.classList.add('open');
+  setTimeout(() => document.getElementById('wifi-input-ssid')?.focus(), 20);
 }
+
+function closeWiFiModal(e) {
+  if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+  const modal = document.getElementById('wifi-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeWiFiModal();
+});
 
 function togglePassVisibility() {
   const passIn = document.getElementById('wifi-input-pass');
@@ -5685,17 +7135,6 @@ function submitWiFiConfig() {
     }).catch(() => {});
   } catch (_) {}
 }
-
-setInterval(() => {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    fetch('/api/resampler')
-      .then(r => r.json())
-      .then(data => {
-        if (data && data.resample) updateResamplerUI(data.resample);
-      })
-      .catch(() => {});
-  }
-}, 1000);
 
 wsConnect();
 </script>
