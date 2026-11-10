@@ -2,12 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>ESP32-S3-DSP</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232e3440'/%3E%3Cpath d='M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12' fill='none' stroke='%2388c0d0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"/>
+<script>
+(function () {
+  var t = null;
+  try { t = localStorage.getItem('esp32_dsp_theme'); } catch (e) {}
+  if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = t;
+})();
+</script>
 <style>
 :root {
-  --nord0: #2E3440; --nord1: #3B4252;
+  color-scheme: light;
+  --on-accent: #FFFFFF;
+  --accent-soft: #E8F0FE;
+  --accent-hover: #4C6F98;
+  --surface-hover: #DAE0EA;
+  --surface-bypass: #E2E8F0;
+  --bypass-veil: rgba(237, 241, 247, 0.45);
+  --dragger-hover: #D5DDE8;
+  --dragger-active: #C4CED8;
+  --scroll-track: #D8DEE9;
+  --scroll-thumb: #4C566A;
+  --ok-text: #2E7D32;
+  --err-text: #C62828;
+  --cv-bg: #FFFFFF; --cv-grid: #E5E9F0; --cv-grid-zero: #4C566A; --cv-label: #718096;
+  --cv-dim: #CBD5E1; --cv-curve: #000000; --cv-node-stroke: #2E3440; --cv-tip: rgba(255, 255, 255, 0.94);
+  --cv-tip-grid: #D8DEE9; --cv-tip-text: #4C566A; --cv-tip-text-strong: #2E3440; --cv-off: #A0AEC0;  --nord0: #2E3440; --nord1: #3B4252;
   --nord2: #434C5E;
   --nord3: #4C566A; --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4; --nord7: #8FBCBB; --nord8: #88C0D0; --nord9: #81A1C1; --nord10: #5E81AC; --nord11: #BF616A; --nord12: #D08770; --nord13: #EBCB8B; --nord14: #438728; --nord15: #B48EAD; --bg: #EDF1F7;
   --card-bg: #FFFFFF;
@@ -21,6 +44,43 @@
   --danger: #BF616A;
 
   --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --nord0: #ECEFF4; --nord1: #E5E9F0; --nord2: #D8DEE9; --nord3: #9AA5BA;
+  --nord4: #2F3541; --nord5: #272C36; --nord6: #1E222A;
+  --nord14: #A3BE8C;
+  --bg: #1A1E25;
+  --card-bg: #232831;
+  --card-header: #2B313C;
+  --border: #353C49;
+  --border-strong: #4A5262;
+  --text: #ECEFF4;
+  --muted: #9AA5BA;
+  --accent: #88C0D0;
+  --active: #A3BE8C;
+  --on-accent: #1A1E25;
+  --accent-soft: #2B3A4E;
+  --accent-hover: #8FBCBB;
+  --surface-hover: #353C49;
+  --surface-bypass: #232831;
+  --bypass-veil: rgba(26, 30, 37, 0.5);
+  --dragger-hover: #353C49;
+  --dragger-active: #4A5262;
+  --scroll-track: #1A1E25;
+  --scroll-thumb: #4A5262;
+  --ok-text: #A3BE8C;
+  --err-text: #D08770;
+  --cv-bg: #1A1E25; --cv-grid: #232831; --cv-grid-zero: #5C667A; --cv-label: #7D879B;
+  --cv-dim: #353C49; --cv-curve: #ECEFF4; --cv-node-stroke: #ECEFF4; --cv-tip: rgba(26, 30, 37, 0.94);
+  --cv-tip-grid: #2B313C; --cv-tip-text: #9AA5BA; --cv-tip-text-strong: #ECEFF4; --cv-off: #4A5262;
+}
+:root[data-theme="dark"] .band-card {
+  --nord0: #2E3440; --nord1: #3B4252; --nord2: #434C5E; --nord3: #4C566A;
+  --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4;
+  --muted: #3B4252; --text: #2E3440; --on-accent: #FFFFFF;
+  --border: #CBD5E1; --border-strong: #4C566A; --card-bg: #FFFFFF; --surface-hover: #DAE0EA;
 }
 
 * {
@@ -74,7 +134,7 @@ select::-ms-expand {
   justify-content: center;
 }
 .conn-card {
-  background: #FFFFFF;
+  background: var(--card-bg);
   border: 2px solid var(--nord11);
   border-radius: 8px;
   padding: 26px 36px;
@@ -93,15 +153,20 @@ select::-ms-expand {
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 .conn-title {
+  text-transform: uppercase;
   font-size: 14px;
   font-weight: 800;
   color: var(--nord11);
-  text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 .conn-desc {
   font-size: 11px;
@@ -136,7 +201,7 @@ select::-ms-expand {
   transform: scale(0.99);
 }
 .input-card.active {
-  background: #E8F0FE;
+  background: var(--accent-soft);
   border-color: var(--nord10);
   border-width: 1.5px;
 }
@@ -164,7 +229,7 @@ select::-ms-expand {
 }
 .input-card.active .input-card-icon {
   background: var(--nord10);
-  color: #FFFFFF;
+  color: var(--on-accent);
   border-color: var(--nord10);
 }
 .input-card-title {
@@ -174,6 +239,7 @@ select::-ms-expand {
   letter-spacing: 0.03em;
 }
 .input-card-badge {
+  text-transform: uppercase;
   font-size: 9px;
   font-weight: 800;
   padding: 3px 7px;
@@ -185,8 +251,9 @@ select::-ms-expand {
   flex-shrink: 0;
 }
 .input-card.active .input-card-badge {
+  text-transform: uppercase;
   background: var(--nord10);
-  color: #FFFFFF;
+  color: var(--on-accent);
   border-color: var(--nord10);
 }
 
@@ -214,11 +281,12 @@ select::-ms-expand {
   font-family: var(--mono);
 }
 .sys-stat-name {
+  text-transform: uppercase;
   font-size: 9px;
   font-weight: 700;
   color: var(--muted);
-  text-transform: uppercase;
   letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .sys-stat-val {
   font-size: 11px;
@@ -241,6 +309,7 @@ select::-ms-expand {
 }
 
 .active-source-pill {
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -284,9 +353,9 @@ select::-ms-expand {
   font-size: 9px;
   font-weight: 700;
   color: var(--muted);
-  text-transform: uppercase;
   letter-spacing: 0.05em;
   font-family: var(--mono);
+  text-transform: uppercase;
 }
 .wifi-info-val {
   font-size: 12px;
@@ -312,12 +381,13 @@ main {
   overflow: hidden;
 }
 .module-box.bypassed {
-  border-color: var(--border);
+  border-color: transparent;
 }
 .module-box.bypassed .module-header {
-  background: #E2E8F0;
+  background: var(--surface-bypass);
 }
 .module-box.bypassed .module-title {
+  text-transform: uppercase;
   color: var(--nord3);
 }
 .module-box.bypassed .module-body {
@@ -334,20 +404,21 @@ main {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(237, 241, 247, 0.45);
+  background: var(--bypass-veil);
   z-index: 100;
   pointer-events: auto;
   cursor: not-allowed;
 }
 
 .submodule-title {
+  text-transform: uppercase;
   font-size: 10px;
   font-weight: 800;
   color: var(--muted);
   letter-spacing: 0.05em;
-  text-transform: uppercase;
   margin: 2px 0 8px 2px;
   font-family: var(--mono);
+  text-transform: uppercase;
 }
 .submodule-separator {
   height: 1px;
@@ -362,7 +433,6 @@ main {
   justify-content: space-between;
   padding: 10px 16px;
   background: var(--card-header);
-  border-bottom: 1px solid var(--border-strong);
   cursor: pointer;
   user-select: none;
 }
@@ -372,7 +442,7 @@ main {
   align-items: stretch;
 }
 .module-header:hover {
-  background: #DAE0EA;
+  background: var(--surface-hover);
 }
 .module-header.static-header {
   cursor: default;
@@ -405,7 +475,6 @@ main {
   min-width: 46px;
   align-self: stretch;
   background: var(--nord4);
-  border-right: 1px solid var(--border-strong);
   cursor: grab;
   cursor: -webkit-grab;
   user-select: none;
@@ -414,7 +483,7 @@ main {
   transition: background 0.15s;
 }
 .module-dragger:hover {
-  background: #D5DDE8;
+  background: var(--dragger-hover);
 }
 .module-dragger:hover .drag-grip-dots {
   opacity: 0.9;
@@ -422,7 +491,7 @@ main {
 .module-dragger:active {
   cursor: grabbing;
   cursor: -webkit-grabbing;
-  background: #C4CED8;
+  background: var(--dragger-active);
 }
 .drag-grip-dots {
   color: var(--nord0);
@@ -439,96 +508,18 @@ main {
   opacity: 0.75;
   pointer-events: none;
 }
-.module-box.bypassed .module-dragger {
-  background: #D8DFE8;
-  opacity: 0.7;
+.module-box { position: relative; }
+.module-box.sorting,
+.band-card.sorting {
+  z-index: 200;
+  cursor: grabbing;
+  will-change: transform;
+  border-color: var(--nord10);
+  outline: 2px solid var(--nord8);
+  outline-offset: -1px;
 }
-.module-box.dragging {
-  opacity: 0.35;
-  transform: scale(0.995);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 2px dashed #88C0D0;
-}
-.module-box.dragging .module-body {
-  display: none !important;
-}
-
-.module-drop-indicator {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: var(--accent);
-  border-radius: 2px;
-  box-shadow: 0 0 12px rgba(136, 192, 208, 0.95);
-  pointer-events: none;
-  z-index: 1000;
-  transition: top 0.06s ease-out;
-}
-.module-drop-indicator::before,
-.module-drop-indicator::after {
-  content: '';
-  position: absolute;
-  top: -4px;
-  width: 12px;
-  height: 12px;
-  background: var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(136, 192, 208, 0.9);
-}
-.module-drop-indicator::before { left: -6px; }
-.module-drop-indicator::after { right: -6px; }
-
-.band-drop-indicator {
-  position: absolute;
-  top: 6px;
-  width: 4px;
-  height: 290px;
-  background: var(--accent);
-  border-radius: 2px;
-  box-shadow: 0 0 12px rgba(136, 192, 208, 0.95);
-  pointer-events: none;
-  z-index: 1000;
-  transition: left 0.06s ease-out;
-}
-.band-drop-indicator::before,
-.band-drop-indicator::after {
-  content: '';
-  position: absolute;
-  left: -4px;
-  width: 12px;
-  height: 12px;
-  background: var(--accent);
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(136, 192, 208, 0.9);
-}
-.band-drop-indicator::before { top: -6px; }
-.band-drop-indicator::after { bottom: -6px; }
-
-.module-drag-ghost {
-  position: fixed;
-  pointer-events: none;
-  z-index: 10000;
-  opacity: 0.94;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
-  transform: scale(1.02) rotate(0.6deg);
-  box-sizing: border-box;
-  background: var(--card-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.band-drag-ghost {
-  position: fixed;
-  pointer-events: none !important;
-  z-index: 10000;
-  opacity: 0.95;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
-  transform: scale(1.02);
-  box-sizing: border-box;
-  border-radius: 8px;
-  overflow: hidden;
-}
+.module-box.sorting { box-shadow: 0 10px 28px rgba(46, 52, 64, 0.28) !important; }
+body:has(.sorting) { user-select: none; cursor: grabbing; }
 
 .module-title-area {
   display: flex;
@@ -559,10 +550,12 @@ main {
   background: transparent;
   border: none;
 }
-.module-box.collapsed .collapse-icon {
+.module-box.collapsed .collapse-icon,
+.module-box.is-collapsing .collapse-icon {
   transform: rotate(-90deg);
 }
 .module-title {
+  text-transform: uppercase;
   font-size: 0.95rem;
   font-weight: 800;
   color: var(--nord0);
@@ -624,7 +617,7 @@ main {
 #canvas-wrap {
   position: relative;
   width: 100%;
-  background: #FFFFFF;
+  background: var(--card-bg);
   border: 1px solid var(--border-strong);
   border-radius: 2px;
   overflow: hidden;
@@ -648,7 +641,7 @@ main {
   position: fixed;
   display: none;
   min-width: 150px;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
@@ -658,12 +651,6 @@ main {
   font-weight: 700;
   user-select: none;
 }
-#graph-band-menu .gm-head {
-  padding: 5px 12px;
-  color: var(--muted);
-  font-size: 11px;
-  border-left: 4px solid transparent;
-}
 #graph-band-menu .gm-opt {
   padding: 6px 12px;
   color: var(--nord0);
@@ -671,7 +658,6 @@ main {
 }
 #graph-band-menu .gm-opt:hover { background: var(--nord5); }
 #graph-band-menu .gm-opt.selected { color: var(--nord10); }
-#graph-band-menu .gm-opt.selected::before { content: '\2713 '; }
 #graph-band-menu .gm-danger { color: var(--nord11); }
 #graph-band-menu .gm-sep { height: 1px; background: var(--border-strong); margin: 4px 0; }
 
@@ -701,6 +687,7 @@ main {
   flex: 1;
 }
 .preset-label {
+  text-transform: uppercase;
   font-size: 10px;
   font-weight: 800;
   color: var(--nord0);
@@ -708,25 +695,26 @@ main {
   text-transform: uppercase;
 }
 .btn-preset {
+  text-transform: uppercase;
   font-size: 11px;
   font-weight: 700;
   padding: 4px 10px;
-  background: #FFFFFF;
+  background: var(--card-bg);
   color: var(--nord0);
   border: 1px solid var(--border-strong);
   border-radius: 2px;
   cursor: pointer;
-  text-transform: uppercase;
 }
 .btn-preset:hover {
-  background: #DAE0EA;
+  background: var(--surface-hover);
 }
 .btn-preset.active {
   background: var(--accent);
-  color: #FFFFFF;
+  color: var(--on-accent);
   border-color: var(--nord0);
 }
 .btn-preset-action {
+  text-transform: uppercase;
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
@@ -739,7 +727,7 @@ main {
   text-transform: uppercase;
 }
 .btn-preset-action:hover {
-  background: #CBD5E1;
+  background: var(--surface-hover);
   border-color: var(--nord0);
 }
 
@@ -758,14 +746,15 @@ main {
   font-size: 11px;
   font-weight: 800;
   color: var(--nord0);
-  background: #FFFFFF;
+  background: var(--card-bg);
   border: 1px solid var(--border-strong);
   padding: 3px 8px;
   border-radius: 2px;
 }
 .btn-primary {
+  text-transform: uppercase;
   background: var(--accent);
-  color: #FFFFFF;
+  color: var(--on-accent);
   border: 1px solid var(--nord0);
   font-size: 11px;
   font-weight: 800;
@@ -778,7 +767,7 @@ main {
   text-transform: uppercase;
 }
 .btn-primary:hover {
-  background: #4C6F98;
+  background: var(--accent-hover);
 }
 .btn-primary:disabled {
   opacity: 0.4;
@@ -836,7 +825,7 @@ main {
   width: 22px;
   height: 200px;
   cursor: pointer;
-  accent-color: #2E3440;
+  accent-color: var(--nord0);
   background: transparent;
   border: none;
   outline: none;
@@ -863,11 +852,11 @@ main {
   height: 12px;
 }
 #bands-container::-webkit-scrollbar-track {
-  background: #D8DEE9;
+  background: var(--scroll-track);
   border-radius: 6px;
 }
 #bands-container::-webkit-scrollbar-thumb {
-  background: #4C566A;
+  background: var(--scroll-thumb);
   background-clip: padding-box;
   border-style: solid;
   border-color: transparent;
@@ -875,11 +864,11 @@ main {
   border-radius: 8px;
 }
 #bands-container::-webkit-scrollbar-thumb:hover {
-  background: #2E3440;
+  background: var(--nord0);
 }
 @supports not selector(::-webkit-scrollbar) {
   #bands-container {
-    scrollbar-color: #4C566A #D8DEE9;
+    scrollbar-color: var(--scroll-thumb) var(--scroll-track);
   }
 }
 .band-card {
@@ -908,14 +897,6 @@ main {
 .band-card:focus-within {
   border-color: var(--nord0);
   z-index: 50;
-}
-.band-card.dragging {
-  opacity: 0.45;
-  border-style: dashed;
-}
-.band-card.drag-over {
-  border-color: var(--nord10);
-  background: #E8F0FE;
 }
 .band-card.band-bypassed {
   opacity: 0.45;
@@ -985,6 +966,7 @@ main {
   user-select: none;
 }
 .btn-card-action {
+  text-transform: uppercase;
   flex: 1;
   width: 100%;
   display: flex;
@@ -1000,15 +982,15 @@ main {
   font-family: var(--mono);
   font-weight: 700;
   font-size: 11px;
-  text-transform: uppercase;
   transition: all 0.15s ease;
   box-sizing: border-box;
   padding: 12px 6px;
   text-align: center;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 .btn-card-action:hover {
-  background: #E5E9F0;
+  background: var(--surface-hover);
   border-color: var(--nord3);
   color: var(--nord0);
   border-style: dashed;
@@ -1024,7 +1006,7 @@ main {
 }
 .btn-card-action.btn-danger:hover {
   background: #BF616A;
-  color: #FFFFFF;
+  color: var(--on-accent);
 }
 
 .band-type-row {
@@ -1044,7 +1026,7 @@ main {
   max-width: 135px;
   font-size: 10.5px;
   font-weight: 700;
-  color: #FFFFFF;
+  color: var(--on-accent);
   background: var(--nord0);
   border: none;
   border-radius: 12px;
@@ -1194,7 +1176,7 @@ main {
   width: 22px;
   height: 122px;
   cursor: pointer;
-  accent-color: #2E3440;
+  accent-color: var(--nord0);
   background: transparent;
   border: none;
   outline: none;
@@ -1203,7 +1185,7 @@ main {
 .band-vslider::-webkit-slider-runnable-track {
   width: 6px;
   height: 100%;
-  background: #FFFFFF;
+  background: var(--card-bg);
   border: 1.5px solid var(--border-strong);
   border-radius: 9999px;
   box-shadow: none;
@@ -1213,7 +1195,7 @@ main {
 .band-vslider::-moz-range-track {
   width: 6px;
   height: 100%;
-  background: #FFFFFF;
+  background: var(--card-bg);
   border: 1.5px solid var(--border-strong);
   border-radius: 9999px;
   box-shadow: none;
@@ -1231,7 +1213,7 @@ main {
   height: 18px;
   border-radius: 50%;
   background: #2E3440 !important;
-  border: 1.5px solid #434C5E !important;
+  border: 2px solid #ECEFF4 !important;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   cursor: pointer;
   transform: translateX(6px);
@@ -1239,7 +1221,7 @@ main {
 .preamp-slider::-webkit-slider-thumb:hover,
 .band-vslider::-webkit-slider-thumb:hover {
   background: #3B4252 !important;
-  border-color: #5E81AC !important;
+  border-color: #FFFFFF !important;
 }
 .preamp-slider::-moz-range-thumb,
 .band-vslider::-moz-range-thumb {
@@ -1247,16 +1229,30 @@ main {
   height: 18px;
   border-radius: 50%;
   background: #2E3440 !important;
-  border: 1.5px solid #434C5E !important;
+  border: 2px solid #ECEFF4 !important;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   cursor: pointer;
 }
 .preamp-slider::-moz-range-thumb:hover,
 .band-vslider::-moz-range-thumb:hover {
   background: #3B4252 !important;
-  border-color: #5E81AC !important;
+  border-color: #FFFFFF !important;
 }
-.knob {
+:root[data-theme="dark"] .preamp-slider,
+:root[data-theme="dark"] .band-vslider {
+  color-scheme: light;
+  accent-color: #2E3440;
+}
+:root[data-theme="dark"] .preamp-slider::-webkit-slider-runnable-track,
+:root[data-theme="dark"] .band-vslider::-webkit-slider-runnable-track {
+  background: #2B313C;
+  border-color: #434C5E;
+}
+:root[data-theme="dark"] .preamp-slider::-moz-range-track,
+:root[data-theme="dark"] .band-vslider::-moz-range-track {
+  background: #2B313C;
+  border-color: #434C5E;
+}.knob {
   cursor: pointer;
   filter: none;
 }
@@ -1300,12 +1296,13 @@ main {
   cursor: pointer;
 }
 .card-val-badge .badge-lbl {
+  text-transform: uppercase;
   font-size: 8.5px;
   font-weight: 800;
-  text-transform: uppercase;
   color: #D8DEE9;
   letter-spacing: 0.05em;
   line-height: 1.1;
+  text-transform: uppercase;
 }
 .badge-input-row {
   display: flex;
@@ -1443,8 +1440,8 @@ main {
 
 .wifi-cfg-panel {
   margin-top: 14px;
-  background: var(--nord5);
-  border: 1px solid var(--border-strong);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -1455,11 +1452,11 @@ main {
   padding: 10px 14px;
   cursor: pointer;
   user-select: none;
-  background: #E5EBF2;
+  background: transparent;
   transition: background 0.15s ease;
 }
 .wifi-cfg-header:hover {
-  background: #DCE3ED;
+  background: var(--card-header);
 }
 .wifi-cfg-title-row {
   display: flex;
@@ -1467,18 +1464,21 @@ main {
   gap: 10px;
 }
 .wifi-cfg-title {
-  font-size: 13px;
-  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
   color: var(--nord0);
 }
 .wifi-cfg-badge {
+  text-transform: uppercase;
   font-size: 10px;
   font-weight: 700;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: 3px;
   background: var(--active);
-  color: #fff;
-  letter-spacing: 0.5px;
+  color: var(--on-accent);
+  letter-spacing: 0.05em;
 }
 .wifi-cfg-badge.ap-mode {
   background: #D08770;
@@ -1493,11 +1493,12 @@ main {
   margin-bottom: 12px;
 }
 .wifi-cfg-status-label {
+  text-transform: uppercase;
   font-size: 11px;
   font-weight: 700;
   color: var(--nord3);
-  text-transform: uppercase;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
 }
 .wifi-cfg-toggle-btn {
   font-size: 11px;
@@ -1505,9 +1506,8 @@ main {
   color: var(--nord9);
 }
 .wifi-cfg-body {
-  padding: 14px;
-  border-top: 1px solid var(--border-strong);
-  background: var(--nord5);
+  padding: 4px 14px 14px;
+  animation: tab-in 0.2s ease-out;
 }
 .wifi-cfg-desc {
   font-size: 12px;
@@ -1516,10 +1516,11 @@ main {
   line-height: 1.4;
 }
 .wifi-cfg-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 480px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  align-items: end;
+  gap: 10px 12px;
+  max-width: 640px;
 }
 .wifi-input-group {
   display: flex;
@@ -1527,11 +1528,12 @@ main {
   gap: 4px;
 }
 .wifi-input-group label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--nord0);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 .wifi-pass-wrap {
   position: relative;
@@ -1541,18 +1543,20 @@ main {
 .wifi-text-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 7px 10px;
+  padding: 8px 10px;
   font-size: 13px;
   font-family: inherit;
-  border: 1.5px solid var(--border-strong);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: #FFFFFF;
+  background: var(--card-bg);
   color: var(--nord0);
   outline: none;
   transition: border-color 0.15s;
 }
-.wifi-text-input:focus {
+.wifi-text-input:focus-visible {
   border-color: var(--accent);
+  outline: 2px solid var(--nord8);
+  outline-offset: 1px;
 }
 .wifi-pass-toggle {
   position: absolute;
@@ -1568,15 +1572,15 @@ main {
   opacity: 1;
 }
 .wifi-actions-row {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 4px;
 }
 .btn-wifi-connect {
-  padding: 8px 18px;
-  background: var(--nord9);
-  color: #FFFFFF;
+  padding: 9px 22px;
+  background: var(--nord10);
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 700;
   border: none;
@@ -1585,7 +1589,7 @@ main {
   transition: background 0.15s ease, transform 0.05s;
 }
 .btn-wifi-connect:hover {
-  background: var(--nord10);
+  background: var(--nord9);
 }
 .btn-wifi-connect:active {
   transform: scale(0.98);
@@ -1596,26 +1600,171 @@ main {
   color: var(--nord3);
 }
 .wifi-status-msg.success {
-  color: #2E7D32;
+  color: var(--ok-text);
 }
+.wifi-link { color: inherit; text-decoration: underline; }
+@media (max-width: 680px) { .wifi-text-input { font-size: 16px; } }
 .wifi-status-msg.error {
-  color: #C62828;
+  color: var(--err-text);
 }
 
-footer {
-  text-align: center;
-  max-width: 1400px;
-  margin: 24px auto 32px;
-  padding: 16px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted);
-  letter-spacing: 0.05em;
-  font-family: var(--mono);
-  box-sizing: border-box;
+body, .module-box, .module-header, .band-card, .btn-preset, .wifi-cfg-panel, .input-card {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
+/* ---- Motion & interaction polish ---- */
+@keyframes body-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+button:not(:disabled), .input-card, .btn-preset, .mobile-tab { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled):active { transform: scale(0.97); }
+button:focus-visible, .switch input:focus-visible + .slider, .module-dragger:focus-visible,
+select:focus-visible, input:focus-visible {
+  outline: 2px solid var(--nord8);
+  outline-offset: 2px;
+}
+.slider, .slider:before { transition: background-color 0.133s ease, transform 0.133s cubic-bezier(0.3, 0.7, 0.4, 1.2), border-color 0.133s ease; }
+.input-card, .btn-preset, .btn-primary, .btn-card-action { transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.1s ease; }
+.module-box { transition: border-color 0.25s ease, background-color 0.25s ease; }
+.module-box.bypassed .module-body { transition: opacity 0.25s ease, filter 0.25s ease; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+.card-val-badge input.badge-val-input::-webkit-outer-spin-button,
+.card-val-badge input.badge-val-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+.card-val-badge { align-items: center; text-align: center; }
+.card-val-badge .badge-lbl { width: 100%; text-align: center; }
+.card-val-badge input.badge-val-input { text-align: center; -moz-appearance: textfield; appearance: textfield; }
+.theme-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.theme-toggle-btn {
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--nord0);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.theme-toggle-btn:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.theme-toggle-btn .theme-icon-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle-btn .theme-icon-sun { display: inline-block; }
+:root[data-theme="dark"] .theme-toggle-btn .theme-icon-moon { display: none; }
+.reorder-bar, .btn-action-reorder { display: none; }
+.btn-card-action.active-reorder {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--nord0);
+}
+body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+.mobile-tabs { display: none; }
+.backup-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.backup-msg { font-size: 11px; font-weight: 700; color: var(--muted); opacity: 0; transition: opacity 0.2s ease; }
+.backup-msg.visible { opacity: 1; }
+.backup-msg.error { color: var(--danger); }
 
 @media (max-width: 680px) {
+  body {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+  .mobile-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: 800;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    margin: 0;
+    background: var(--card-bg);
+    border-top: 1px solid var(--border-strong);
+  }
+  .mobile-tab {
+  text-transform: uppercase;
+    padding: 10px 0;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+  }
+  .mobile-tab.active {
+    color: var(--nord0);
+    background: var(--surface-hover);
+    border-color: var(--border-strong);
+  }
+  main[data-tab="system"] [data-tabpanel="dsp"],
+  main[data-tab="dsp"] [data-tabpanel="system"] { display: none !important; }
+  #mod-input {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+  }
+  #mod-input > .module-header {
+    display: none;
+  }
+  #mod-input > .module-body {
+    display: block !important;
+    padding: 0;
+  }
+  .reorder-bar {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .reorder-bar .btn-card-action {
+  text-transform: uppercase;
+    flex: 0 0 auto;
+    width: auto;
+    flex-direction: row;
+    padding: 9px 16px;
+  }
+  .btn-action-reorder {
+    display: flex;
+  }
+  #bands-container {
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+  .band-card:not(.sorting),
+  .eq-actions-card {
+    scroll-snap-align: start;
+  }
+  .module-dragger, .band-dragger-titlebar { pointer-events: none; }
+  body:not(.reorder-modules) .module-dragger .drag-grip-dots { display: none; }
+  body:not(.reorder-bands) .band-dragger-titlebar .drag-grip { visibility: hidden; }
+  body.reorder-modules .module-dragger,
+  body.reorder-bands .band-dragger-titlebar { pointer-events: auto; }
+  body.reorder-modules .module-dragger {
+    background: var(--accent-soft);
+    outline: 2px solid var(--nord8);
+    outline-offset: -2px;
+  }
+  body.reorder-bands .band-dragger-titlebar { background: rgba(136, 192, 208, 0.35); border-radius: 6px; }
+  main[data-tab] [data-tabpanel] { animation: tab-in 0.22s ease-out; }
   .input-selector-grid {
     grid-template-columns: 1fr;
   }
@@ -1631,8 +1780,7 @@ footer {
     justify-content: space-between;
     width: 100%;
   }
-}
-</style>
+}</style>
 </head>
 <body>
 
@@ -1644,8 +1792,12 @@ footer {
   </div>
 </div>
 
-<main>
-  <section class="module-box" id="mod-input">
+<main data-tab="system">
+  <nav class="mobile-tabs" role="tablist" aria-label="Sections">
+    <button type="button" class="mobile-tab active" role="tab" id="tab-system" aria-selected="true" aria-controls="tabpanel-system" data-tab="system">System</button>
+    <button type="button" class="mobile-tab" role="tab" id="tab-dsp" aria-selected="false" aria-controls="tabpanel-dsp" data-tab="dsp">DSP</button>
+  </nav>
+  <section class="module-box" id="mod-input" data-tabpanel="system">
     <div class="module-header" onclick="toggleModuleCollapse('input')">
       <div class="module-title-area">
         <span class="module-title">ESP32-S3-DSP</span>
@@ -1736,39 +1888,44 @@ footer {
         </div>
       </div>
 
+      <div class="theme-row">
+        <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" aria-pressed="false">
+          <svg class="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <span id="theme-toggle-label">Dark mode</span>
+        </button>
+      </div>
+
       <div class="wifi-cfg-panel">
         <div class="wifi-cfg-header" onclick="toggleWiFiConfig(event)">
           <div class="wifi-cfg-title-row">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
               <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
               <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
               <line x1="12" y1="20" x2="12.01" y2="20"/>
             </svg>
-            <span class="wifi-cfg-title">Wi-Fi setup</span>
+            <span class="wifi-cfg-title">Wi-Fi</span>
+            <span class="wifi-cfg-badge" id="wifi-cfg-cur-status">Checking...</span>
           </div>
           <span class="wifi-cfg-toggle-btn" id="wifi-cfg-arrow">▼</span>
         </div>
         <div class="wifi-cfg-body" id="wifi-cfg-body" style="display: none;">
-          <div class="wifi-cfg-status-row">
-            <span class="wifi-cfg-status-label">Wi-Fi Status:</span>
-            <span class="wifi-cfg-badge" id="wifi-cfg-cur-status">Checking...</span>
-          </div>
-          <div class="wifi-cfg-desc">Connect the ESP32-S3 to your 2.4 GHz home Wi-Fi network. After connecting, the Web UI is reachable on your network at <strong>http://dsp.local</strong>.</div>
+          <div class="wifi-cfg-desc">Join a 2.4 GHz network, then open <strong>http://dsp.local</strong>.</div>
           <div class="wifi-cfg-inputs">
             <div class="wifi-input-group">
-              <label for="wifi-input-ssid">Network SSID</label>
-              <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="e.g. MyHomeNetwork" autocomplete="off" autocorrect="off" autocapitalize="none">
+              <label for="wifi-input-ssid">Network</label>
+              <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="SSID" autocomplete="off" autocorrect="off" autocapitalize="none">
             </div>
             <div class="wifi-input-group">
               <label for="wifi-input-pass">Password</label>
               <div class="wifi-pass-wrap">
-                <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Wi-Fi Password" autocomplete="off">
-                <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show/Hide Password">👁</button>
+                <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Password" autocomplete="off">
+                <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show or hide password" aria-label="Show or hide password">👁</button>
               </div>
             </div>
             <div class="wifi-actions-row">
-              <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Save &amp; Connect</button>
+              <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Connect</button>
               <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
             </div>
           </div>
@@ -1777,7 +1934,7 @@ footer {
     </div>
   </section>
 
-  <section class="module-box" id="mod-wifi-meta" style="display: none;">
+  <section class="module-box" id="mod-wifi-meta" data-tabpanel="system" style="display: none;">
     <div class="module-header static-header">
       <div class="module-title-area">
         <span class="module-title">Wi-Fi Stream</span>
@@ -1811,7 +1968,11 @@ footer {
     </div>
   </section>
 
-  <div id="dsp-modules-container">
+  <div class="reorder-bar" data-tabpanel="dsp">
+    <button type="button" class="btn-card-action" id="reorder-modules-btn"><span>Reorder modules</span></button>
+  </div>
+
+  <div id="dsp-modules-container" data-tabpanel="dsp">
 
   <section class="module-box bypassed" id="mod-eq" data-module="eq">
     <div class="module-header" onclick="toggleModuleCollapse('eq')">
@@ -2114,57 +2275,85 @@ footer {
       </div>
     </div>
   </section>
-  </div> <section class="module-box" id="mod-boot-cfg">
+  </div> <section class="module-box" id="mod-boot-cfg" data-tabpanel="dsp">
     <div class="module-header" onclick="toggleModuleCollapse('boot-cfg')">
       <div class="module-title-area">
-        <span class="module-title">Startup Effects Configuration</span>
+        <span class="module-title">Startup &amp; Backup</span>
       </div>
       <span class="collapse-icon">▼</span>
     </div>
     <div class="module-body" id="body-boot-cfg">
       <div class="boot-cfg-container">
+        <div class="submodule-title">Startup</div>
         <div class="boot-cfg-mode-row">
           <label class="boot-radio-label">
             <input type="radio" name="boot_mode" value="last_state" id="boot-mode-last" checked onchange="updateBootConfigUI(); sendBootDefaults();">
-            <span>Restore Last Saved State on Boot</span>
+            <span>Last used</span>
           </label>
           <label class="boot-radio-label">
             <input type="radio" name="boot_mode" value="custom" id="boot-mode-custom" onchange="updateBootConfigUI(); sendBootDefaults();">
-            <span>Use Configured Startup Defaults</span>
+            <span>Custom</span>
           </label>
         </div>
-        <div class="boot-toggles-row" id="boot-toggles-wrap" style="opacity: 0.4; pointer-events: none;">
+        <div class="boot-toggles-row" id="boot-toggles-wrap" title="Effects switched on at boot" style="opacity: 0.4; pointer-events: none;">
           <label class="boot-toggle-item">
             <input type="checkbox" id="boot-def-eq" onchange="onBootToggleChanged()">
-            <span>Equalizer ON</span>
+            <span>Equalizer</span>
           </label>
           <label class="boot-toggle-item">
             <input type="checkbox" id="boot-def-sub" onchange="onBootToggleChanged()">
-            <span>Speakers Correction ON</span>
+            <span>Speaker Correction</span>
           </label>
           <label class="boot-toggle-item">
             <input type="checkbox" id="boot-def-comp" onchange="onBootToggleChanged()">
-            <span>Compressor ON</span>
+            <span>Compressor</span>
           </label>
           <label class="boot-toggle-item">
             <input type="checkbox" id="boot-def-lim" onchange="onBootToggleChanged()">
-            <span>Limiter ON</span>
+            <span>Limiter</span>
           </label>
         </div>
         <div class="boot-actions-row">
-          <button class="btn-primary" onclick="saveCurrentAsBootDefaults()">Save Current States as Boot Defaults</button>
-          <span class="boot-saved-indicator" id="boot-saved-indicator">Saved to Flash</span>
+          <button class="btn-primary" onclick="saveCurrentAsBootDefaults()">Save as startup</button>
+          <span class="boot-saved-indicator" id="boot-saved-indicator">Saved</span>
+        </div>
+        <div class="submodule-separator"></div>
+        <div class="submodule-title">Backup</div>
+        <div class="backup-row">
+          <button type="button" class="btn-primary" onclick="exportConfig()">Export</button>
+          <button type="button" class="btn-primary" onclick="document.getElementById('backup-file').click()">Import</button>
+          <input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importConfig(event)">
+          <span class="backup-msg" id="backup-msg" role="status" aria-live="polite"></span>
         </div>
       </div>
     </div>
   </section>
-</main>
 
-<footer>
-  ESP32-S3-DSP FreeRTOS WebUI
-</footer>
+  </main>
 
 <script>
+/* ---- Theme (Nord light / dark) ---- */
+const cvCache = {};
+function cv(name) {
+  return cvCache[name] || (cvCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim());
+}
+function isDarkTheme() { return document.documentElement.dataset.theme === 'dark'; }
+function bandCardBg(hsl) {
+  if (isDarkTheme()) return `hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`;
+  return `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+}
+function bandCardBorder(hsl, hex) {
+  if (isDarkTheme()) return `hsl(${hsl.h}, ${hsl.s}%, ${Math.round(hsl.l * 0.55)}%)`;
+  return hex;
+}function setTheme(name, persist) {
+  document.documentElement.dataset.theme = name;
+  Object.keys(cvCache).forEach(k => delete cvCache[k]);
+  const tBtn = document.getElementById('theme-toggle-btn');
+  const tLbl = document.getElementById('theme-toggle-label');
+  if (tBtn) tBtn.setAttribute('aria-pressed', name === 'dark' ? 'true' : 'false');
+  if (tLbl) tLbl.textContent = name === 'dark' ? 'Dark mode: On' : 'Dark mode: Off';
+  if (persist) { try { localStorage.setItem('esp32_dsp_theme', name); } catch (_) {} }
+}
 const FS = 44100;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
@@ -2476,15 +2665,6 @@ function initPreamp() {
     requestDrawResponse(); // Apply to ESP32 on mouse release!
   });
 
-  slider.addEventListener('dblclick', () => {
-    isPreampDragging = false;
-    eqPreamp = 0.0;
-    slider.value = 0.0;
-    input.value = "0.0";
-    wsTx({ t: 'eq_preamp', preamp: 0.0 });
-    requestDrawResponse();
-  });
-
   input.addEventListener('change', e => {
     let v = parseFloat(e.target.value);
     if (isNaN(v)) v = eqPreamp;
@@ -2496,13 +2676,6 @@ function initPreamp() {
     requestDrawResponse();
   });
 
-  input.addEventListener('dblclick', () => {
-    eqPreamp = 0.0;
-    slider.value = 0.0;
-    input.value = "0.0";
-    wsTx({ t: 'eq_preamp', preamp: 0.0 });
-    requestDrawResponse();
-  });
 }
 
 function updatePreampUI() {
@@ -2656,7 +2829,16 @@ function handleMsg(d) {
     if (d.status === 'connected') {
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg success';
-        statusMsg.innerHTML = `Connected to <strong>${d.ssid || ''}</strong>! IP: ${d.ip || ''} (<a href="http://dsp.local" target="_blank" style="color:inherit;text-decoration:underline;">http://dsp.local</a>)`;
+        statusMsg.replaceChildren();
+        const strong = document.createElement('strong');
+        strong.textContent = d.ssid || '';
+        const link = document.createElement('a');
+        link.href = 'http://dsp.local';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.className = 'wifi-link';
+        link.textContent = 'http://dsp.local';
+        statusMsg.append('Connected to ', strong, ` · ${d.ip || ''} · `, link);
       }
       if (badge) {
         badge.className = 'wifi-cfg-badge';
@@ -2880,140 +3062,135 @@ function updateDraggerNumbers() {
   });
 }
 
-function getDragAfterElement(container, y) {
-  const draggableElements = [...container.querySelectorAll('.module-box[data-module]:not(.dragging)')];
-  return draggableElements.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset: offset, element: child };
-    } else {
-      return closest;
-    }
-  }, { offset: Number.NEGATIVE_INFINITY }).element;
+/* Live-swap sortable: dragged item follows the pointer, siblings swap in real time (FLIP animated). */
+function makeLiveSortable(opts) {
+  const { container, itemSelector, handle, item, axis, onStart, onCommit, edge } = opts;
+  const horiz = axis === 'x';
+  const posProp = horiz ? 'offsetLeft' : 'offsetTop';
+  const sizeProp = horiz ? 'offsetWidth' : 'offsetHeight';
+  const tx = (v) => horiz ? `translate3d(${v}px,0,0)` : `translate3d(0,${v}px,0)`;
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (opts.ignore && opts.ignore(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
+    const rectC = () => container.getBoundingClientRect();
+    const ptr = (ev) => horiz ? (ev.clientX - rectC().left + container.scrollLeft)
+                              : (ev.clientY - rectC().top);
+    const grab = ptr(e) - item[posProp];
+    const startOrder = [...container.querySelectorAll(itemSelector)];
+    item.style.transition = 'none';
+    item.classList.add('sorting');
+    if (onStart) onStart();
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+
+    const siblings = () => [...container.querySelectorAll(itemSelector)].filter(el => el !== item);
+
+    const flip = (mutate) => {
+      const others = siblings();
+      const first = new Map(others.map(el => [el, el[posProp]]));
+      mutate();
+      if (reduced) return;
+      others.forEach(el => {
+        const d = first.get(el) - el[posProp];
+        if (!d) return;
+        el.style.transition = 'none';
+        el.style.transform = tx(d);
+        void el.offsetWidth;
+        el.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        el.style.transform = '';
+      });
+    };
+
+    let lastEv = e;
+    const place = () => {
+      const p = ptr(lastEv);
+      item.style.transform = tx(p - grab - item[posProp]);
+    };
+
+    const onMove = (ev) => {
+      ev.preventDefault();
+      lastEv = ev;
+      if (horiz) {
+        const r = rectC();
+        if (ev.clientX < r.left + 60) container.scrollLeft -= 10;
+        else if (ev.clientX > r.right - 60) container.scrollLeft += 10;
+      } else {
+        if (ev.clientY < 70) window.scrollBy(0, -8);
+        else if (ev.clientY > window.innerHeight - 70) window.scrollBy(0, 8);
+      }
+      // Center of the dragged item in container coordinates.
+      const center = ptr(ev) - grab + item[sizeProp] / 2;
+      for (let guard = 0; guard < 8; guard++) {
+        const prev = item.previousElementSibling;
+        const next = item.nextElementSibling;
+        if (prev && prev.matches(itemSelector) && center < prev[posProp] + prev[sizeProp] / 2) {
+          flip(() => container.insertBefore(item, prev));
+        } else if (next && next.matches(itemSelector) && center > next[posProp] + next[sizeProp] / 2) {
+          flip(() => container.insertBefore(item, next.nextElementSibling));
+        } else break;
+      }
+      place();
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+      // Settle into the final slot.
+      item.style.transition = reduced ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      item.style.transform = '';
+      let done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        item.style.transition = '';
+        item.classList.remove('sorting');
+        siblings().forEach(el => { el.style.transition = ''; el.style.transform = ''; });
+        const now = [...container.querySelectorAll(itemSelector)];
+        if (now.some((el, i) => el !== startOrder[i]) && onCommit) onCommit(now);
+      };
+      item.addEventListener('transitionend', finish, { once: true });
+      setTimeout(finish, 260);
+    };
+
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  });
 }
 
 function initModuleReordering() {
   const container = document.getElementById('dsp-modules-container');
   if (!container) return;
 
-  const draggers = container.querySelectorAll('.module-dragger');
-  draggers.forEach(dragger => {
-    dragger.addEventListener('pointerdown', (e) => {
-      if (e.button !== undefined && e.button !== 0) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      const box = dragger.closest('.module-box');
-      if (!box) return;
-
-      isDraggingModule = true;
-      draggedModuleBox = box;
-      box.classList.add('dragging');
-
-      const indicator = document.createElement('div');
-      indicator.className = 'module-drop-indicator';
-      container.appendChild(indicator);
-
-      let currentAfterElement = box.nextElementSibling;
-      const updateIndicator = (afterEl) => {
-        const cRect = container.getBoundingClientRect();
-        if (afterEl) {
-          const elRect = afterEl.getBoundingClientRect();
-          indicator.style.top = (elRect.top - cRect.top - 8 - 2) + 'px';
-        } else {
-          const remainingBoxes = container.querySelectorAll('.module-box[data-module]:not(.dragging)');
-          if (remainingBoxes.length > 0) {
-            const lastBox = remainingBoxes[remainingBoxes.length - 1];
-            const elRect = lastBox.getBoundingClientRect();
-            indicator.style.top = (elRect.bottom - cRect.top + 8 - 2) + 'px';
-          }
-        }
-      };
-      updateIndicator(currentAfterElement);
-
-      const rect = box.getBoundingClientRect();
-      const grabOffsetX = e.clientX - rect.left;
-      const grabOffsetY = e.clientY - rect.top;
-
-      const ghost = box.cloneNode(true);
-      ghost.classList.add('module-drag-ghost');
-      ghost.classList.remove('dragging');
-      const ghostBody = ghost.querySelector('.module-body');
-      if (ghostBody) ghostBody.remove();
-      ghost.style.left = (e.clientX - grabOffsetX) + 'px';
-      ghost.style.top = (e.clientY - grabOffsetY) + 'px';
-      ghost.style.width = rect.width + 'px';
-      document.body.appendChild(ghost);
-
-      try {
-        dragger.setPointerCapture(e.pointerId);
-      } catch (_) {}
-
-      const onPointerMove = (ev) => {
-        if (!isDraggingModule || !draggedModuleBox) return;
-        ev.preventDefault();
-
-        ghost.style.left = (ev.clientX - grabOffsetX) + 'px';
-        ghost.style.top = (ev.clientY - grabOffsetY) + 'px';
-
-        if (ev.clientY < 70) {
-          window.scrollBy({ top: -8, behavior: 'auto' });
-        } else if (ev.clientY > window.innerHeight - 70) {
-          window.scrollBy({ top: 8, behavior: 'auto' });
-        }
-
-        const afterElement = getDragAfterElement(container, ev.clientY);
-        currentAfterElement = afterElement;
-        updateIndicator(afterElement);
-      };
-
-      const onPointerUp = (ev) => {
-        if (!isDraggingModule) return;
-        isDraggingModule = false;
-
-        try {
-          dragger.releasePointerCapture(ev.pointerId);
-        } catch (_) {}
-
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('pointercancel', onPointerUp);
-        dragger.removeEventListener('pointermove', onPointerMove);
-        dragger.removeEventListener('pointerup', onPointerUp);
-        dragger.removeEventListener('pointercancel', onPointerUp);
-
-        ghost.remove();
-        indicator.remove();
-
-        if (currentAfterElement) {
-          container.insertBefore(draggedModuleBox, currentAfterElement);
-        } else {
-          container.appendChild(draggedModuleBox);
-        }
-
-        if (draggedModuleBox) {
-          draggedModuleBox.classList.remove('dragging');
-          draggedModuleBox = null;
-        }
-
+  container.querySelectorAll('.module-dragger').forEach(dragger => {
+    const box = dragger.closest('.module-box');
+    if (!box) return;
+    makeLiveSortable({
+      container,
+      itemSelector: '.module-box[data-module]',
+      handle: dragger,
+      item: box,
+      axis: 'y',
+      onStart: () => { isDraggingModule = true; draggedModuleBox = box; },
+      onCommit: () => {
         updateDraggerNumbers();
-
         const order = getCurrentModuleOrder();
         const orderStr = order.join(',');
         if (orderStr && orderStr !== lastSentModuleOrder) {
           lastSentModuleOrder = orderStr;
           wsTx({ t: 'module_order', order: order });
         }
-      };
-
-      dragger.addEventListener('pointermove', onPointerMove);
-      dragger.addEventListener('pointerup', onPointerUp);
-      dragger.addEventListener('pointercancel', onPointerUp);
-      window.addEventListener('pointermove', onPointerMove, { passive: false });
-      window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerUp);
+      }
     });
+    dragger.addEventListener('pointerup', () => { isDraggingModule = false; draggedModuleBox = null; });
+    dragger.addEventListener('pointercancel', () => { isDraggingModule = false; draggedModuleBox = null; });
   });
 }
 
@@ -3236,12 +3413,6 @@ class Knob {
       this._md(e.clientY);
       window.addEventListener('mousemove', this._onMove, { passive: true });
       window.addEventListener('mouseup', this._onUp);
-    });
-
-    svg.addEventListener('dblclick', () => {
-      this.set(this.defaultVal, true);
-      if (this.onApply) this.onApply(this.value);
-      else if (this.onEnd) this.onEnd(this.value);
     });
 
     svg.addEventListener('wheel', e => {
@@ -3550,7 +3721,7 @@ function drawResponse() {
 
   c.clearRect(0, 0, W, H);
 
-  c.fillStyle = '#FFFFFF';
+  c.fillStyle = cv('--cv-bg');
   c.fillRect(0, 0, W, H);
 
   [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
@@ -3558,7 +3729,7 @@ function drawResponse() {
     c.beginPath();
     c.moveTo(0, y);
     c.lineTo(W, y);
-    c.strokeStyle = db === 0 ? '#4C566A' : '#E5E9F0';
+    c.strokeStyle = db === 0 ? cv('--cv-grid-zero') : cv('--cv-grid');
     c.lineWidth   = db === 0 ? 1.5 * DPR : 1 * DPR;
     c.stroke();
   });
@@ -3568,13 +3739,13 @@ function drawResponse() {
     c.beginPath();
     c.moveTo(x, 0);
     c.lineTo(x, H);
-    c.strokeStyle = '#E5E9F0';
+    c.strokeStyle = cv('--cv-grid');
     c.lineWidth   = 1 * DPR;
     c.stroke();
 
     const lbl = f >= 1000 ? (f / 1000) + 'k' : String(f);
     c.font = `600 ${9 * DPR}px ui-monospace, SFMono-Regular, monospace`;
-    c.fillStyle = '#718096';
+    c.fillStyle = cv('--cv-label');
     c.textAlign = 'center';
     c.textBaseline = 'bottom';
     c.fillText(lbl, x, H - 4 * DPR);
@@ -3604,13 +3775,13 @@ function drawResponse() {
     bPts.forEach(p => c.lineTo(p.x, p.y));
     c.lineTo(bPts[bPts.length - 1].x, zY);
     c.closePath();
-    c.fillStyle = eqEnabled ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)` : 'rgba(160, 174, 192, 0.08)';
+    c.fillStyle = eqEnabled ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${isDarkTheme() ? 0.10 : 0.22})` : 'rgba(160, 174, 192, 0.08)';
     c.fill();
 
     // Outline stroke for individual band curve
     c.beginPath();
     bPts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
-    c.strokeStyle = eqEnabled ? (bandColor + 'B0') : '#CBD5E1';
+    c.strokeStyle = eqEnabled ? (bandColor + (isDarkTheme() ? '66' : 'B0')) : cv('--cv-dim');
     c.lineWidth   = 1.5 * DPR;
     c.stroke();
   });
@@ -3624,7 +3795,7 @@ function drawResponse() {
   // Draw overall total EQ composite response line
   c.beginPath();
   pts.forEach((p, k) => k === 0 ? c.moveTo(p.x, p.y) : c.lineTo(p.x, p.y));
-  c.strokeStyle = eqEnabled ? '#000000' : '#718096';
+  c.strokeStyle = eqEnabled ? cv('--cv-curve') : cv('--cv-label');
   c.lineWidth   = 3.5 * DPR;
   c.lineJoin    = 'round';
   c.stroke();
@@ -3634,13 +3805,13 @@ function drawResponse() {
     const y = db2y(totalMagAt(b.freq), H);
     const bandColor = getBandColor(b, i);
     c.beginPath();
-    c.arc(x, y, 4.5 * DPR, 0, Math.PI * 2);
+    c.arc(x, y, (window.innerWidth <= 680 ? 3 : 4.5) * DPR, 0, Math.PI * 2);
     if (eqEnabled) {
-      c.fillStyle   = b.enabled ? bandColor : '#A0AEC0';
-      c.strokeStyle = '#2E3440';
+      c.fillStyle   = b.enabled ? bandColor : cv('--cv-off');
+      c.strokeStyle = cv('--cv-node-stroke');
     } else {
-      c.fillStyle   = b.enabled ? '#718096' : '#CBD5E1';
-      c.strokeStyle = '#4C566A';
+      c.fillStyle   = b.enabled ? cv('--cv-label') : cv('--cv-dim');
+      c.strokeStyle = cv('--cv-grid-zero');
     }
     c.lineWidth   = 1.5 * DPR;
     c.fill();
@@ -3669,15 +3840,15 @@ function drawResponse() {
     const pw = tw + 8 * DPR;
     const ph = 14 * DPR;
 
-    c.fillStyle = 'rgba(255, 255, 255, 0.94)';
+    c.fillStyle = cv('--cv-tip');
     c.beginPath();
     c.rect(px, py, pw, ph);
     c.fill();
-    c.strokeStyle = db === 0 ? '#4C566A' : '#D8DEE9';
+    c.strokeStyle = db === 0 ? cv('--cv-grid-zero') : cv('--cv-tip-grid');
     c.lineWidth   = 1 * DPR;
     c.stroke();
 
-    c.fillStyle = db === 0 ? '#2E3440' : '#4C566A';
+    c.fillStyle = db === 0 ? cv('--cv-tip-text-strong') : cv('--cv-tip-text');
     c.fillText(txt, px + 4 * DPR, y);
     c.restore();
   });
@@ -3732,11 +3903,6 @@ function openGraphMenu(i, clientX, clientY) {
   if (!b) return;
   const types = ['Peaking', 'Low Shelf', 'High Shelf', 'Low Pass', 'High Pass'];
   graphMenu.innerHTML = '';
-  const head = document.createElement('div');
-  head.className = 'gm-head';
-  head.textContent = 'Band ' + (i + 1);
-  head.style.borderLeftColor = getBandColor(b, i);
-  graphMenu.appendChild(head);
   types.forEach((name, t) => {
     const el = document.createElement('div');
     el.className = 'gm-opt' + (b.type === t ? ' selected' : '');
@@ -3774,9 +3940,10 @@ window.addEventListener('scroll', closeGraphMenu, { passive: true });
 
 let graphDrag = null;
 
-fCanvas.style.touchAction = 'none';
+fCanvas.style.touchAction = window.innerWidth <= 680 ? 'pan-y' : 'none';
 
 fCanvas.addEventListener('contextmenu', (e) => {
+  if (window.innerWidth <= 680) return;
   const rect = fCanvas.getBoundingClientRect();
   const i = graphHitBand(e.clientX - rect.left, e.clientY - rect.top);
   if (i >= 0) {
@@ -3812,6 +3979,7 @@ function stepGraphSmooth() {
 }
 
 fCanvas.addEventListener('pointerdown', (e) => {
+  if (window.innerWidth <= 680) return;
   if (e.button !== 0 && e.button !== 1) return;
   const rect = fCanvas.getBoundingClientRect();
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
@@ -3834,6 +4002,7 @@ fCanvas.addEventListener('pointerdown', (e) => {
 });
 
 fCanvas.addEventListener('pointermove', (e) => {
+  if (window.innerWidth <= 680) return;
   const rect = fCanvas.getBoundingClientRect();
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
 
@@ -4093,7 +4262,10 @@ function updateSelectionUI() {
 function updateActionCardButtons() {
   const btnTop = document.getElementById('btn-action-top');
   const btnBottom = document.getElementById('btn-action-bottom');
+  const btnReorder = document.getElementById('btn-action-reorder');
   if (!btnTop || !btnBottom) return;
+
+  const reordering = document.body.classList.contains('reorder-bands');
 
   if (isSelectMode) {
     btnTop.innerHTML = '<span>Cancel</span>';
@@ -4104,17 +4276,23 @@ function updateActionCardButtons() {
     btnBottom.innerHTML = `<span>Delete (${count})</span>`;
     btnBottom.disabled = (count === 0 || count >= bands.length);
     btnBottom.classList.add('btn-danger');
+    if (btnReorder) btnReorder.style.display = 'none';
   } else {
     btnTop.innerHTML = '<span>Add band</span>';
-    btnTop.disabled = bands.length >= MAX_BANDS;
+    btnTop.disabled = reordering || bands.length >= MAX_BANDS;
     btnTop.classList.remove('btn-danger');
 
     btnBottom.innerHTML = '<span>Select band</span>';
-    btnBottom.disabled = bands.length <= 1;
+    btnBottom.disabled = reordering || bands.length <= 1;
     btnBottom.classList.remove('btn-danger');
+
+    if (btnReorder) {
+      btnReorder.style.display = '';
+      btnReorder.innerHTML = reordering ? '<span>Done</span>' : '<span>Reorder</span>';
+      btnReorder.classList.toggle('active-reorder', reordering);
+    }
   }
 }
-
 function handleActionTopClick() {
   if (isSelectMode) {
     exitSelectMode();
@@ -4150,19 +4328,6 @@ function deleteSelectedBands() {
   requestDrawResponse();
 }
 
-function getBandDragAfterElement(container, x) {
-  const draggableElements = [...container.querySelectorAll('.band-card:not(.dragging)')];
-  return draggableElements.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const offset = x - box.left - box.width / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset: offset, element: child };
-    } else {
-      return closest;
-    }
-  }, { offset: Number.NEGATIVE_INFINITY }).element;
-}
-
 function rebuildBandsUI() {
   const root = document.getElementById('bands-container');
   if (!root) return;
@@ -4179,7 +4344,7 @@ function rebuildBandsUI() {
     const bandColor = getBandColor(b, i);
     b.color = bandColor;
     const hsl = hexToHsl(bandColor);
-    const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+    const cardBg = bandCardBg(hsl);
 
     const card = document.createElement('div');
     card.className = 'band-card' + (b.enabled ? '' : ' band-bypassed');
@@ -4212,139 +4377,25 @@ function rebuildBandsUI() {
 
     card.appendChild(draggerBar);
 
-    draggerBar.addEventListener('pointerdown', (e) => {
-      if (isSelectMode) return;
-      if (e.button !== undefined && e.button !== 0) return;
-      if (e.target.closest('.band-select-checkbox')) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      const rect = card.getBoundingClientRect();
-      const grabOffsetX = e.clientX - rect.left;
-      const grabOffsetY = e.clientY - rect.top;
-
-      // Clone card before adding dragging styles
-      const ghost = card.cloneNode(true);
-      ghost.classList.add('band-drag-ghost');
-      ghost.classList.remove('dragging');
-      ghost.removeAttribute('id');
-      ghost.style.position = 'fixed';
-      ghost.style.left = (e.clientX - grabOffsetX) + 'px';
-      ghost.style.top = (e.clientY - grabOffsetY) + 'px';
-      ghost.style.width = rect.width + 'px';
-      ghost.style.height = rect.height + 'px';
-      ghost.style.backgroundColor = cardBg;
-      ghost.style.borderColor = bandColor;
-      ghost.style.borderWidth = '3px';
-      ghost.style.borderStyle = 'solid';
-      ghost.style.opacity = '0.95';
-      ghost.style.pointerEvents = 'none';
-      ghost.style.zIndex = '10000';
-      document.body.appendChild(ghost);
-
-      card.classList.add('dragging');
-      card.style.opacity = '0.35';
-
-      const indicator = document.createElement('div');
-      indicator.className = 'band-drop-indicator';
-      root.appendChild(indicator);
-
-      let currentAfterCard = card.nextElementSibling;
-      const updateBandIndicator = (afterEl) => {
-        const rootRect = root.getBoundingClientRect();
-        if (afterEl && afterEl !== indicator) {
-          const elRect = afterEl.getBoundingClientRect();
-          const x = (elRect.left - rootRect.left) + root.scrollLeft - 6;
-          indicator.style.left = (x - 2) + 'px';
-          indicator.style.top = '6px';
-          indicator.style.height = '290px';
-        } else {
-          const actCard = document.getElementById('eq-actions-card');
-          const remainingCards = root.querySelectorAll('.band-card:not(.dragging)');
-          const targetCard = actCard || (remainingCards.length > 0 ? remainingCards[remainingCards.length - 1] : null);
-          if (targetCard) {
-            const elRect = targetCard.getBoundingClientRect();
-            const x = (targetCard === actCard)
-              ? (elRect.left - rootRect.left) + root.scrollLeft - 6
-              : (elRect.right - rootRect.left) + root.scrollLeft + 6;
-            indicator.style.left = (x - 2) + 'px';
-            indicator.style.top = '6px';
-            indicator.style.height = '290px';
-          }
-        }
-      };
-      updateBandIndicator(currentAfterCard);
-
-      try {
-        draggerBar.setPointerCapture(e.pointerId);
-      } catch (_) {}
-
-      const onPointerMove = (ev) => {
-        ev.preventDefault();
-        ghost.style.left = (ev.clientX - grabOffsetX) + 'px';
-        ghost.style.top = (ev.clientY - grabOffsetY) + 'px';
-
-        const cRect = root.getBoundingClientRect();
-        if (ev.clientX < cRect.left + 60) {
-          root.scrollLeft -= 10;
-        } else if (ev.clientX > cRect.right - 60) {
-          root.scrollLeft += 10;
-        }
-
-        const afterCard = getBandDragAfterElement(root, ev.clientX);
-        currentAfterCard = afterCard;
-        updateBandIndicator(afterCard);
-      };
-
-      const onPointerUp = (ev) => {
-        try {
-          draggerBar.releasePointerCapture(ev.pointerId);
-        } catch (_) {}
-
-        window.removeEventListener('pointermove', onPointerMove);
-        window.removeEventListener('pointerup', onPointerUp);
-        window.removeEventListener('pointercancel', onPointerUp);
-        draggerBar.removeEventListener('pointermove', onPointerMove);
-        draggerBar.removeEventListener('pointerup', onPointerUp);
-        draggerBar.removeEventListener('pointercancel', onPointerUp);
-
-        ghost.remove();
-        indicator.remove();
-
-        card.style.opacity = '';
-        card.classList.remove('dragging');
-
-        const allBandCards = [...root.querySelectorAll('.band-card')];
-        let dropIdx;
-        if (currentAfterCard && currentAfterCard.classList.contains('band-card')) {
-          dropIdx = allBandCards.indexOf(currentAfterCard);
-        } else {
-          dropIdx = allBandCards.length;
-        }
-
-        if (dropIdx !== -1) {
-          if (i < dropIdx) dropIdx--;
-          if (dropIdx !== i) {
-            const [movedBand] = bands.splice(i, 1);
-            bands.splice(dropIdx, 0, movedBand);
-            bands.forEach((bd, idx) => {
-              bd.band = idx;
-              sendBand(idx);
-            });
-            rebuildBandsUI();
-            requestDrawResponse();
-          }
-        }
-      };
-
-      draggerBar.addEventListener('pointermove', onPointerMove);
-      draggerBar.addEventListener('pointerup', onPointerUp);
-      draggerBar.addEventListener('pointercancel', onPointerUp);
-      window.addEventListener('pointermove', onPointerMove, { passive: false });
-      window.addEventListener('pointerup', onPointerUp);
-      window.addEventListener('pointercancel', onPointerUp);
+    makeLiveSortable({
+      container: root,
+      itemSelector: '.band-card',
+      handle: draggerBar,
+      item: card,
+      axis: 'x',
+      ignore: (e) => isSelectMode || !!e.target.closest('.band-select-checkbox'),
+      onCommit: (cards) => {
+        const ids = cards.map(c => parseInt(c.id.replace('band-card-', ''), 10));
+        const reordered = ids.map(id => bands[id]);
+        bands.splice(0, bands.length, ...reordered);
+        bands.forEach((bd, idx) => {
+          bd.band = idx;
+          sendBand(idx);
+        });
+        rebuildBandsUI();
+        requestDrawResponse();
+      }
     });
-
     const typeRow = document.createElement('div');
     typeRow.className = 'band-type-row';
     const currentLabel = getBandTypeLabel(b.type);
@@ -4409,7 +4460,7 @@ function rebuildBandsUI() {
     fUnit.innerHTML = `
       <svg id="knob-f-${i}" class="knob" width="54" height="54" viewBox="0 0 54 54"></svg>
       <div class="card-val-badge">
-        <span class="badge-lbl">Freq</span>
+        <span class="badge-lbl">FREQ</span>
         <div class="badge-input-row">
           <input type="number" id="num-f-${i}" class="badge-val-input" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
         </div>
@@ -4446,7 +4497,7 @@ function rebuildBandsUI() {
       const bypassBtn = card.querySelector(`#band-bypass-${i}`);
       if (b.enabled) {
         card.style.backgroundColor = cardBg;
-        card.style.borderColor = bandColor;
+        card.style.borderColor = bandCardBorder(hsl, bandColor);
         card.style.borderWidth = '3px';
         if (bypassBtn) {
           bypassBtn.style.color = 'var(--muted)';
@@ -4600,6 +4651,9 @@ function rebuildBandsUI() {
     <button type="button" class="btn-card-action" id="btn-action-bottom" onclick="handleActionBottomClick()">
       <span>Select band</span>
     </button>
+    <button type="button" class="btn-card-action btn-action-reorder" id="btn-action-reorder" onclick="toggleBandReorder()">
+      <span>Reorder</span>
+    </button>
   `;
   root.appendChild(actionCard);
 
@@ -4630,14 +4684,14 @@ function syncBandCardUI(i) {
 
   const bandColor = getBandColor(b, i);
   const hsl = hexToHsl(bandColor);
-  const cardBg = `hsl(${hsl.h}, ${Math.max(55, Math.min(80, Math.round(hsl.s * 1.3)))}%, 88%)`;
+  const cardBg = bandCardBg(hsl);
 
   if (b.enabled) {
     card.style.backgroundColor = cardBg;
-    card.style.borderColor = bandColor;
+    card.style.borderColor = bandCardBorder(hsl, bandColor);
     card.style.borderWidth = '3px';
     if (bypassBtn) {
-      bypassBtn.style.color = bandColor;
+      bypassBtn.style.color = bandCardBorder(hsl, bandColor);
     }
     card.classList.remove('band-bypassed');
   } else {
@@ -4727,6 +4781,122 @@ function updateBypassUI(mod, enabled) {
   }
 }
 
+const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+function isModuleCollapsed(box) {
+  return box.classList.contains('collapsed') || box.classList.contains('is-collapsing');
+}
+
+/* Glitch-free open/close using inline height/padding CSS transitions so height stays at 0px
+   until .collapsed applies, and reverses cleanly if clicked mid-transition. */
+function setModuleCollapsed(box, want) {
+  if (isModuleCollapsed(box) === want) return;
+  const body = box.querySelector(':scope > .module-body');
+  if (box._cleanupCollapse) { box._cleanupCollapse(false); }
+  if (!body || REDUCED_MOTION.matches) {
+    box.classList.remove('is-collapsing');
+    box.classList.toggle('collapsed', want);
+    if (!want && box.id === 'mod-eq') requestDrawResponse();
+    return;
+  }
+
+  const dur = '0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+  const trans = `height ${dur}, padding-top ${dur}, padding-bottom ${dur}`;
+
+  if (want) {
+    const startH = body.getBoundingClientRect().height;
+    const cs = getComputedStyle(body);
+    const startPT = cs.paddingTop;
+    const startPB = cs.paddingBottom;
+
+    body.style.transition = 'none';
+    body.style.overflow = 'hidden';
+    body.style.height = startH + 'px';
+    body.style.paddingTop = startPT;
+    body.style.paddingBottom = startPB;
+    box.classList.add('is-collapsing');
+    void body.offsetHeight;
+
+    body.style.transition = trans;
+    body.style.height = '0px';
+    body.style.paddingTop = '0px';
+    body.style.paddingBottom = '0px';
+
+    let finished = false;
+    const finish = (commit = true) => {
+      if (finished) return;
+      finished = true;
+      body.removeEventListener('transitionend', onEnd);
+      clearTimeout(timer);
+      box._cleanupCollapse = null;
+      if (commit) {
+        box.classList.remove('is-collapsing');
+        box.classList.add('collapsed');
+        body.style.transition = '';
+        body.style.overflow = '';
+        body.style.height = '';
+        body.style.paddingTop = '';
+        body.style.paddingBottom = '';
+      }
+    };
+    const onEnd = (e) => { if (e.target === body && e.propertyName === 'height') finish(true); };
+    const timer = setTimeout(() => finish(true), 260);
+    body.addEventListener('transitionend', onEnd);
+    box._cleanupCollapse = finish;
+  } else {
+    const wasMidCollapse = box.classList.contains('is-collapsing');
+    const curRectH = wasMidCollapse ? body.getBoundingClientRect().height : 0;
+    const curCS = wasMidCollapse ? getComputedStyle(body) : null;
+    const startPT = curCS ? curCS.paddingTop : '0px';
+    const startPB = curCS ? curCS.paddingBottom : '0px';
+
+    box.classList.remove('is-collapsing');
+    box.classList.remove('collapsed');
+
+    body.style.transition = 'none';
+    body.style.height = '';
+    body.style.paddingTop = '';
+    body.style.paddingBottom = '';
+    if (box.id === 'mod-eq') drawResponse();
+    const targetH = body.offsetHeight;
+    const targetCS = getComputedStyle(body);
+    const targetPT = targetCS.paddingTop;
+    const targetPB = targetCS.paddingBottom;
+
+    body.style.overflow = 'hidden';
+    body.style.height = curRectH + 'px';
+    body.style.paddingTop = startPT;
+    body.style.paddingBottom = startPB;
+    void body.offsetHeight;
+
+    body.style.transition = trans;
+    body.style.height = targetH + 'px';
+    body.style.paddingTop = targetPT;
+    body.style.paddingBottom = targetPB;
+
+    let finished = false;
+    const finish = (commit = true) => {
+      if (finished) return;
+      finished = true;
+      body.removeEventListener('transitionend', onEnd);
+      clearTimeout(timer);
+      box._cleanupCollapse = null;
+      if (commit) {
+        body.style.transition = '';
+        body.style.overflow = '';
+        body.style.height = '';
+        body.style.paddingTop = '';
+        body.style.paddingBottom = '';
+        if (box.id === 'mod-eq') requestDrawResponse();
+      }
+    };
+    const onEnd = (e) => { if (e.target === body && e.propertyName === 'height') finish(true); };
+    const timer = setTimeout(() => finish(true), 260);
+    body.addEventListener('transitionend', onEnd);
+    box._cleanupCollapse = finish;
+  }
+}
+
 function toggleModuleCollapse(mod) {
   const map = {
     'eq': 'mod-eq',
@@ -4739,12 +4909,52 @@ function toggleModuleCollapse(mod) {
   const boxId = map[mod] || `mod-${mod}`;
   const box = document.getElementById(boxId);
   if (!box) return;
-  box.classList.toggle('collapsed');
-  if (mod === 'eq' && !box.classList.contains('collapsed')) {
-    setTimeout(requestDrawResponse, 60);
+  setModuleCollapsed(box, !isModuleCollapsed(box));
+}
+
+/* ---- Mobile reorder mode: draggers stay disabled until the user opts in ---- */
+const mobileMQ = window.matchMedia('(max-width: 680px)');
+let savedCollapsed = null;
+
+function setModuleReorder(on) {
+  document.body.classList.toggle('reorder-modules', on);
+  const btn = document.getElementById('reorder-modules-btn');
+  if (btn) {
+    btn.innerHTML = on ? '<span>Done</span>' : '<span>Reorder modules</span>';
+    btn.classList.toggle('active-reorder', on);
+  }
+  const boxes = [...document.querySelectorAll('#dsp-modules-container .module-box[data-module]')];
+  if (on) {
+    savedCollapsed = new Map(boxes.map(b => [b, isModuleCollapsed(b)]));
+    boxes.forEach(b => setModuleCollapsed(b, true));
+  } else if (savedCollapsed) {
+    savedCollapsed.forEach((wasCollapsed, b) => setModuleCollapsed(b, wasCollapsed));
+    savedCollapsed = null;
   }
 }
 
+function setBandReorder(on) {
+  if (on && isSelectMode) exitSelectMode();
+  document.body.classList.toggle('reorder-bands', on);
+  updateActionCardButtons();
+}
+
+function toggleBandReorder() {
+  setBandReorder(!document.body.classList.contains('reorder-bands'));
+}
+
+document.getElementById('reorder-modules-btn').addEventListener('click', () => {
+  const next = !document.body.classList.contains('reorder-modules');
+  if (next) setBandReorder(false);
+  setModuleReorder(next);
+});
+mobileMQ.addEventListener('change', (e) => {
+  fCanvas.style.touchAction = e.matches ? 'pan-y' : 'none';
+  requestDrawResponse();
+  if (e.matches) return;
+  if (document.body.classList.contains('reorder-modules')) setModuleReorder(false);
+  setBandReorder(false);
+});
 function toggleEQModule(checked) {
   if (typeof checked === 'boolean') {
     eqEnabled = checked;
@@ -5230,7 +5440,26 @@ initCompanderKnobs();
 initLimiterKnobs();
 initModuleReordering();
 updateDraggerNumbers();
-
+document.getElementById('theme-toggle-btn')?.addEventListener('click', () => {
+  setTheme(isDarkTheme() ? 'light' : 'dark', true);
+  rebuildBandsUI();
+  requestDrawResponse();
+});
+if (mobileMQ.matches) {
+  const wfBody = document.getElementById('wifi-cfg-body');
+  const wfArrow = document.getElementById('wifi-cfg-arrow');
+  if (wfBody) wfBody.style.display = 'block';
+  if (wfArrow) wfArrow.textContent = '▲';
+}
+setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', false);
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  let saved = null;
+  try { saved = localStorage.getItem('esp32_dsp_theme'); } catch (_) {}
+  if (saved) return;
+  setTheme(e.matches ? 'dark' : 'light', false);
+  rebuildBandsUI();
+  requestDrawResponse();
+});
 updateBypassUI('eq', eqEnabled);
 updateBypassUI('subsonic', subsonicParams.enabled);
 updateBypassUI('comp', compParams.enabled);
@@ -5248,6 +5477,164 @@ document.addEventListener('click', (e) => {
 });
 
 
+/* ---- Mobile tabs (System / DSP) ---- */
+(function initMobileTabs() {
+  const main = document.querySelector('main[data-tab]');
+  const tabs = [...document.querySelectorAll('.mobile-tab')];
+  if (!main || !tabs.length) return;
+  const select = (name) => {
+    main.dataset.tab = name;
+    tabs.forEach(b => {
+      const on = b.dataset.tab === name;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    if (name === 'dsp') requestDrawResponse();
+    window.scrollTo(0, 0);
+  };
+  tabs.forEach(b => b.addEventListener('click', () => select(b.dataset.tab)));
+})();
+
+/* ---- Import / Export of the full DSP configuration ---- */
+const CONFIG_VERSION = 1;
+
+function backupNotice(text, isError) {
+  const el = document.getElementById('backup-msg');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  el.classList.add('visible');
+  clearTimeout(backupNotice._t);
+  backupNotice._t = setTimeout(() => el.classList.remove('visible'), 3000);
+}
+
+function exportConfig() {
+  const cfg = {
+    app: 'esp32-s3-dsp',
+    version: CONFIG_VERSION,
+    moduleOrder: getCurrentModuleOrder(),
+    eq: {
+      enabled: !!eqEnabled,
+      preamp: eqPreamp,
+      bands: bands.map(b => ({
+        freq: b.freq, gain: b.gain, q: b.q,
+        type: b.type || 0, order: b.order || 2, enabled: !!b.enabled
+      }))
+    },
+    subsonic: { ...subsonicParams },
+    compander: { ...compParams },
+    limiter: { ...limParams }
+  };
+  const blob = new Blob([JSON.stringify(cfg, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `esp32-s3-dsp-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  backupNotice('Exported');
+}
+
+function clampNum(v, min, max, def) {
+  const n = parseFloat(v);
+  return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : def;
+}
+
+function applyImportedConfig(cfg) {
+  if (!cfg || cfg.app !== 'esp32-s3-dsp' || typeof cfg.version !== 'number') {
+    throw new Error('Not a DSP config file');
+  }
+  if (cfg.version > CONFIG_VERSION) throw new Error('File is from a newer version');
+
+  if (cfg.eq) {
+    if (Array.isArray(cfg.eq.bands) && cfg.eq.bands.length) {
+      bands = cfg.eq.bands.slice(0, MAX_BANDS).map((b, idx) => ({
+        band: idx,
+        freq: clampNum(b.freq, 20, 20000, 1000),
+        gain: clampNum(b.gain, -24, 24, 0),
+        q:    clampNum(b.q, 0.1, 24, 0.707),
+        type: Math.round(clampNum(b.type, 0, 4, 0)),
+        order: Math.round(clampNum(b.order, 1, 8, 2)),
+        enabled: b.enabled !== false,
+        color: BAND_COLORS[idx % BAND_COLORS.length]
+      }));
+      document.querySelectorAll('.btn-preset').forEach(el => el.classList.remove('active'));
+      rebuildBandsUI();
+      bands.forEach((_, i) => sendBand(i));
+    }
+    if (cfg.eq.preamp !== undefined) {
+      eqPreamp = clampNum(cfg.eq.preamp, -18, 18, 0);
+      updatePreampUI();
+      wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
+    }
+    toggleEQModule(!!cfg.eq.enabled);
+  }
+
+  if (cfg.subsonic) {
+    const s = cfg.subsonic;
+    Object.assign(subsonicParams, {
+      freq: clampNum(s.freq, 20, 100, subsonicParams.freq),
+      order: Math.round(clampNum(s.order, 1, 4, subsonicParams.order)),
+      balance: clampNum(s.balance, -100, 100, 0),
+      delayL: clampNum(s.delayL, -20, 20, 0),
+      delayR: clampNum(s.delayR, -20, 20, 0),
+      phaseL: Math.round(clampNum(s.phaseL, -180, 180, 0)),
+      phaseR: Math.round(clampNum(s.phaseR, -180, 180, 0))
+    });
+    syncSubsonicUI();
+    toggleSubsonicModule(!!s.enabled);
+  }
+
+  if (cfg.compander) {
+    const c = cfg.compander;
+    Object.assign(compParams, {
+      threshold: clampNum(c.threshold, -60, 0, compParams.threshold),
+      ratio: clampNum(c.ratio, 1, 20, compParams.ratio),
+      attackMs: clampNum(c.attackMs, 0.1, 200, compParams.attackMs),
+      releaseMs: clampNum(c.releaseMs, 10, 2000, compParams.releaseMs),
+      makeup: clampNum(c.makeup, -12, 24, compParams.makeup)
+    });
+    syncCompanderUI();
+    toggleCompanderModule(!!c.enabled);
+  }
+
+  if (cfg.limiter) {
+    const l = cfg.limiter;
+    Object.assign(limParams, {
+      ceiling: clampNum(l.ceiling, -6, 0, limParams.ceiling),
+      knee: clampNum(l.knee, 0, 6, limParams.knee)
+    });
+    syncLimiterUI();
+    toggleLimiterModule(!!l.enabled);
+  }
+
+  if (Array.isArray(cfg.moduleOrder) && cfg.moduleOrder.length) {
+    applyModuleOrder(cfg.moduleOrder);
+    wsTx({ t: 'module_order', order: getCurrentModuleOrder() });
+  }
+  drawResponse();
+}
+
+function importConfig(event) {
+  const input = event.target;
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      applyImportedConfig(JSON.parse(reader.result));
+      backupNotice('Imported');
+    } catch (err) {
+      backupNotice('Import failed: ' + err.message, true);
+    }
+    input.value = '';
+  };
+  reader.onerror = () => { backupNotice('Could not read file', true); input.value = ''; };
+  reader.readAsText(file);
+}
 function toggleWiFiConfig(e) {
   if (e) e.stopPropagation();
   const body = document.getElementById('wifi-cfg-body');
