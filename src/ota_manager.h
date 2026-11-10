@@ -6,33 +6,42 @@
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
 #include "wireless_console.h"
+#include "param_store.h"
 
 class OTAManager {
 public:
     static inline bool s_initialized{false};
+    static inline bool s_otaStartedOk{false};
+    static inline bool s_isFlashing{false};
 
-    static void beginArduinoOTA() {
+    static void beginArduinoOTA(const char* password = "admin") {
         if (s_initialized) return;
-        if (WiFi.status() != WL_CONNECTED && WiFi.getMode() != WIFI_AP && WiFi.getMode() != WIFI_AP_STA) {
+        // Never open unauthenticated ArduinoOTA, and do not listen in AP-only mode
+        if (WiFi.status() != WL_CONNECTED) {
             return;
         }
 
         ArduinoOTA.setHostname("esp32-s3-dsp");
         ArduinoOTA.setPort(3232);
         ArduinoOTA.setMdnsEnabled(false);
+        if (password && strlen(password) > 0) {
+            ArduinoOTA.setPassword(password);
+        }
 
         ArduinoOTA.onStart([]() {
+            s_isFlashing = true;
             String type = (ArduinoOTA.getCommand() == U_FLASH) ? "sketch" : "filesystem";
             Console.println("[OTA] ArduinoOTA update starting: " + type);
         });
 
         ArduinoOTA.onEnd([]() {
+            s_isFlashing = false;
             Console.println("\n[OTA] ArduinoOTA update complete! Rebooting...");
         });
 
         ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
             static unsigned int lastPct = 999;
-            unsigned int pct = (progress / (total / 100));
+            unsigned int pct = (total > 0) ? (progress * 100ULL / total) : 0;
             if (pct != lastPct && pct % 10 == 0) {
                 lastPct = pct;
                 Console.printf("[OTA] Progress: %u%%\n", pct);
@@ -40,6 +49,7 @@ public:
         });
 
         ArduinoOTA.onError([](ota_error_t error) {
+            s_isFlashing = false;
             Console.printf("[OTA] ArduinoOTA Error[%u]\n", error);
         });
 
@@ -48,17 +58,22 @@ public:
         Console.println("[OTA] ArduinoOTA service listening on port 3232 (Hostname: esp32-s3-dsp)");
     }
 
-    static void loopArduinoOTA() {
+    static void loopArduinoOTA(const char* password = "admin") {
         if (s_initialized) {
             ArduinoOTA.handle();
-        } else if (WiFi.status() == WL_CONNECTED || WiFi.getMode() == WIFI_AP) {
-            beginArduinoOTA();
+        } else if (WiFi.status() == WL_CONNECTED) {
+            beginArduinoOTA(password);
         }
     }
 
-    static void setupWebRoutes(AsyncWebServer& server) {
+    static void setupWebRoutes(AsyncWebServer& server, ParamStore& params) {
         // GET /update - Web-based firmware upload page
-        server.on("/update", HTTP_GET, [](AsyncWebServerRequest* req) {
+        server.on("/update", HTTP_GET, [&params](AsyncWebServerRequest* req) {
+            char u[32], p[64];
+            params.getAuth(u, sizeof(u), p, sizeof(p));
+            if (!req->authenticate(u, p)) {
+                return req->requestAuthentication("ESP32-S3-DSP");
+            }
             const char* html = R"rawhtml(<!DOCTYPE html>
 <html>
 <head>
@@ -192,8 +207,17 @@ function uploadFirmware() {
         server.on(
             "/update",
             HTTP_POST,
-            [](AsyncWebServerRequest* req) {
-                bool ok = !Update.hasError();
+            [&params](AsyncWebServerRequest* req) {
+                char u[32], p[64];
+                params.getAuth(u, sizeof(u), p, sizeof(p));
+                if (!req->authenticate(u, p)) {
+                    Update.abort();
+                    s_otaStartedOk = false;
+                    s_isFlashing = false;
+                    return req->requestAuthentication("ESP32-S3-DSP");
+                }
+
+                bool ok = s_otaStartedOk && !Update.hasError();
                 AsyncWebServerResponse* res = req->beginResponse(
                     ok ? 200 : 500,
                     "text/plain",
@@ -202,31 +226,78 @@ function uploadFirmware() {
                 res->addHeader("Connection", "close");
                 req->send(res);
                 if (ok) {
-                    Console.println("[OTA] Firmware flashed successfully! Restarting in 500ms...");
+                    Console.println("[OTA] Firmware flashed successfully! Restarting in 600ms...");
                     xTaskCreate([](void*) {
                         vTaskDelay(pdMS_TO_TICKS(600));
                         ESP.restart();
                     }, "OTAReboot", 2048, nullptr, 1, nullptr);
+                } else {
+                    Update.abort();
+                    s_otaStartedOk = false;
+                    s_isFlashing = false;
                 }
             },
-            [](AsyncWebServerRequest* req, String filename, size_t index, uint8_t* data, size_t len, bool final) {
+            [&params](AsyncWebServerRequest* req, String filename, size_t index, uint8_t* data, size_t len, bool final) {
+                char u[32], p[64];
+                params.getAuth(u, sizeof(u), p, sizeof(p));
+                if (!req->authenticate(u, p)) {
+                    Update.abort();
+                    s_otaStartedOk = false;
+                    s_isFlashing = false;
+                    return;
+                }
+
                 if (!index) {
                     Console.printf("[OTA] Web upload started: %s\n", filename.c_str());
-                    if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) {
-                        Console.printf("[OTA] Update.begin failed: %s\n", Update.errorString());
+                    s_otaStartedOk = false;
+                    s_isFlashing = true;
+
+                    // Validate image magic byte (ESP32 image starts with 0xE9)
+                    if (len < 1 || data[0] != 0xE9) {
+                        Console.println("[OTA] Error: Invalid firmware image (missing ESP32 0xE9 magic byte)");
+                        Update.abort();
+                        s_isFlashing = false;
+                        return;
                     }
+
+                    // Validate Content-Length vs partition size (~6.25 MB max)
+                    const size_t maxPartitionSize = 0x640000;
+                    size_t contentLength = req->contentLength();
+                    if (contentLength > maxPartitionSize) {
+                        Console.printf("[OTA] Error: Upload size (%u) exceeds partition size (%u)\n", contentLength, maxPartitionSize);
+                        Update.abort();
+                        s_isFlashing = false;
+                        return;
+                    }
+
+                    size_t updateSize = (contentLength > 0 && contentLength <= maxPartitionSize) ? contentLength : UPDATE_SIZE_UNKNOWN;
+                    if (!Update.begin(updateSize, U_FLASH)) {
+                        Console.printf("[OTA] Update.begin failed: %s\n", Update.errorString());
+                        Update.abort();
+                        s_isFlashing = false;
+                        return;
+                    }
+                    s_otaStartedOk = true;
                 }
-                if (!Update.hasError()) {
+
+                if (s_otaStartedOk && !Update.hasError()) {
                     if (Update.write(data, len) != len) {
                         Console.printf("[OTA] Update.write failed: %s\n", Update.errorString());
+                        Update.abort();
+                        s_otaStartedOk = false;
+                        s_isFlashing = false;
                     }
                 }
+
                 if (final) {
-                    if (Update.end(true)) {
+                    if (s_otaStartedOk && !Update.hasError() && Update.end(true)) {
                         Console.printf("[OTA] Web upload finished: %u bytes\n", index + len);
                     } else {
                         Console.printf("[OTA] Update.end failed: %s\n", Update.errorString());
+                        Update.abort();
+                        s_otaStartedOk = false;
                     }
+                    s_isFlashing = false;
                 }
             }
         );

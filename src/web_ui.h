@@ -64,12 +64,12 @@ public:
         _server.begin();
         Console.println("[WEB] HTTP & WebSocket server started");
 
-        OTAManager::beginArduinoOTA();
+        OTAManager::beginArduinoOTA(_params.getAuthPass());
     }
 
     void loop() {
         Console.loop();
-        OTAManager::loopArduinoOTA();
+        OTAManager::loopArduinoOTA(_params.getAuthPass());
         _ws.cleanupClients();
 
         InputSourceMode mode;
@@ -125,6 +125,12 @@ public:
         if (_wifiReconnectRequested && now >= _wifiReconnectTimer) {
             _performWiFiReconnect();
         }
+
+        if (_rebootRequested && now >= _rebootTimer) {
+            _rebootRequested = false;
+            Console.println("[SYS] Rebooting system on request...");
+            ESP.restart();
+        }
     }
 
 private:
@@ -136,10 +142,23 @@ private:
     uint32_t          _lastInputVersion{1};
     uint32_t          _lastWifiMetaVersion{1};
     std::atomic<bool> _stateBroadcastPending{false};
+    portMUX_TYPE      _wifiMux = portMUX_INITIALIZER_UNLOCKED;
     bool              _wifiReconnectRequested{false};
     String            _newSSID{""};
     String            _newPass{""};
     unsigned long     _wifiReconnectTimer{0};
+    bool              _rebootRequested{false};
+    unsigned long     _rebootTimer{0};
+
+    bool _checkAuth(AsyncWebServerRequest* req) {
+        char u[32], p[64];
+        _params.getAuth(u, sizeof(u), p, sizeof(p));
+        if (!req->authenticate(u, p)) {
+            req->requestAuthentication("ESP32-S3-DSP");
+            return false;
+        }
+        return true;
+    }
 
     void _startWiFi() {
         Preferences prefs;
@@ -226,7 +245,7 @@ private:
                 Console.println("[NET] mDNS active: http://dsp.local");
             }
 
-            StaticJsonDocument<256> doc;
+            StaticJsonDocument<512> doc;
             doc["t"] = "wifi_status";
             doc["status"] = "connected";
             doc["ssid"] = _newSSID;
@@ -237,7 +256,7 @@ private:
             _ws.textAll(out);
         } else {
             Console.println("\n[WEB] Wi-Fi connection failed! Remaining in current mode.");
-            StaticJsonDocument<256> doc;
+            StaticJsonDocument<512> doc;
             doc["t"] = "wifi_status";
             doc["status"] = "failed";
             doc["msg"] = "Could not connect to '" + _newSSID + "'. Please check password and try again.";
@@ -276,21 +295,24 @@ private:
         });
 
         _server.on("/api/wifi", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
             String ssid = req->hasParam("ssid", true) ? req->getParam("ssid", true)->value() : "";
             String pass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
-            if (ssid.length() > 0) {
+            if (ssid.length() >= 1 && ssid.length() <= 32 && (pass.length() == 0 || (pass.length() >= 8 && pass.length() <= 63))) {
+                portENTER_CRITICAL(&_wifiMux);
                 _newSSID = ssid;
                 _newPass = pass;
                 _wifiReconnectRequested = true;
                 _wifiReconnectTimer = millis() + 300;
+                portEXIT_CRITICAL(&_wifiMux);
                 req->send(200, "application/json", "{\"status\":\"connecting\",\"msg\":\"Connecting to network...\"}");
             } else {
-                req->send(400, "application/json", "{\"error\":\"Missing SSID\"}");
+                req->send(400, "application/json", "{\"error\":\"Invalid SSID or password length (SSID 1-32 chars, Pass 8-63 chars)\"}");
             }
         });
 
         _server.on("/api/wifi", HTTP_GET, [](AsyncWebServerRequest* req) {
-            StaticJsonDocument<256> doc;
+            StaticJsonDocument<512> doc;
             doc["connected"] = (WiFi.status() == WL_CONNECTED);
             doc["ssid"] = (WiFi.status() == WL_CONNECTED) ? WiFi.SSID() : (WiFi.getMode() == WIFI_AP ? "ESP32-S3-DSP" : "");
             doc["ip"] = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
@@ -301,7 +323,22 @@ private:
             req->send(200, "application/json", out);
         });
 
-        OTAManager::setupWebRoutes(_server);
+        _server.on("/api/auth", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
+            String user = req->hasParam("user", true) ? req->getParam("user", true)->value() : "";
+            String pass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
+            if (user.length() >= 1 && user.length() < 32 && pass.length() >= 4 && pass.length() < 64) {
+                if (_params.setAuth(user.c_str(), pass.c_str())) {
+                    req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Credentials updated\"}");
+                } else {
+                    req->send(500, "application/json", "{\"error\":\"Failed to save to NVS\"}");
+                }
+            } else {
+                req->send(400, "application/json", "{\"error\":\"Invalid credentials length (user 1-31, pass 4-63 chars)\"}");
+            }
+        });
+
+        OTAManager::setupWebRoutes(_server, _params);
 
         _server.on("/api/resampler", HTTP_GET, [this](AsyncWebServerRequest* req) {
             StaticJsonDocument<1024> doc;
@@ -311,9 +348,13 @@ private:
             req->send(200, "application/json", out);
         });
 
-        _server.on("/api/resampler/validate", HTTP_POST, [](AsyncWebServerRequest* req) {
-            resampler_run_validation();
-            req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Validation executed on serial log\"}");
+        _server.on("/api/resampler/validate", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
+            xTaskCreate([](void*) {
+                resampler_run_validation();
+                vTaskDelete(nullptr);
+            }, "RS_Valid", 4096, nullptr, 1, nullptr);
+            req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Validation task dispatched to background\"}");
         });
 
         _server.on("/api/resampler/log", HTTP_POST, [](AsyncWebServerRequest* req) {
@@ -322,18 +363,21 @@ private:
             req->send(200, "application/json", en ? "{\"status\":\"ok\",\"logging\":true}" : "{\"status\":\"ok\",\"logging\":false}");
         });
 
-        _server.on("/console", HTTP_GET, [](AsyncWebServerRequest* req) {
+        _server.on("/console", HTTP_GET, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
             req->send(200, "text/html", s_consoleHtml);
         });
 
-        _server.on("/api/logs", HTTP_GET, [](AsyncWebServerRequest* req) {
+        _server.on("/api/logs", HTTP_GET, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
             req->send(200, "text/plain", Console.getRecentLogs());
         });
 
-        _server.on("/api/reboot", HTTP_POST, [](AsyncWebServerRequest* req) {
+        _server.on("/api/reboot", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
             req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Rebooting ESP32-S3...\"}");
-            delay(250);
-            ESP.restart();
+            _rebootRequested = true;
+            _rebootTimer = millis() + 400;
         });
 
         _server.onNotFound([](AsyncWebServerRequest* req) {

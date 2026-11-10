@@ -69,14 +69,39 @@ function clearLogs() {
 }
 
 function copyLogs() {
-  navigator.clipboard.writeText(term.innerText).then(() => alert('Logs copied to clipboard!'));
+  const text = term.innerText;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => alert('Logs copied to clipboard!')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    alert('Logs copied to clipboard!');
+  } catch (e) {
+    alert('Failed to copy logs: ' + e);
+  }
 }
 
 function rebootEsp() {
   if (confirm('Reboot the ESP32-S3 audio processor?')) {
-    fetch('/api/reboot', { method: 'POST' }).then(() => {
-      alert('Reboot command sent. Reconnecting in 5s...');
-      setTimeout(() => location.reload(), 5000);
+    fetch('/api/reboot', { method: 'POST' }).then(res => {
+      if (res.ok) {
+        alert('Reboot command sent. Reconnecting in 5s...');
+        setTimeout(() => location.reload(), 5000);
+      } else {
+        alert('Reboot failed: HTTP ' + res.status);
+      }
+    }).catch(err => {
+      alert('Reboot network error: ' + err);
     });
   }
 }

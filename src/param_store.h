@@ -95,6 +95,19 @@ public:
     void begin() {
         _loadDefaults();
 
+        Preferences authPrefs;
+        if (authPrefs.begin("dsp_auth", true)) {
+            String u = authPrefs.getString("user", "admin");
+            String p = authPrefs.getString("pass", "admin");
+            xSemaphoreTake(_mutex, portMAX_DELAY);
+            strncpy(_authUser, u.c_str(), sizeof(_authUser) - 1);
+            _authUser[sizeof(_authUser) - 1] = '\0';
+            strncpy(_authPass, p.c_str(), sizeof(_authPass) - 1);
+            _authPass[sizeof(_authPass) - 1] = '\0';
+            xSemaphoreGive(_mutex);
+            authPrefs.end();
+        }
+
         Preferences prefs;
         if (prefs.begin("dsp_cfg", true)) {
             if (prefs.isKey("init")) {
@@ -546,8 +559,54 @@ public:
         return true;
     }
 
+    void getAuth(char* outUser, size_t userLen, char* outPass, size_t passLen) const {
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        if (outUser && userLen > 0) {
+            strncpy(outUser, _authUser, userLen - 1);
+            outUser[userLen - 1] = '\0';
+        }
+        if (outPass && passLen > 0) {
+            strncpy(outPass, _authPass, passLen - 1);
+            outPass[passLen - 1] = '\0';
+        }
+        xSemaphoreGive(_mutex);
+    }
+
+    const char* getAuthUser() const { return _authUser; }
+    const char* getAuthPass() const { return _authPass; }
+
+    bool checkAuth(const char* user, const char* pass) const {
+        if (!user || !pass) return false;
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        bool ok = (strcmp(user, _authUser) == 0 && strcmp(pass, _authPass) == 0);
+        xSemaphoreGive(_mutex);
+        return ok;
+    }
+
+    bool setAuth(const char* user, const char* pass) {
+        if (!user || strlen(user) < 1 || strlen(user) >= sizeof(_authUser)) return false;
+        if (!pass || strlen(pass) < 4 || strlen(pass) >= sizeof(_authPass)) return false;
+        xSemaphoreTake(_mutex, portMAX_DELAY);
+        strncpy(_authUser, user, sizeof(_authUser) - 1);
+        _authUser[sizeof(_authUser) - 1] = '\0';
+        strncpy(_authPass, pass, sizeof(_authPass) - 1);
+        _authPass[sizeof(_authPass) - 1] = '\0';
+        xSemaphoreGive(_mutex);
+
+        Preferences authPrefs;
+        if (authPrefs.begin("dsp_auth", false)) {
+            authPrefs.putString("user", user);
+            authPrefs.putString("pass", pass);
+            authPrefs.end();
+            return true;
+        }
+        return false;
+    }
+
 private:
     mutable SemaphoreHandle_t      _mutex;
+    char                           _authUser[32]{"admin"};
+    char                           _authPass[64]{"admin"};
     EQBandParams                   _eq[kEQBands];
     int                            _eqCount{5};
     bool                           _eqEnabled{false};

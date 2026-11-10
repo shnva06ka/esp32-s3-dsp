@@ -47,9 +47,6 @@ void setup()
 
     SystemMonitor::begin();
 
-    // Confirm healthy boot to OTA subsystem to cancel automatic rollback
-    esp_ota_mark_app_valid_cancel_rollback();
-
     g_params.begin();
     output_init(lINFO, OUTPUTBUF_SIZE, NULL);
 
@@ -116,9 +113,19 @@ static void webTask(void* /*pvParameters*/)
     static SlimprotoClient slimproto(g_params);
     slimproto.begin();
 
+    bool otaConfirmed = false;
+    uint32_t bootConfirmTimer = millis() + 5000;
+
     for (;;) {
         ui.loop();
         ResamplerTelemetry::poll();
+
+        if (!otaConfirmed && millis() >= bootConfirmTimer) {
+            esp_ota_mark_app_valid_cancel_rollback();
+            otaConfirmed = true;
+            Console.println("[OTA] Firmware verified healthy - rollback cancelled.");
+        }
+
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
