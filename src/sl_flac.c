@@ -38,6 +38,7 @@ static size_t _flac_read_cb(void *pUserData, void *buffer, size_t bytesToRead) {
     (void)pUserData;
     size_t totalRead = 0;
     uint8_t *dst = (uint8_t *)buffer;
+    unsigned wait_count = 0;
 
     while (bytesToRead > 0) {
         LOCK_S;
@@ -53,6 +54,7 @@ static size_t _flac_read_cb(void *pUserData, void *buffer, size_t bytesToRead) {
             dst += chunk;
             totalRead += chunk;
             bytesToRead -= chunk;
+            wait_count = 0;
             continue;
         }
         UNLOCK_S;
@@ -64,6 +66,11 @@ static size_t _flac_read_cb(void *pUserData, void *buffer, size_t bytesToRead) {
 
         if (!active || !decode_running) {
             // Truly at EOF
+            break;
+        }
+
+        if (++wait_count > 25) {
+            // Avoid deadlocking LOCK_D when stream stalls or LMS flushes
             break;
         }
 
@@ -296,7 +303,12 @@ struct codec *register_flac(void) {
         if (!s_outR) s_outR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
         if (!s_inL || !s_inR || !s_outL || !s_outR) {
+            if (s_inL)  { free(s_inL);  s_inL  = NULL; }
+            if (s_inR)  { free(s_inR);  s_inR  = NULL; }
+            if (s_outL) { free(s_outL); s_outL = NULL; }
+            if (s_outR) { free(s_outR); s_outR = NULL; }
             LOG_ERROR("FLAC resampler buffers allocation failed");
+            return NULL;
         }
     }
     return &flac_codec;

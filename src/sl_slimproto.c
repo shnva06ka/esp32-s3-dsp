@@ -189,8 +189,13 @@ static void sendHELO(bool reconnect, const u8_t mac[6]) {
     LOG_INFO("Sending HELO to LMS: MAC=%02X:%02X:%02X:%02X:%02X:%02X cap=%s",
              mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], cap);
 
-    slimproto_send_packet((const u8_t *)&pkt, sizeof(pkt));
-    slimproto_send_packet((const u8_t *)cap, strlen(cap));
+    u8_t buf[sizeof(pkt) + 256];
+    size_t cap_len = strlen(cap);
+    if (sizeof(pkt) + cap_len <= sizeof(buf)) {
+        memcpy(buf, &pkt, sizeof(pkt));
+        memcpy(buf + sizeof(pkt), cap, cap_len);
+        slimproto_send_packet(buf, sizeof(pkt) + cap_len);
+    }
 }
 
 static void sendSTAT(const char *event, u32_t server_timestamp) {
@@ -268,8 +273,12 @@ static void sendRESP(const char *header, size_t len) {
     pkt.length = htonl(sizeof(pkt) + len - 8);
 
     LOG_INFO("Sending RESP (%u bytes header)", len);
-    slimproto_send_packet((const u8_t *)&pkt, sizeof(pkt));
-    slimproto_send_packet((const u8_t *)header, len);
+    u8_t buf[sizeof(pkt) + MAX_HEADER];
+    if (sizeof(pkt) + len <= sizeof(buf)) {
+        memcpy(buf, &pkt, sizeof(pkt));
+        memcpy(buf + sizeof(pkt), header, len);
+        slimproto_send_packet(buf, sizeof(pkt) + len);
+    }
 }
 
 static void sendSETDName(const char *name) {
@@ -280,8 +289,13 @@ static void sendSETDName(const char *name) {
     pkt.length = htonl(sizeof(pkt) + strlen(name) + 1 - 8);
 
     LOG_INFO("Sending SETD player name: %s", name);
-    slimproto_send_packet((const u8_t *)&pkt, sizeof(pkt));
-    slimproto_send_packet((const u8_t *)name, strlen(name) + 1);
+    u8_t buf[sizeof(pkt) + 64];
+    size_t nlen = strlen(name) + 1;
+    if (sizeof(pkt) + nlen <= sizeof(buf)) {
+        memcpy(buf, &pkt, sizeof(pkt));
+        memcpy(buf + sizeof(pkt), name, nlen);
+        slimproto_send_packet(buf, sizeof(pkt) + nlen);
+    }
 }
 
 static void process_strm(u8_t *pkt, int len) {
@@ -302,10 +316,10 @@ static void process_strm(u8_t *pkt, int len) {
         break;
 
     case 'f': {
+        stream_disconnect();
         decode_flush(false);
         bool flushed = output_flush_streaming();
         (void)flushed;
-        stream_disconnect();
         sendSTAT("STMf", 0);
         buf_flush(streambuf);
         output.stop_time = gettime_ms();
@@ -313,10 +327,10 @@ static void process_strm(u8_t *pkt, int len) {
     }
 
     case 'q':
+        stream_disconnect();
         decode_flush(true);
         output_flush();
         status.frames_played = 0;
-        stream_disconnect();
         sendSTAT("STMf", 0);
         buf_flush(streambuf);
         output.stop_time = gettime_ms();
@@ -325,7 +339,7 @@ static void process_strm(u8_t *pkt, int len) {
     case 'p': {
         unsigned interval = unpackN(&strm->replay_gain);
         LOCK_O;
-        output.pause_frames = interval * status.current_sample_rate / 1000;
+        output.pause_frames = (unsigned)(((u64_t)interval * (u64_t)status.current_sample_rate) / 1000ULL);
         if (interval) {
             output.state = OUTPUT_PAUSE_FRAMES;
         } else if (output.state != OUTPUT_OFF) {
@@ -341,7 +355,7 @@ static void process_strm(u8_t *pkt, int len) {
     case 'a': {
         unsigned interval = unpackN(&strm->replay_gain);
         LOCK_O;
-        output.skip_frames = interval * status.current_sample_rate / 1000;
+        output.skip_frames = (unsigned)(((u64_t)interval * (u64_t)status.current_sample_rate) / 1000ULL);
         output.state = OUTPUT_SKIP_FRAMES;
         UNLOCK_O;
         LOG_INFO("Skip ahead interval: %u ms", interval);
@@ -360,6 +374,7 @@ static void process_strm(u8_t *pkt, int len) {
     }
 
     case 's': {
+        stream_disconnect();
         unsigned header_len = (unsigned)len - sizeof(struct strm_packet);
         if (header_len >= MAX_HEADER) {
             header_len = MAX_HEADER - 1;
@@ -411,7 +426,7 @@ static void process_strm(u8_t *pkt, int len) {
 }
 
 static void process_cont(u8_t *pkt, int len) {
-    (void)len;
+    if (len < (int)sizeof(struct cont_packet)) return;
     struct cont_packet *cont = (struct cont_packet *)pkt;
     cont->metaint = unpackN(&cont->metaint);
     LOG_INFO("Command cont metaint: %u", cont->metaint);
@@ -429,14 +444,14 @@ static void process_cont(u8_t *pkt, int len) {
 }
 
 static void process_codc(u8_t *pkt, int len) {
-    (void)len;
+    if (len < (int)sizeof(struct strm_packet)) return;
     struct strm_packet *codc = (struct strm_packet *)pkt;
     LOG_INFO("Command codc format: '%c'", codc->format);
     codec_open(codc->format, codc->pcm_sample_size, codc->pcm_sample_rate, codc->pcm_channels, codc->pcm_endianness);
 }
 
 static void process_audg(u8_t *pkt, int len) {
-    (void)len;
+    if (len < (int)sizeof(struct audg_packet)) return;
     struct audg_packet *audg = (struct audg_packet *)pkt;
     u32_t gL = unpackN(&audg->gainL);
     u32_t gR = unpackN(&audg->gainR);
@@ -444,7 +459,7 @@ static void process_audg(u8_t *pkt, int len) {
 }
 
 static void process_aude(u8_t *pkt, int len) {
-    (void)len;
+    if (len < (int)sizeof(struct aude_packet)) return;
     struct aude_packet *aude = (struct aude_packet *)pkt;
     LOG_INFO("Command aude enable_dac=%d enable_spdif=%d", aude->enable_dac, aude->enable_spdif);
     LOCK_O;
@@ -477,7 +492,7 @@ static void process_setd(u8_t *pkt, int len) {
 }
 
 static void process_serv(u8_t *pkt, int len) {
-    (void)len;
+    if (len < (int)sizeof(struct serv_packet)) return;
     struct serv_packet *serv = (struct serv_packet *)pkt;
     if (serv->server_ip != 0 && serv->server_ip != htonl(1)) {
         slimproto_ip = serv->server_ip;
@@ -780,7 +795,8 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
         strncpy(player_name, name, sizeof(player_name) - 1);
     }
     if (server && server[0]) {
-        slimproto_ip = inet_addr(server);
+        in_addr_t parsed = inet_addr(server);
+        slimproto_ip = (parsed != INADDR_NONE) ? parsed : 0;
     }
 
     if (!s_pktBuffer) {
@@ -790,6 +806,11 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
     if (!s_headerCopy) {
         s_headerCopy = (char *)heap_caps_malloc(MAX_HEADER, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!s_headerCopy) s_headerCopy = (char *)malloc(MAX_HEADER);
+    }
+
+    if (!s_pktBuffer || !s_headerCopy) {
+        LOG_ERROR("Failed allocating SlimProto packet buffers");
+        return;
     }
 
     _wake_create(&wake_e);

@@ -53,7 +53,10 @@ frames_t _output_frames(frames_t avail) {
 
     s32_t gainL = output.current_replay_gain ? gain(output.gainL, output.current_replay_gain) : output.gainL;
     s32_t gainR = output.current_replay_gain ? gain(output.gainR, output.current_replay_gain) : output.gainR;
-    if (output.invert) { gainL = -gainL; gainR = -gainR; }
+    if (output.invert) {
+        gainL = (gainL == -2147483647 - 1) ? 2147483647 : -gainL;
+        gainR = (gainR == -2147483647 - 1) ? 2147483647 : -gainR;
+    }
 
     frames = _buf_used(outputbuf) / BYTES_PER_FRAME;
 

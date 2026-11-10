@@ -52,15 +52,17 @@ void _buf_flush(struct buffer *buf) {
     if (!buf) return;
     buf->readp  = buf->buf;
     buf->writep = buf->buf;
+    buf->flush_seq++;
 }
 
 void buf_adjust(struct buffer *buf, size_t mod) {
-    if (!buf) return;
+    if (!buf || mod == 0) return;
     mutex_lock(buf->mutex);
-    buf->base_size = ((size_t)(buf->size / mod)) * mod;
+    size_t adjusted = ((size_t)(buf->base_size / mod)) * mod;
     buf->readp  = buf->writep = buf->buf;
-    buf->wrap   = buf->buf + buf->base_size;
-    buf->size   = buf->base_size;
+    buf->wrap   = buf->buf + adjusted;
+    buf->size   = adjusted;
+    buf->flush_seq++;
     mutex_unlock(buf->mutex);
 }
 

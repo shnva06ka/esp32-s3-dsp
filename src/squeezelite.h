@@ -108,6 +108,7 @@ struct buffer {
     size_t size;
     size_t base_size;
     mutex_type mutex;
+    volatile u32_t flush_seq;
 };
 
 unsigned _buf_used(struct buffer *buf);

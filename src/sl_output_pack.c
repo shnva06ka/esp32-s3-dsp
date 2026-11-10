@@ -27,7 +27,7 @@ void _apply_gain(struct buffer *outputbuf, frames_t count, s32_t gainL, s32_t ga
         ISAMPLE_T *ptrL = (ISAMPLE_T *)(void *)outputbuf->readp;
         ISAMPLE_T *ptrR = (ISAMPLE_T *)(void *)outputbuf->readp + 1;
         while (count--) {
-            *ptrL = *ptrR = (gain(gainL, *ptrL) + gain(gainR, *ptrR)) / 2;
+            *ptrL = *ptrR = (s32_t)(((int64_t)gain(gainL, *ptrL) + (int64_t)gain(gainR, *ptrR)) / 2);
             ptrL += 2; ptrR += 2;
         }
     } else if (flags & MONO_RIGHT) {
@@ -60,7 +60,10 @@ void _apply_cross(struct buffer *outputbuf, frames_t out_frames, s32_t cross_gai
         if (*cross_ptr >= (ISAMPLE_T *)(void *)outputbuf->wrap) {
             *cross_ptr -= outputbuf->size / sizeof(ISAMPLE_T);
         }
-        *ptr = gain(cross_gain_out, *ptr) + gain(cross_gain_in, **cross_ptr);
+        int64_t sum = (int64_t)gain(cross_gain_out, *ptr) + (int64_t)gain(cross_gain_in, **cross_ptr);
+        if (sum > 2147483647LL) sum = 2147483647LL;
+        else if (sum < -2147483648LL) sum = -2147483648LL;
+        *ptr = (s32_t)sum;
         ptr++;
         (*cross_ptr)++;
     }

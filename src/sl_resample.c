@@ -92,9 +92,10 @@ static float bessel_i0(float x) {
  * PSRAM is used strictly as a fallback.
  */
 static void *rs_alloc(size_t bytes, int *used_psram) {
-    void *p = heap_caps_aligned_alloc(16, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
+    void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!p) {
-        p = heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     }
     if (p) {
         if (used_psram && *used_psram == 0) *used_psram = 0;
@@ -102,9 +103,9 @@ static void *rs_alloc(size_t bytes, int *used_psram) {
     }
 
     /* Fallback to PSRAM */
-    p = heap_caps_aligned_alloc(16, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!p) {
-        p = heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     }
     if (p && used_psram) {
         *used_psram = 1;
@@ -233,7 +234,7 @@ int resampler_is_passthrough(const resampler_t *r) {
 
 size_t resampler_max_out(const resampler_t *r, size_t n_in) {
     if (!r || r->bypass) return n_in;
-    return (n_in * r->L + r->M - 1) / r->M + 2;
+    return (size_t)(((uint64_t)n_in * r->L + r->M - 1) / r->M + 2);
 }
 
 size_t resampler_in_for_out(const resampler_t *r, size_t out_frames) {
@@ -285,17 +286,20 @@ size_t resampler_process(resampler_t *r,
         pos += M;
     }
 
-    uint32_t consumed = (uint32_t)n_in * L;
+    uint32_t consumed_in = (pos / L);
+    if (consumed_in > (uint32_t)n_in) consumed_in = (uint32_t)n_in;
+    uint32_t consumed = consumed_in * L;
     r->pos = (pos >= consumed) ? (pos - consumed) : 0;
 
-    memcpy(r->histL, r->bufL + n_in, (T - 1) * sizeof(float));
-    memcpy(r->histR, r->bufR + n_in, (T - 1) * sizeof(float));
+    memcpy(r->histL, r->bufL + consumed_in, (T - 1) * sizeof(float));
+    memcpy(r->histR, r->bufR + consumed_in, (T - 1) * sizeof(float));
 
     int64_t t1 = esp_timer_get_time();
     uint32_t dur = (uint32_t)(t1 - t0);
 
     /* Telemetry update */
     r->seq++;
+    __sync_synchronize();
     r->total_calls++;
     r->in_frames_total += n_in;
     r->out_frames_total += produced;
@@ -325,6 +329,7 @@ size_t resampler_process(resampler_t *r,
 
     int64_t expected = (r->in_frames_total * (uint64_t)r->L) / r->M;
     r->frame_mismatch = (int32_t)((int64_t)r->out_frames_total - expected);
+    __sync_synchronize();
     r->seq++;
 
     return produced;
@@ -339,6 +344,7 @@ void resampler_get_stats(const resampler_t *r, resampler_stats_t *out) {
     int retries = 0;
     do {
         s1 = r->seq;
+        __sync_synchronize();
         out->in_rate              = r->in_rate;
         out->out_rate             = r->out_rate;
         out->ratio_L              = r->L;
@@ -361,6 +367,7 @@ void resampler_get_stats(const resampler_t *r, resampler_stats_t *out) {
         out->overruns             = r->overruns;
         out->buf_occupancy_frames = r->buf_occupancy_frames;
         out->buf_capacity_frames  = r->buf_capacity_frames;
+        __sync_synchronize();
         s2 = r->seq;
     } while ((s1 & 1 || s1 != s2) && ++retries < 5);
 }

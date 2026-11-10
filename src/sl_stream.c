@@ -13,10 +13,12 @@ struct streamstate stream;
 
 static sockfd fd = -1;
 static bool running = true;
+static volatile u32_t s_stream_gen = 0;
 static TaskHandle_t stream_task_handle = NULL;
 
 static void _disconnect(stream_state state, disconnect_code disconnect) {
     LOCK_S;
+    s_stream_gen++;
     stream.state = state;
     stream.disconnect = disconnect;
     if (fd >= 0) {
@@ -109,14 +111,19 @@ static void stream_task(void *arg) {
                             }
                             LOG_INFO("Error or socket closed reading HTTP headers: %s", n ? strerror(last_error()) : "closed");
                             UNLOCK_S;
-                            _disconnect(STOPPED, LOCAL_DISCONNECT);
+                            _disconnect(DISCONNECT, LOCAL_DISCONNECT);
                             LOCK_S;
                             break;
                         }
 
-                        if (stream.header_len < MAX_HEADER - 1) {
-                            stream.header[stream.header_len++] = c;
+                        if (stream.header_len >= MAX_HEADER - 1) {
+                            LOG_WARN("HTTP response headers exceeded MAX_HEADER (%d)", MAX_HEADER);
+                            UNLOCK_S;
+                            _disconnect(DISCONNECT, LOCAL_DISCONNECT);
+                            LOCK_S;
+                            break;
                         }
+                        stream.header[stream.header_len++] = c;
 
                         if ((stream.header_len >= 4 && !memcmp(stream.header + stream.header_len - 4, "\r\n\r\n", 4)) ||
                             (stream.header_len >= 2 && !memcmp(stream.header + stream.header_len - 2, "\n\n", 2))) {
@@ -136,6 +143,7 @@ static void stream_task(void *arg) {
                     LOCK_S;
                     cur_fd = fd;
                     space = _buf_space(streambuf);
+                    u32_t cur_gen = s_stream_gen;
                     UNLOCK_S;
 
                     if (cur_fd < 0 || space == 0) break;
@@ -146,7 +154,7 @@ static void stream_task(void *arg) {
                     if (n > 0) {
                         bool wake = false;
                         LOCK_S;
-                        if (fd >= 0) {
+                        if (fd >= 0 && fd == cur_fd && s_stream_gen == cur_gen) {
                             size_t written = 0;
                             while (written < (size_t)n) {
                                 size_t chunk = min((size_t)n - written, _buf_cont_write(streambuf));

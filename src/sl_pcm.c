@@ -108,9 +108,12 @@ static void _check_header(void) {
                 u32_t r     = (u32_t)ptr[12] | ((u32_t)ptr[13] << 8) | ((u32_t)ptr[14] << 16) | ((u32_t)ptr[15] << 24);
                 sample_size = ((u32_t)ptr[22] | ((u32_t)ptr[23] << 8)) / 8;
                 bigendian   = false;
+                if (channels < 1 || channels > 2) channels = 2;
+                if (sample_size < 1 || sample_size > 4) sample_size = 2;
                 if (r > 0 && r != pcm_sample_rate) {
                     _update_resampler(r);
                 }
+                sl_source_bits = sample_size * 8;
                 LOG_INFO("WAV fmt: %u ch, %u Hz, %u bytes/sample", channels, pcm_sample_rate, sample_size);
             }
 
@@ -128,28 +131,36 @@ static void _check_header(void) {
                 channels    = ((u32_t)ptr[8] << 8) | (u32_t)ptr[9];
                 sample_size = (((u32_t)ptr[14] << 8) | (u32_t)ptr[15]) / 8;
                 bigendian   = true;
+                if (channels < 1 || channels > 2) channels = 2;
+                if (sample_size < 1 || sample_size > 4) sample_size = 2;
+                sl_source_bits = sample_size * 8;
                 LOG_INFO("AIFF COMM: %u ch, %u bytes/sample", channels, sample_size);
             }
 
             if (format == AIFF && !memcmp(ptr, "SSND", 4) && bytes >= 16) {
                 unsigned offset = ((u32_t)ptr[8] << 24) | ((u32_t)ptr[9] << 16) | ((u32_t)ptr[10] << 8) | (u32_t)ptr[11];
                 ptr += 16;
-                _buf_inc_readp(streambuf, (unsigned)(ptr + offset - streambuf->readp));
-                audio_left = len - 8 - offset;
-                limit = true;
-                LOG_INFO("AIFF SSND chunk: %u bytes", audio_left);
-                header_checked = true;
-                return;
+                unsigned skip_ssnd = (unsigned)(ptr + offset - streambuf->readp);
+                if (len >= 8 + offset && skip_ssnd <= _buf_used(streambuf)) {
+                    _buf_inc_readp(streambuf, skip_ssnd);
+                    audio_left = len - 8 - offset;
+                    limit = true;
+                    LOG_INFO("AIFF SSND chunk: %u bytes", audio_left);
+                    header_checked = true;
+                    return;
+                }
             }
 
-            unsigned skip = 8 + len;
+            uint64_t skip = 8ULL + (uint64_t)len;
             if (skip > bytes) break;
-            ptr += skip;
-            bytes -= skip;
+            ptr += (size_t)skip;
+            bytes -= (size_t)skip;
         }
     }
 
-    header_checked = true;
+    if (format == UNKNOWN || _buf_used(streambuf) > 4096) {
+        header_checked = true;
+    }
 }
 
 static decode_state pcm_decode(void) {
@@ -217,10 +228,22 @@ static decode_state pcm_decode(void) {
         return DECODE_RUNNING;
     }
 
-    const u8_t *iptr = streambuf->readp;
-    const u8_t *in_start = iptr;
+    static u8_t s_rawIn[RS_MAX_IN * 8];
+    unsigned consumed = frames * bytes_per_frame;
+    if (consumed > sizeof(s_rawIn)) {
+        frames = sizeof(s_rawIn) / bytes_per_frame;
+        consumed = frames * bytes_per_frame;
+    }
+
+    memcpy(s_rawIn, streambuf->readp, consumed);
+    _buf_inc_readp(streambuf, consumed);
+    if (limit && audio_left >= consumed) {
+        audio_left -= consumed;
+    }
+    u32_t out_seq = outputbuf->flush_seq;
     UNLOCK_S;
 
+    const u8_t *iptr = s_rawIn;
     static const float kScale32 = 1.0f / 2147483648.0f;
 
     for (frames_t i = 0; i < frames; ++i) {
@@ -294,36 +317,24 @@ static decode_state pcm_decode(void) {
 
     if (out_frames > 0 && writeL && writeR) {
         LOCK_O;
-        ISAMPLE_T *optr = (ISAMPLE_T *)(void *)outputbuf->writep;
-        ISAMPLE_T *buf_start = (ISAMPLE_T *)(void *)outputbuf->buf;
-        ISAMPLE_T *buf_wrap  = (ISAMPLE_T *)(void *)outputbuf->wrap;
+        if (outputbuf->flush_seq == out_seq) {
+            ISAMPLE_T *optr = (ISAMPLE_T *)(void *)outputbuf->writep;
+            ISAMPLE_T *buf_start = (ISAMPLE_T *)(void *)outputbuf->buf;
+            ISAMPLE_T *buf_wrap  = (ISAMPLE_T *)(void *)outputbuf->wrap;
 
-        for (size_t i = 0; i < out_frames; ++i) {
-            float l = fmaxf(-1.0f, fminf(1.0f, writeL[i]));
-            float r = fmaxf(-1.0f, fminf(1.0f, writeR[i]));
-            *optr++ = (s32_t)(l * 2147483392.0f);
-            *optr++ = (s32_t)(r * 2147483392.0f);
-            if (optr >= buf_wrap) {
-                optr = buf_start;
+            for (size_t i = 0; i < out_frames; ++i) {
+                float l = fmaxf(-1.0f, fminf(1.0f, writeL[i]));
+                float r = fmaxf(-1.0f, fminf(1.0f, writeR[i]));
+                *optr++ = (s32_t)(l * 2147483392.0f);
+                *optr++ = (s32_t)(r * 2147483392.0f);
+                if (optr >= buf_wrap) {
+                    optr = buf_start;
+                }
             }
+            _buf_inc_writep(outputbuf, (unsigned)out_frames * BYTES_PER_FRAME);
         }
-        _buf_inc_writep(outputbuf, (unsigned)out_frames * BYTES_PER_FRAME);
         UNLOCK_O;
     }
-
-    unsigned consumed = frames * bytes_per_frame;
-
-    // Commit. If a flush reset either buffer while converting, drop the result.
-    LOCK_S;
-    if (streambuf->readp != in_start) {
-        UNLOCK_S;
-        return DECODE_RUNNING;
-    }
-    _buf_inc_readp(streambuf, consumed);
-    if (limit && audio_left >= consumed) {
-        audio_left -= consumed;
-    }
-    UNLOCK_S;
 
     if (limit && audio_left == 0) {
         return DECODE_COMPLETE;
@@ -333,8 +344,10 @@ static decode_state pcm_decode(void) {
 }
 
 static void pcm_open(u8_t size, u8_t rate, u8_t chan, u8_t endianness) {
-    sample_size = size - '0' + 1;
     channels    = (chan >= '1') ? (chan - '0') : 2;
+    if (channels < 1 || channels > 2) channels = 2;
+    sample_size = size - '0' + 1;
+    if (sample_size < 1 || sample_size > 4) sample_size = 2;
     bigendian   = (endianness == '0');
 
     limit = false;
@@ -390,7 +403,12 @@ struct codec *register_pcm(void) {
         if (!s_pcmOutR) s_pcmOutR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 
         if (!s_pcmInL || !s_pcmInR || !s_pcmOutL || !s_pcmOutR) {
+            if (s_pcmInL)  { free(s_pcmInL);  s_pcmInL  = NULL; }
+            if (s_pcmInR)  { free(s_pcmInR);  s_pcmInR  = NULL; }
+            if (s_pcmOutL) { free(s_pcmOutL); s_pcmOutL = NULL; }
+            if (s_pcmOutR) { free(s_pcmOutR); s_pcmOutR = NULL; }
             LOG_ERROR("PCM resampler buffers allocation failed");
+            return NULL;
         }
     }
     return &pcm_codec;
