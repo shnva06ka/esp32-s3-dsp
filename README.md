@@ -43,10 +43,24 @@ Connect to this access point and open `http://dsp.local` to access the web UI.
 ### Build & Flash
 
 ```bash
-pio run -e yd_esp32s3_n16r8 -t upload   # ESP32-S3
-pio run -e wroom_bt -t upload           # ESP32-WROOM Bluetooth bridge
-pio device monitor -e yd_esp32s3_n16r8  # serial monitor
+pio run -e yd_esp32s3_n16r8              # Compile ESP32-S3 firmware
+pio run -e yd_esp32s3_n16r8 -t upload   # Flash to ESP32-S3 (when connected)
+pio run -e wroom_bt -t upload           # Flash ESP32-WROOM Bluetooth bridge
+pio test -e yd_esp32s3_n16r8 --without-uploading --without-testing # Run test suite
+pio device monitor -e yd_esp32s3_n16r8  # Serial monitor
 ```
+
+## Security & LAN-Only Architecture
+
+- **100% LAN-Only Operation**: Designed strictly for private local networks. No external cloud endpoints, external telemetry, or internet access is required or attempted.
+- **Access Control**: Administrative endpoints (`/update`, `/api/reboot`, `/console`, `/api/logs`) are protected by HTTP Basic Authentication.
+  - **Default Credentials**: Username `admin`, Password `admin`.
+  - **Change Password**: Update credentials via `POST /api/auth` or the Settings card in the Web UI. Credentials are encrypted and persisted in NVS (`dsp_auth`).
+- **OTA Safety & Anti-Brick Protection**:
+  - Dual 6.25 MB partition layout (`app0` and `app1`) with ESP-IDF hardware bootloader rollback support.
+  - Binary header validation (0xE9 magic byte check) prevents flashing corrupted images.
+  - Rollback cancellation is deferred for 5 seconds of healthy system runtime after boot. If a watchdog reset or crash occurs during initial startup, the device automatically reverts to the previous working partition.
+  - ArduinoOTA network flashing requires an NVS password and is automatically disabled when operating in Access Point (AP) mode.
 
 ## Architecture
 
