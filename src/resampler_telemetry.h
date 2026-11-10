@@ -71,17 +71,17 @@ public:
         d.resetReason = getResetReasonString();
         d.temperatureC = temperatureRead();
 
-        if (_s().btTask) {
+        if (_s().btTask && eTaskGetState(_s().btTask) != eDeleted) {
             d.btStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(_s().btTask) * sizeof(StackType_t);
         }
-        if (_s().audioTask) {
+        if (_s().audioTask && eTaskGetState(_s().audioTask) != eDeleted) {
             d.audioStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(_s().audioTask) * sizeof(StackType_t);
         }
-        if (_s().webTask) {
+        if (_s().webTask && eTaskGetState(_s().webTask) != eDeleted) {
             d.webStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(_s().webTask) * sizeof(StackType_t);
         }
         TaskHandle_t dec = _s().decodeTask ? _s().decodeTask : sl_decode_task_handle();
-        if (dec) {
+        if (dec && eTaskGetState(dec) != eDeleted) {
             d.decodeStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(dec) * sizeof(StackType_t);
         }
         return d;

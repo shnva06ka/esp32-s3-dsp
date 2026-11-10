@@ -1232,6 +1232,23 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
   display: block;
 }
 
+:root:not([data-theme="dark"]) .band-type-dropdown {
+  background: #FFFFFF;
+  border-color: #D8DEE9;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+:root:not([data-theme="dark"]) .band-menu-opt {
+  color: #2E3440;
+}
+:root:not([data-theme="dark"]) .band-menu-opt:hover {
+  background: #ECEFF4;
+  color: #2E3440;
+}
+:root:not([data-theme="dark"]) .band-menu-opt.selected {
+  color: #5E81AC;
+  font-weight: 800;
+}
+
 body.is-scrubbing-val,
 body.is-scrubbing-val * {
   cursor: ns-resize !important;
@@ -3483,21 +3500,23 @@ function renderCustomPresets() {
         updatePreampUI();
         wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
       }
-      bands = p.bands.map((b, i) => {
-        let t = b.type || 0;
-        let ord = b.order || 2;
-        if (t === 5) { t = 3; ord = 4; }
-        else if (t === 6) { t = 4; ord = 4; }
-        return {
-          band: i,
-          freq: b.freq,
-          gain: b.gain,
-          q: b.q,
-          type: t,
-          order: ord,
-          enabled: b.enabled !== undefined ? b.enabled : true
-        };
-      });
+      if (Array.isArray(p.bands)) {
+        bands = p.bands.map((b, i) => {
+          let t = b.type || 0;
+          let ord = b.order || 2;
+          if (t === 5) { t = 3; ord = 4; }
+          else if (t === 6) { t = 4; ord = 4; }
+          return {
+            band: i,
+            freq: b.freq,
+            gain: b.gain,
+            q: b.q,
+            type: t,
+            order: ord,
+            enabled: b.enabled !== undefined ? b.enabled : true
+          };
+        });
+      }
       renderCustomPresets();
       rebuildBandsUI();
       drawResponse();
@@ -3713,6 +3732,7 @@ let compKnobs = {};
 let limKnobs  = {};
 
 let ws = null, wsRetry = null;
+let wsBackoffMs = 1000;
 
 function wsConnect() {
   clearTimeout(wsRetry);
@@ -3721,22 +3741,29 @@ function wsConnect() {
   try {
     ws = new WebSocket(proto + '//' + location.host + '/ws');
     ws.onopen = () => {
+      wsBackoffMs = 1000;
       setDot('ok', 'Connected');
       wsTx({ t: 'getState' });
     };
     ws.onclose = () => {
       setDot('err', 'Reconnecting...');
       ws = null;
-      wsRetry = setTimeout(wsConnect, 1500);
+      const jitter = Math.floor(Math.random() * 500);
+      const delay = Math.min(10000, wsBackoffMs) + jitter;
+      wsBackoffMs = Math.min(10000, wsBackoffMs * 1.5);
+      wsRetry = setTimeout(wsConnect, delay);
     };
     ws.onerror = () => {
       setDot('err', 'Error');
     };
     ws.onmessage = e => {
-      try { handleMsg(JSON.parse(e.data)); } catch (_) {}
+      try { handleMsg(JSON.parse(e.data)); } catch (err) { console.error('[WS] Parse error:', err); }
     };
   } catch (e) {
     setDot('err', 'Connection Error');
+    const delay = Math.min(10000, wsBackoffMs);
+    wsBackoffMs = Math.min(10000, wsBackoffMs * 1.5);
+    wsRetry = setTimeout(wsConnect, delay);
   }
 }
 
@@ -3828,11 +3855,12 @@ function handleMsg(d) {
         const strong = document.createElement('strong');
         strong.textContent = d.ssid || '';
         const link = document.createElement('a');
-        link.href = 'http://dsp.local';
+        const targetUrl = d.ip ? `http://${d.ip}` : (location.origin || 'http://dsp.local');
+        link.href = targetUrl;
         link.target = '_blank';
         link.rel = 'noopener';
         link.className = 'wifi-link';
-        link.textContent = 'http://dsp.local';
+        link.textContent = targetUrl;
         statusMsg.append('Connected to ', strong, ` · ${d.ip || ''} · `, link);
       }
       setWiFiBadges('wifi-cfg-badge', `Connected: ${d.ssid || d.ip || 'OK'}`);

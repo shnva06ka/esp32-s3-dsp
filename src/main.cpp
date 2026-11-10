@@ -11,6 +11,7 @@
 #include "resampler_telemetry.h"
 #include "wireless_console.h"
 #include <esp_ota_ops.h>
+#include <esp_task_wdt.h>
 
 static void audioTask(void* pvParameters);
 static void webTask(void* pvParameters);
@@ -52,6 +53,8 @@ void setup()
 
     Console.println("[RESAMPLE] Running quick arbitrary-rate resampler self-test...");
     resampler_run_self_test();
+
+    esp_task_wdt_init(10, true);
 
     xTaskCreatePinnedToCore(
         audioTask,
@@ -96,10 +99,13 @@ static void audioTask(void* /*pvParameters*/)
     static DSPPipeline dsp(g_params);
     Console.println("[AUDIO] DSP Pipeline active on Core 1");
 
+    esp_task_wdt_add(nullptr);
+
     for (;;) {
         g_audio.process([&](float* left, float* right, size_t frames) {
             dsp.process(left, right, frames);
         });
+        esp_task_wdt_reset();
     }
 }
 
@@ -112,6 +118,8 @@ static void webTask(void* /*pvParameters*/)
     Console.println("[NET] Starting Squeezelite / SlimProto Wi-Fi streaming client on Core 0...");
     static SlimprotoClient slimproto(g_params);
     slimproto.begin();
+
+    esp_task_wdt_add(nullptr);
 
     bool otaConfirmed = false;
     uint32_t bootConfirmTimer = millis() + 5000;
@@ -126,6 +134,7 @@ static void webTask(void* /*pvParameters*/)
             Console.println("[OTA] Firmware verified healthy - rollback cancelled.");
         }
 
+        esp_task_wdt_reset();
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
