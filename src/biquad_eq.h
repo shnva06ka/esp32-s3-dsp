@@ -38,14 +38,42 @@ public:
 
     void process(float* left, float* right, size_t frames, int numBands = kEQBands) {
         if (numBands > kEQBands) numBands = kEQBands;
+        for (size_t i = 0; i < frames; ++i) {
+            if (!std::isfinite(left[i]))  left[i]  = 0.0f;
+            if (!std::isfinite(right[i])) right[i] = 0.0f;
+        }
         for (int b = 0; b < numBands; ++b) {
             if (!_enabled[b]) continue;
 #if defined(HAVE_ESP_DSP)
             dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[b][0], _zL[b][0]);
             dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[b][0], _zR[b][0]);
+            if (!std::isfinite(_zL[b][0][0]) || !std::isfinite(_zL[b][0][1])) {
+                _zL[b][0][0] = 0.0f; _zL[b][0][1] = 0.0f;
+            } else {
+                if (fabsf(_zL[b][0][0]) < 1e-15f) _zL[b][0][0] = 0.0f;
+                if (fabsf(_zL[b][0][1]) < 1e-15f) _zL[b][0][1] = 0.0f;
+            }
+            if (!std::isfinite(_zR[b][0][0]) || !std::isfinite(_zR[b][0][1])) {
+                _zR[b][0][0] = 0.0f; _zR[b][0][1] = 0.0f;
+            } else {
+                if (fabsf(_zR[b][0][0]) < 1e-15f) _zR[b][0][0] = 0.0f;
+                if (fabsf(_zR[b][0][1]) < 1e-15f) _zR[b][0][1] = 0.0f;
+            }
             if (_hasSecondStage[b]) {
                 dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[b][1], _zL[b][1]);
                 dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[b][1], _zR[b][1]);
+                if (!std::isfinite(_zL[b][1][0]) || !std::isfinite(_zL[b][1][1])) {
+                    _zL[b][1][0] = 0.0f; _zL[b][1][1] = 0.0f;
+                } else {
+                    if (fabsf(_zL[b][1][0]) < 1e-15f) _zL[b][1][0] = 0.0f;
+                    if (fabsf(_zL[b][1][1]) < 1e-15f) _zL[b][1][1] = 0.0f;
+                }
+                if (!std::isfinite(_zR[b][1][0]) || !std::isfinite(_zR[b][1][1])) {
+                    _zR[b][1][0] = 0.0f; _zR[b][1][1] = 0.0f;
+                } else {
+                    if (fabsf(_zR[b][1][0]) < 1e-15f) _zR[b][1][0] = 0.0f;
+                    if (fabsf(_zR[b][1][1]) < 1e-15f) _zR[b][1][1] = 0.0f;
+                }
             }
 #else
             _processStage(left, right, frames, _coeffs[b][0], _zL[b][0], _zR[b][0]);

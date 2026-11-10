@@ -28,12 +28,41 @@ public:
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
+        for (size_t i = 0; i < frames; ++i) {
+            if (!std::isfinite(left[i]))  left[i]  = 0.0f;
+            if (!std::isfinite(right[i])) right[i] = 0.0f;
+        }
+
 #if defined(HAVE_ESP_DSP)
         dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[0], _zL[0]);
         dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[0], _zR[0]);
+        if (!std::isfinite(_zL[0][0]) || !std::isfinite(_zL[0][1])) {
+            _zL[0][0] = 0.0f; _zL[0][1] = 0.0f;
+        } else {
+            if (fabsf(_zL[0][0]) < 1e-15f) _zL[0][0] = 0.0f;
+            if (fabsf(_zL[0][1]) < 1e-15f) _zL[0][1] = 0.0f;
+        }
+        if (!std::isfinite(_zR[0][0]) || !std::isfinite(_zR[0][1])) {
+            _zR[0][0] = 0.0f; _zR[0][1] = 0.0f;
+        } else {
+            if (fabsf(_zR[0][0]) < 1e-15f) _zR[0][0] = 0.0f;
+            if (fabsf(_zR[0][1]) < 1e-15f) _zR[0][1] = 0.0f;
+        }
         if (_hasSecondStage) {
             dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[1], _zL[1]);
             dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[1], _zR[1]);
+            if (!std::isfinite(_zL[1][0]) || !std::isfinite(_zL[1][1])) {
+                _zL[1][0] = 0.0f; _zL[1][1] = 0.0f;
+            } else {
+                if (fabsf(_zL[1][0]) < 1e-15f) _zL[1][0] = 0.0f;
+                if (fabsf(_zL[1][1]) < 1e-15f) _zL[1][1] = 0.0f;
+            }
+            if (!std::isfinite(_zR[1][0]) || !std::isfinite(_zR[1][1])) {
+                _zR[1][0] = 0.0f; _zR[1][1] = 0.0f;
+            } else {
+                if (fabsf(_zR[1][0]) < 1e-15f) _zR[1][0] = 0.0f;
+                if (fabsf(_zR[1][1]) < 1e-15f) _zR[1][1] = 0.0f;
+            }
         }
 #else
         _processStage(left, right, frames, _coeffs[0], _zL[0], _zR[0]);
@@ -47,13 +76,23 @@ private:
     static inline void _processStage(float* left, float* right, size_t frames,
                                      const float* c, float* wL, float* wR) {
         for (size_t i = 0; i < frames; ++i) {
-            float d0L = left[i] - c[3] * wL[0] - c[4] * wL[1];
-            left[i]   = c[0] * d0L + c[1] * wL[0] + c[2] * wL[1];
+            float inL = left[i];
+            if (!std::isfinite(inL)) inL = 0.0f;
+            float d0L = inL - c[3] * wL[0] - c[4] * wL[1];
+            if (fabsf(d0L) < 1e-15f) d0L = 0.0f;
+            float outL = c[0] * d0L + c[1] * wL[0] + c[2] * wL[1];
+            if (!std::isfinite(outL)) { outL = 0.0f; d0L = 0.0f; wL[0] = 0.0f; wL[1] = 0.0f; }
+            left[i]   = outL;
             wL[1] = wL[0];
             wL[0] = d0L;
 
-            float d0R = right[i] - c[3] * wR[0] - c[4] * wR[1];
-            right[i]  = c[0] * d0R + c[1] * wR[0] + c[2] * wR[1];
+            float inR = right[i];
+            if (!std::isfinite(inR)) inR = 0.0f;
+            float d0R = inR - c[3] * wR[0] - c[4] * wR[1];
+            if (fabsf(d0R) < 1e-15f) d0R = 0.0f;
+            float outR = c[0] * d0R + c[1] * wR[0] + c[2] * wR[1];
+            if (!std::isfinite(outR)) { outR = 0.0f; d0R = 0.0f; wR[0] = 0.0f; wR[1] = 0.0f; }
+            right[i]  = outR;
             wR[1] = wR[0];
             wR[0] = d0R;
         }

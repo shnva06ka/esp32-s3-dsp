@@ -82,6 +82,11 @@ public:
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
+        for (size_t i = 0; i < frames; ++i) {
+            if (!std::isfinite(left[i]))  left[i]  = 0.0f;
+            if (!std::isfinite(right[i])) right[i] = 0.0f;
+        }
+
         _subsonic.process(left, right, frames);
 
 #if defined(HAVE_ESP_DSP)
