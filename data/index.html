@@ -787,7 +787,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 }
 .preset-modal-footer {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   padding: 12px;
   border-top: 1px solid var(--border);
@@ -2854,6 +2854,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
       <div class="preset-modal-footer">
         <button type="button" class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
         <button type="button" class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
+        <button type="button" class="btn-preset-action" onclick="exportPresetFile()" title="Download preset config file">Export</button>
       </div>
     </div>
   </div>
@@ -3401,13 +3402,9 @@ function applyPreset(name) {
   bands.forEach((_, i) => sendBand(i));
 }
 
-function saveCurrentPreset() {
-  const defaultName = `Preset ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-  const name = prompt("Enter preset name:", defaultName);
-  if (!name || !name.trim()) return;
-
-  const presetData = {
-    name: name.trim(),
+function buildEqPresetPayload(name) {
+  return {
+    name: name,
     preamp: eqPreamp,
     bands: bands.map(b => ({
       freq: b.freq,
@@ -3418,31 +3415,44 @@ function saveCurrentPreset() {
       enabled: b.enabled !== undefined ? b.enabled : true
     }))
   };
+}
+
+function saveCurrentPreset() {
+  const defaultName = `Preset ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+  const name = prompt("Enter preset name:", defaultName);
+  if (!name || !name.trim()) return;
+
+  const trimmed = name.trim();
+  const presetData = buildEqPresetPayload(trimmed);
 
   let customPresets = [];
   try {
     customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
   } catch (_) { customPresets = []; }
 
-  const existingIdx = customPresets.findIndex(p => p.name.toLowerCase() === name.trim().toLowerCase());
+  const existingIdx = customPresets.findIndex(p => p.name.toLowerCase() === trimmed.toLowerCase());
   if (existingIdx >= 0) {
     customPresets[existingIdx] = presetData;
   } else {
     customPresets.push(presetData);
   }
   localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
-  currentPreset = name.trim();
+  currentPreset = trimmed;
   renderCustomPresets();
+}
 
+function exportPresetFile() {
+  const presetLabel = BUILTIN_PRESET_LABELS[currentPreset] || currentPreset || 'eq_preset';
+  const presetData = buildEqPresetPayload(presetLabel);
   const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${name.trim().replace(/[^a-zA-Z0-9_-]/g, '_')}_preset.json`;
+  a.download = `${presetLabel.replace(/[^a-zA-Z0-9_-]/g, '_')}_preset.json`;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function importPresetFile(event) {
@@ -3452,7 +3462,8 @@ function importPresetFile(event) {
   const reader = new FileReader();
   reader.onload = (e) => {
     try {
-      const data = JSON.parse(e.target.result);
+      const raw = JSON.parse(e.target.result);
+      const data = (raw && raw.eq && Array.isArray(raw.eq.bands)) ? raw.eq : raw;
       if (!data || !Array.isArray(data.bands) || data.bands.length === 0) {
         alert("Invalid preset file: missing bands data.");
         return;
@@ -3470,7 +3481,6 @@ function importPresetFile(event) {
         if (t === 5) { t = 3; ord = 4; }
         else if (t === 6) { t = 4; ord = 4; }
         if (ord < 2 || ord > 4) ord = 2;
-        if (ord < 2 || ord > 4) ord = 2;
         return {
           band: idx,
           freq: parseFloat(b.freq) || 1000,
@@ -3482,7 +3492,7 @@ function importPresetFile(event) {
         };
       });
 
-      const presetName = data.name || file.name.replace(/\.[^/.]+$/, "");
+      const presetName = (raw && raw.name) || file.name.replace(/\.[^/.]+$/, "");
       let customPresets = [];
       try {
         customPresets = JSON.parse(localStorage.getItem('esp32_dsp_custom_presets') || '[]');
