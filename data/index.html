@@ -1093,23 +1093,24 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
 }
 
 @keyframes band-enter-row {
-  0% { opacity: 0; transform: translateY(-8px) scale(0.985); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateY(-6px) scale(0.985); max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-width: 0; padding-top: 0; padding-bottom: 0; }
+  100% { opacity: 1; transform: translateY(0) scale(1); max-height: 44px; min-height: 44px; height: 44px; margin-top: 0; border-width: 2px; padding-top: 0; padding-bottom: 0; }
 }
 @keyframes band-exit-row {
   0% { opacity: 1; transform: scale(1); max-height: 44px; }
   100% { opacity: 0; transform: scale(0.97); max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-width: 0; padding-top: 0; padding-bottom: 0; }
 }
 @keyframes band-enter-card {
-  0% { opacity: 0; transform: scale(0.88); }
-  100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: scale(0.9); width: 0; min-width: 0; max-width: 0; flex-basis: 0; margin-left: -12px; padding-left: 0; padding-right: 0; border-width: 0; }
+  100% { opacity: 1; transform: scale(1); width: 175px; min-width: 175px; max-width: 175px; flex-basis: 175px; margin-left: 0; padding-left: 8px; padding-right: 8px; border-width: 3px; }
 }
 @keyframes band-exit-card {
   0% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(0.82); width: 0; min-width: 0; max-width: 0; flex-basis: 0; margin-left: -8px; padding-left: 0; padding-right: 0; border-width: 0; }
 }
 .band-card.eq-row-desktop.band-enter-anim {
-  animation: band-enter-row 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: band-enter-row 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
 }
 .band-card.eq-row-desktop.band-exit-anim {
   animation: band-exit-row 0.18s ease-in forwards;
@@ -1117,7 +1118,8 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
   pointer-events: none;
 }
 .band-card:not(.eq-row-desktop).band-enter-anim {
-  animation: band-enter-card 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: band-enter-card 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
 }
 .band-card:not(.eq-row-desktop).band-exit-anim {
   animation: band-exit-card 0.18s ease-in forwards;
@@ -5600,6 +5602,11 @@ function rebuildBandsUI(opts = {}) {
       const row = document.createElement('div');
       row.className = 'band-card eq-row-desktop' + (b.enabled ? '' : ' band-bypassed') + (opts.enteringIndex === i ? ' band-enter-anim' : '');
       row.id = `band-card-${i}`;
+      if (opts.enteringIndex === i) {
+        row.addEventListener('animationend', (e) => {
+          if (e.target === row) row.classList.remove('band-enter-anim');
+        }, { once: true });
+      }
 
       row.innerHTML = `
         <div class="band-dragger-titlebar eq-row-dragger" id="band-dragger-${i}" title="Drag to reorder band">
@@ -5844,6 +5851,11 @@ function rebuildBandsUI(opts = {}) {
     const card = document.createElement('div');
     card.className = 'band-card' + (b.enabled ? '' : ' band-bypassed') + (selectedBandIndices.has(i) ? ' selected' : '') + (opts.enteringIndex === i ? ' band-enter-anim' : '');
     card.id = `band-card-${i}`;
+    if (opts.enteringIndex === i) {
+      card.addEventListener('animationend', (e) => {
+        if (e.target === card) card.classList.remove('band-enter-anim');
+      }, { once: true });
+    }
 
     card.addEventListener('click', (e) => {
       if (isSelectMode) {
