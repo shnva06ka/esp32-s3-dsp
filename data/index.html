@@ -3733,9 +3733,70 @@ let limKnobs  = {};
 
 let ws = null, wsRetry = null;
 let wsBackoffMs = 1000;
+const isMockMode = (location.protocol === 'file:') || (new URLSearchParams(location.search).get('mock') === '1');
+let mockSysTimer = null;
+let mockSsid = 'Mock-DSP (Offline)';
+
+function startMockMode() {
+  clearTimeout(wsRetry);
+  setDot('ok', 'Mock Mode');
+  handleMsg({
+    t: 'state',
+    input: { source: selectedInputSource, active: activeInputSource },
+    eq: {
+      enabled: true,
+      preamp: eqPreamp,
+      count: bands.length,
+      bands: bands.map((b, i) => ({
+        band: i, freq: b.freq, gain: b.gain, q: b.q,
+        type: b.type, order: b.order || 2, enabled: b.enabled !== false
+      }))
+    },
+    subsonic: Object.assign({}, subsonicParams, { enabled: true, freq: 60.0 }),
+    compander: Object.assign({}, compParams),
+    limiter: Object.assign({}, limParams, { enabled: true, ceiling: -1.0 }),
+    boot_defaults: { custom: false, eq: true, sub: true, subsonic: true, comp: false, lim: true },
+    module_order: ['eq', 'comp', 'lim', 'subsonic'],
+    wifi_stream: {
+      server: 'SlimProto (Mock)',
+      server_ip: '192.168.1.28',
+      format: '96.0 kHz 24-bit FLAC',
+      connected: true,
+      streaming: false,
+      paused: true,
+      rate: 96000,
+      bits: 24
+    },
+    sys: {
+      cpu0: 14.2, cpu1: 31.8,
+      heap_u: 55000, heap_t: 312380,
+      flash_u: 1263661, flash_t: 6553600,
+      wifi_ssid: mockSsid, wifi_con: true
+    }
+  });
+  if (!mockSysTimer) {
+    mockSysTimer = setInterval(() => {
+      handleMsg({
+        t: 'sys',
+        cpu0: 12 + Math.random() * 6,
+        cpu1: 28 + Math.random() * 7,
+        heap_u: 54000 + Math.floor(Math.random() * 2000),
+        heap_t: 312380,
+        flash_u: 1263661,
+        flash_t: 6553600,
+        wifi_ssid: mockSsid,
+        wifi_con: true
+      });
+    }, 1500);
+  }
+}
 
 function wsConnect() {
   clearTimeout(wsRetry);
+  if (isMockMode) {
+    startMockMode();
+    return;
+  }
 
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   try {
@@ -3768,6 +3829,30 @@ function wsConnect() {
 }
 
 function wsTx(obj) {
+  if (isMockMode) {
+    console.debug('[MOCK WS TX]', obj);
+    if (obj && obj.t === 'input_source') {
+      const isWifi = (obj.source === 3);
+      handleMsg({
+        t: 'wifi_meta',
+        server: 'SlimProto (Mock)',
+        server_ip: '192.168.1.28',
+        format: isWifi ? '96.0 kHz 24-bit FLAC' : 'Idle',
+        connected: true,
+        streaming: isWifi,
+        paused: !isWifi,
+        rate: 96000,
+        bits: 24
+      });
+    } else if (obj && obj.t === 'wifi_save') {
+      handleMsg({ t: 'wifi_status', status: 'connecting', msg: 'Initiating Wi-Fi connection (Mock)...' });
+      setTimeout(() => {
+        mockSsid = (obj.ssid || 'Mock-WiFi') + ' (Offline)';
+        handleMsg({ t: 'wifi_status', status: 'connected', ssid: obj.ssid, ip: '192.168.1.19' });
+      }, 500);
+    }
+    return;
+  }
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(obj));
   }
@@ -7168,16 +7253,18 @@ function submitWiFiConfig() {
 
   wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
 
-  try {
-    const params = new URLSearchParams();
-    params.append('ssid', ssid);
-    params.append('pass', pass);
-    fetch('/api/wifi', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    }).catch(() => {});
-  } catch (_) {}
+  if (!isMockMode) {
+    try {
+      const params = new URLSearchParams();
+      params.append('ssid', ssid);
+      params.append('pass', pass);
+      fetch('/api/wifi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      }).catch(() => {});
+    } catch (_) {}
+  }
 }
 
 wsConnect();
