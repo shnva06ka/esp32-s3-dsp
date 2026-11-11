@@ -630,7 +630,7 @@ private:
         p.gain = _clamp(p.gain, -18.0f,  18.0f);
         p.q    = _clamp(p.q,     0.05f,   10.0f);
         p.freq = _clamp(p.freq,  20.0f,  20000.0f);
-        if (p.order < 1 || p.order > 4) p.order = 2;
+        if (p.order < 2 || p.order > 4) p.order = 2;
         if (p.type == 5) {
             p.type  = EQ_FILTER_LOW_PASS;
             p.order = 4;
@@ -656,7 +656,7 @@ private:
         if (doc.containsKey("phaseR"))  p.phaseR   = doc["phaseR"].as<int16_t>();
 
         p.freq = _clamp(p.freq, 20.0f, 100.0f);
-        if (p.order < 1 || p.order > 4) p.order = 2;
+        if (p.order < 2 || p.order > 4) p.order = 2;
         p.balance  = _clamp(p.balance, -100.0f, 100.0f);
         p.delayMsL = _clamp(p.delayMsL, 0.0f, 20.0f);
         p.delayMsR = _clamp(p.delayMsR, 0.0f, 20.0f);

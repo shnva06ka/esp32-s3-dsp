@@ -126,7 +126,7 @@ private:
         const float tan0     = tanf(w0 * 0.5f);
 
         uint8_t type  = p.type;
-        uint8_t order = (p.order >= 1 && p.order <= 4) ? p.order : 2;
+        uint8_t order = (p.order >= 2 && p.order <= 4) ? p.order : 2;
 
         if (type == EQ_FILTER_FLAT_LOW_PASS) {
             type = EQ_FILTER_LOW_PASS;
@@ -139,15 +139,7 @@ private:
         _hasSecondStage[b] = false;
 
         if (type == EQ_FILTER_LOW_PASS) {
-            if (order == 1) {
-                const float b0 = tan0 / (1.0f + tan0);
-                const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
-                _coeffs[b][0][0] = b0;
-                _coeffs[b][0][1] = b0;
-                _coeffs[b][0][2] = 0.0f;
-                _coeffs[b][0][3] = a1;
-                _coeffs[b][0][4] = 0.0f;
-            } else if (order == 3) {
+            if (order == 3) {
                 const float b0 = tan0 / (1.0f + tan0);
                 const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
                 _coeffs[b][0][0] = b0;
@@ -179,7 +171,8 @@ private:
                 }
                 _hasSecondStage[b] = true;
             } else {
-                const float alpha = sin0 / (2.0f * safeQ);
+                constexpr float kButterQ2 = 0.70710678f;
+                const float alpha = sin0 / (2.0f * kButterQ2);
                 const float a0_s  = 1.0f + alpha;
                 const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
                 _coeffs[b][0][0] = (1.0f - cos0) * 0.5f * invA0;
@@ -192,15 +185,7 @@ private:
         }
 
         if (type == EQ_FILTER_HIGH_PASS) {
-            if (order == 1) {
-                const float b0 = 1.0f / (1.0f + tan0);
-                const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
-                _coeffs[b][0][0] = b0;
-                _coeffs[b][0][1] = -b0;
-                _coeffs[b][0][2] = 0.0f;
-                _coeffs[b][0][3] = a1;
-                _coeffs[b][0][4] = 0.0f;
-            } else if (order == 3) {
+            if (order == 3) {
                 const float b0 = 1.0f / (1.0f + tan0);
                 const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
                 _coeffs[b][0][0] = b0;
@@ -232,7 +217,8 @@ private:
                 }
                 _hasSecondStage[b] = true;
             } else {
-                const float alpha = sin0 / (2.0f * safeQ);
+                constexpr float kButterQ2 = 0.70710678f;
+                const float alpha = sin0 / (2.0f * kButterQ2);
                 const float a0_s  = 1.0f + alpha;
                 const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
                 _coeffs[b][0][0] = (1.0f + cos0) * 0.5f * invA0;

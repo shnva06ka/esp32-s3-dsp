@@ -136,7 +136,7 @@ public:
                         if (!std::isfinite(_eq[b].gain) || _eq[b].gain < -24.0f || _eq[b].gain > 24.0f) _eq[b].gain = 0.0f;
                         if (!std::isfinite(_eq[b].q) || _eq[b].q < 0.05f || _eq[b].q > 10.0f) _eq[b].q = 0.707f;
                         if (_eq[b].type > EQ_FILTER_FLAT_HIGH_PASS) _eq[b].type = EQ_FILTER_PEAK;
-                        if (_eq[b].order < 1 || _eq[b].order > 4) _eq[b].order = 2;
+                        if (_eq[b].order < 2 || _eq[b].order > 4) _eq[b].order = 2;
                     }
                 }
 
@@ -144,7 +144,7 @@ public:
                     _subsonic = { 80.0f, 2, false };
                 } else {
                     if (!std::isfinite(_subsonic.freq) || _subsonic.freq < 10.0f || _subsonic.freq > 200.0f) _subsonic.freq = 80.0f;
-                    if (_subsonic.order != 2 && _subsonic.order != 4) _subsonic.order = 2;
+                    if (_subsonic.order < 2 || _subsonic.order > 4) _subsonic.order = 2;
                     if (!std::isfinite(_subsonic.balance) || _subsonic.balance < -100.0f || _subsonic.balance > 100.0f) _subsonic.balance = 0.0f;
                     if (!std::isfinite(_subsonic.delayMsL) || _subsonic.delayMsL < -20.0f || _subsonic.delayMsL > 20.0f) _subsonic.delayMsL = 0.0f;
                     if (!std::isfinite(_subsonic.delayMsR) || _subsonic.delayMsR < -20.0f || _subsonic.delayMsR > 20.0f) _subsonic.delayMsR = 0.0f;
@@ -358,6 +358,7 @@ public:
             xSemaphoreGive(_mutex);
             return false;
         }
+        if (order < 2 || order > 4) order = 2;
         _eq[_eqCount] = { freq, gain, q, true, type, order };
         _eqCount++;
         _eqVersion.fetch_add(1, std::memory_order_release);
@@ -406,7 +407,7 @@ public:
             if (!std::isfinite(sanitized.q) || sanitized.q < 0.05f) sanitized.q = 0.05f;
             if (sanitized.q > 10.0f) sanitized.q = 10.0f;
             if (sanitized.type > EQ_FILTER_FLAT_HIGH_PASS) sanitized.type = EQ_FILTER_PEAK;
-            if (sanitized.order < 1 || sanitized.order > 4) sanitized.order = 2;
+            if (sanitized.order < 2 || sanitized.order > 4) sanitized.order = 2;
 
             _eq[band] = sanitized;
             if (band >= _eqCount) _eqCount = band + 1;
@@ -507,7 +508,7 @@ public:
         _subsonic = p;
         if (!std::isfinite(_subsonic.freq) || _subsonic.freq < 10.0f) _subsonic.freq = 10.0f;
         if (_subsonic.freq > 200.0f) _subsonic.freq = 200.0f;
-        if (_subsonic.order != 2 && _subsonic.order != 4) _subsonic.order = 2;
+        if (_subsonic.order < 2 || _subsonic.order > 4) _subsonic.order = 2;
         if (!std::isfinite(_subsonic.balance)) _subsonic.balance = 0.0f;
         if (_subsonic.balance < -100.0f) _subsonic.balance = -100.0f;
         if (_subsonic.balance >  100.0f) _subsonic.balance =  100.0f;

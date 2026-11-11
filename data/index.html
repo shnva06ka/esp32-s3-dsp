@@ -223,6 +223,12 @@ select::-ms-expand {
   flex-direction: column;
   gap: 2px;
 }
+.input-card-sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.25;
+}
 .input-card-icon {
   width: 38px;
   height: 38px;
@@ -335,8 +341,20 @@ select::-ms-expand {
   border: 1px solid var(--muted);
 }
 
-#mod-wifi-meta {
-  border-color: var(--border);
+.wifi-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.wifi-cfg-note {
+  margin: 0 0 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.35;
 }
 .wifi-stream-card {
   padding: 2px 0;
@@ -558,7 +576,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   cursor: pointer;
   user-select: none;
   transform-origin: center center;
-  transition: transform 0.08s cubic-bezier(0, 0, 0.2, 1), color 0.08s ease;
+  transition: transform 0.14s cubic-bezier(0.16, 1, 0.3, 1), color 0.08s ease;
   flex-shrink: 0;
 }
 .module-header:hover .collapse-icon {
@@ -616,7 +634,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .switch input:checked + .slider {
-  background-color: var(--active);
+  background-color: #3D7820;
   border-color: var(--nord0);
 }
 .switch input:checked + .slider:before {
@@ -735,27 +753,25 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   background: var(--surface-hover);
   border-color: var(--nord0);
 }
-.preset-dropdown-menu {
-  display: none;
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  min-width: 170px;
-  background: var(--card-bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25) !important;
-  z-index: 400;
-  padding: 4px 0;
+.preset-modal-panel {
+  max-width: 360px;
+}
+.preset-modal-body {
+  padding: 10px 12px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.preset-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   font-size: 12px;
   font-weight: 700;
   user-select: none;
 }
-.preset-dropdown-wrap.open .preset-dropdown-menu {
-  display: block;
-}
-.preset-dropdown-menu .gm-opt {
-  padding: 6px 12px;
+.preset-modal-list .gm-opt {
+  padding: 8px 12px;
+  border-radius: 4px;
   color: var(--nord0);
   cursor: pointer;
   display: flex;
@@ -763,25 +779,39 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   justify-content: space-between;
   gap: 8px;
 }
-.preset-dropdown-menu .gm-opt:hover {
+.preset-modal-list .gm-opt:hover {
   background: var(--nord5);
 }
-.preset-dropdown-menu .gm-opt.selected {
+.preset-modal-list .gm-opt.selected {
   color: var(--nord10);
+  background: var(--accent-soft);
 }
-.preset-dropdown-menu .gm-sep {
+.preset-modal-list .gm-sep {
   height: 1px;
-  background: var(--border-strong);
-  margin: 4px 0;
+  background: var(--border);
+  margin: 6px 0;
+}
+.preset-modal-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--card-header);
+}
+.preset-modal-footer .btn-preset-action {
+  width: 100%;
+  height: 34px;
 }
 .preset-del-x {
   font-size: 11px;
   color: var(--muted);
-  padding: 0 4px;
+  padding: 2px 6px;
   border-radius: 3px;
 }
 .preset-del-x:hover {
   color: var(--danger);
+  background: rgba(191, 97, 106, 0.14);
 }
 .btn-preset-action {
   text-transform: uppercase;
@@ -1113,7 +1143,7 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
   overflow: hidden;
 }
 .band-card.eq-row-desktop.band-exit-anim {
-  animation: band-exit-row 0.18s ease-in forwards;
+  animation: band-exit-row 0.11s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   overflow: hidden;
   pointer-events: none;
 }
@@ -1122,7 +1152,7 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
   overflow: hidden;
 }
 .band-card:not(.eq-row-desktop).band-exit-anim {
-  animation: band-exit-card 0.18s ease-in forwards;
+  animation: band-exit-card 0.11s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   overflow: hidden;
   pointer-events: none;
 }
@@ -2273,7 +2303,7 @@ select:focus-visible, input:focus-visible {
   outline: 2px solid var(--nord8);
   outline-offset: 2px;
 }
-.slider, .slider:before { transition: background-color 0.133s ease, transform 0.133s cubic-bezier(0.3, 0.7, 0.4, 1.2), border-color 0.133s ease; }
+.slider, .slider:before { transition: background-color 0.133s ease, transform 0.133s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.133s ease; }
 .input-card, .btn-preset, .btn-primary, .btn-card-action { transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.1s ease; }
 .module-box { transition: border-color 0.25s ease, background-color 0.25s ease; }
 .module-box.bypassed .module-body { transition: opacity 0.25s ease, filter 0.25s ease; }
@@ -2406,7 +2436,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   .wifi-open-btn { display: none !important; }
   .mobile-only-el { display: block; }
   .submodule-separator.mobile-only-el { margin: 0 0 12px; }
-  .wifi-modal-backdrop {
+  #wifi-modal.wifi-modal-backdrop {
     position: static;
     inset: auto;
     background: transparent;
@@ -2418,7 +2448,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     pointer-events: auto;
     transition: none;
   }
-  .wifi-modal-backdrop .wifi-cfg-panel {
+  #wifi-modal.wifi-modal-backdrop .wifi-cfg-panel {
     max-width: 100%;
     transform: none;
     transition: none;
@@ -2427,10 +2457,10 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     border-radius: 0;
     overflow: visible;
   }
-  .wifi-cfg-header {
+  #wifi-modal .wifi-cfg-header {
     display: none;
   }
-  .wifi-cfg-body {
+  #wifi-modal .wifi-cfg-body {
     padding: 0;
   }
   #mod-input,
@@ -2697,7 +2727,10 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
                 <line x1="12" y1="20" x2="12.01" y2="20"/>
               </svg>
             </div>
-            <div class="input-card-title">Web UI</div>
+            <div class="input-card-text">
+              <div class="input-card-title">Network</div>
+              <div class="input-card-sub">Web UI &amp; Squeezebox</div>
+            </div>
           </div>
         </button>
       </div>
@@ -2743,6 +2776,29 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           </div>
         </div>
       </div>
+
+      <div id="wifi-stream-sub" style="display: none;">
+        <div class="submodule-separator"></div>
+        <div class="wifi-sub-header">
+          <div class="submodule-title" style="margin-bottom: 0;">Squeezebox Stream</div>
+          <div class="active-source-pill" id="wifi-status-pill">
+            <span class="badge-dot" id="wifi-status-dot"></span>
+            <span id="wifi-status-text">DISCONNECTED</span>
+          </div>
+        </div>
+        <div class="wifi-stream-card">
+          <div class="wifi-stream-meta-grid">
+            <div class="wifi-info-item">
+              <span class="wifi-info-lbl">Stream Format</span>
+              <span class="wifi-info-val" id="wifi-format-val">--</span>
+            </div>
+            <div class="wifi-info-item">
+              <span class="wifi-info-lbl">Playback Status</span>
+              <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -2756,13 +2812,14 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
             <line x1="12" y1="20" x2="12.01" y2="20"/>
           </svg>
-          <span class="wifi-cfg-title">Wi-Fi Setup</span>
+          <span class="wifi-cfg-title">Network</span>
         </div>
         <button type="button" class="wifi-modal-close" onclick="closeWiFiModal()" aria-label="Close">✕</button>
       </div>
       <div class="wifi-cfg-body" id="wifi-cfg-body">
         <div class="submodule-separator mobile-only-el"></div>
-        <div class="submodule-title mobile-only-el">Wi-Fi</div>
+        <div class="submodule-title mobile-only-el">Network</div>
+        <p class="wifi-cfg-note">Web UI and Squeezebox streaming will use this network.</p>
         <div class="wifi-cfg-inputs">
           <div class="wifi-input-group">
             <label for="wifi-input-ssid">Network</label>
@@ -2784,31 +2841,23 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     </div>
   </div>
 
-  <section class="module-box" id="mod-wifi-meta" data-tabpanel="system" style="display: none;">
-    <div class="module-header static-header">
-      <div class="module-title-area">
-        <span class="module-title">Wi-Fi Stream</span>
-      </div>
-      <div class="active-source-pill" id="wifi-status-pill">
-        <span class="badge-dot" id="wifi-status-dot"></span>
-        <span id="wifi-status-text">DISCONNECTED</span>
-      </div>
-    </div>
-    <div class="module-body">
-      <div class="wifi-stream-card">
-        <div class="wifi-stream-meta-grid">
-          <div class="wifi-info-item">
-            <span class="wifi-info-lbl">Stream Format</span>
-            <span class="wifi-info-val" id="wifi-format-val">--</span>
-          </div>
-          <div class="wifi-info-item">
-            <span class="wifi-info-lbl">Playback Status</span>
-            <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
-          </div>
+  <div class="wifi-modal-backdrop" id="preset-modal" data-tabpanel="dsp" onclick="closePresetModal(event)">
+    <div class="wifi-cfg-panel preset-modal-panel" onclick="event.stopPropagation()">
+      <div class="wifi-cfg-header">
+        <div class="wifi-cfg-title-row">
+          <span class="wifi-cfg-title">EQ Presets</span>
         </div>
+        <button type="button" class="wifi-modal-close" onclick="closePresetModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="preset-modal-body">
+        <div class="preset-modal-list" id="preset-modal-list"></div>
+      </div>
+      <div class="preset-modal-footer">
+        <button type="button" class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
+        <button type="button" class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
       </div>
     </div>
-  </section>
+  </div>
 
   <div class="reorder-bar" data-tabpanel="dsp">
     <button type="button" class="btn-card-action" id="reorder-modules-btn"><span>Reorder modules</span></button>
@@ -2849,13 +2898,10 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
         <div class="eq-preset-box">
           <span class="preset-label">Preset:</span>
           <div class="preset-dropdown-wrap" id="preset-dropdown-wrap">
-            <button type="button" class="preset-dropdown-btn" id="preset-dropdown-btn" onclick="togglePresetDropdown(event)">
+            <button type="button" class="preset-dropdown-btn" id="preset-dropdown-btn" onclick="openPresetModal(event)">
               <span id="preset-dropdown-label">Flat 5 Bands</span>
             </button>
-            <div class="preset-dropdown-menu" id="preset-dropdown-menu"></div>
           </div>
-          <button class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
-          <button class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
           <input type="file" id="preset-file-input" accept=".json" style="display:none" onchange="importPresetFile(event)">
         </div>
       </div>
@@ -3066,7 +3112,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">SLOPE</span>
             <div class="badge-input-row">
-              <input type="number" id="num-sub-order" class="badge-val-input" min="6" max="24" step="6" value="12">
+              <input type="number" id="num-sub-order" class="badge-val-input" min="12" max="24" step="6" value="12">
               <span class="badge-unit">dB</span>
             </div>
           </div>
@@ -3318,24 +3364,24 @@ const BUILTIN_PRESET_LABELS = {
   high_boost: 'High Boost'
 };
 
-function togglePresetDropdown(event) {
+function openPresetModal(event) {
   if (event) event.stopPropagation();
-  const wrap = document.getElementById('preset-dropdown-wrap');
-  if (!wrap) return;
-  wrap.classList.toggle('open');
+  renderCustomPresets();
+  const modal = document.getElementById('preset-modal');
+  if (modal) modal.classList.add('open');
 }
 
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('#preset-dropdown-wrap')) {
-    document.getElementById('preset-dropdown-wrap')?.classList.remove('open');
-  }
-});
+function closePresetModal(e) {
+  if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+  const modal = document.getElementById('preset-modal');
+  if (modal) modal.classList.remove('open');
+}
 
 function applyPreset(name) {
   if (name === 'flat') name = 'flat_5';
   if (!PRESETS[name]) return;
   currentPreset = name;
-  document.getElementById('preset-dropdown-wrap')?.classList.remove('open');
+  closePresetModal();
 
   bands = PRESETS[name].map((p, idx) => ({
     band: idx,
@@ -3424,6 +3470,8 @@ function importPresetFile(event) {
         let ord = parseInt(b.order) || 2;
         if (t === 5) { t = 3; ord = 4; }
         else if (t === 6) { t = 4; ord = 4; }
+        if (ord < 2 || ord > 4) ord = 2;
+        if (ord < 2 || ord > 4) ord = 2;
         return {
           band: idx,
           freq: parseFloat(b.freq) || 1000,
@@ -3466,7 +3514,7 @@ function importPresetFile(event) {
 }
 
 function renderCustomPresets() {
-  const menu = document.getElementById('preset-dropdown-menu');
+  const menu = document.getElementById('preset-modal-list');
   const lbl = document.getElementById('preset-dropdown-label');
   if (lbl) {
     lbl.textContent = BUILTIN_PRESET_LABELS[currentPreset] || currentPreset || 'Flat 5 Bands';
@@ -3497,16 +3545,39 @@ function renderCustomPresets() {
     menu.appendChild(sep);
   }
 
+  const deleteCustomAt = (idx, name) => {
+    if (confirm(`Delete preset "${name}"?`)) {
+      customPresets.splice(idx, 1);
+      localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+      if (currentPreset === name) currentPreset = 'flat_5';
+      renderCustomPresets();
+    }
+  };
+
   customPresets.forEach((p, idx) => {
     const opt = document.createElement('div');
     opt.className = 'gm-opt' + (currentPreset === p.name ? ' selected' : '');
     opt.setAttribute('data-custom-preset', p.name);
-    opt.textContent = p.name;
-    opt.title = `Apply "${p.name}" (Right-click to delete)`;
+    opt.title = `Apply "${p.name}"`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = p.name;
+    opt.appendChild(nameSpan);
+
+    const delBtn = document.createElement('span');
+    delBtn.className = 'preset-del-x';
+    delBtn.textContent = '✕';
+    delBtn.title = `Delete "${p.name}"`;
+    delBtn.onclick = (e) => {
+      e.stopPropagation();
+      deleteCustomAt(idx, p.name);
+    };
+    opt.appendChild(delBtn);
+
     opt.onclick = (e) => {
       e.stopPropagation();
       currentPreset = p.name;
-      document.getElementById('preset-dropdown-wrap')?.classList.remove('open');
+      closePresetModal();
       if (typeof p.preamp === 'number') {
         eqPreamp = p.preamp;
         updatePreampUI();
@@ -3518,6 +3589,7 @@ function renderCustomPresets() {
           let ord = b.order || 2;
           if (t === 5) { t = 3; ord = 4; }
           else if (t === 6) { t = 4; ord = 4; }
+          if (ord < 2 || ord > 4) ord = 2;
           return {
             band: i,
             freq: b.freq,
@@ -3538,12 +3610,7 @@ function renderCustomPresets() {
     opt.oncontextmenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (confirm(`Delete preset "${p.name}"?`)) {
-        customPresets.splice(idx, 1);
-        localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
-        if (currentPreset === p.name) currentPreset = 'flat_5';
-        renderCustomPresets();
-      }
+      deleteCustomAt(idx, p.name);
     };
 
     menu.appendChild(opt);
@@ -4003,6 +4070,7 @@ function handleMsg(d) {
         let ord = parseInt(b.order) || 2;
         if (t === 5) { t = 3; ord = 4; }
         else if (t === 6) { t = 4; ord = 4; }
+        if (ord < 2 || ord > 4) ord = 2;
         return {
           band: b.band,
           freq: parseFloat(b.freq) || 1000,
@@ -4417,7 +4485,7 @@ function updateInputSourceUI() {
 }
 
 function updateWiFiModuleVisibility() {
-  const wfMod = document.getElementById('mod-wifi-meta');
+  const wfMod = document.getElementById('wifi-stream-sub');
   if (wfMod) {
     const isWifi = (selectedInputSource === 3);
     wfMod.style.display = isWifi ? 'block' : 'none';
@@ -4803,13 +4871,11 @@ function bandMagAt(b, f) {
   let order = b.order || 2;
   if (type === 5) { type = 3; order = 4; }
   else if (type === 6) { type = 4; order = 4; }
+  if (order < 2 || order > 4) order = 2;
 
   if ((type === 0 || type === 1 || type === 2) && Math.abs(b.gain) < 0.001) return 0;
 
   if (type === 3) {
-    if (order === 1) {
-      return Math.max(-60, Math.min(30, eval1stOrderLP(b.freq, f)));
-    }
     if (order === 3) {
       const m = eval1stOrderLP(b.freq, f) + singleBiquadMag(3, b.freq, 0, 1.0, f);
       return Math.max(-60, Math.min(30, m));
@@ -4818,14 +4884,11 @@ function bandMagAt(b, f) {
       const m = singleBiquadMag(3, b.freq, 0, 1.30656296, f) + singleBiquadMag(3, b.freq, 0, 0.5411961, f);
       return Math.max(-60, Math.min(30, m));
     }
-    const m = singleBiquadMag(3, b.freq, 0, b.q, f);
+    const m = singleBiquadMag(3, b.freq, 0, Math.SQRT1_2, f);
     return Math.max(-60, Math.min(30, m));
   }
 
   if (type === 4) {
-    if (order === 1) {
-      return Math.max(-60, Math.min(30, eval1stOrderHP(b.freq, f)));
-    }
     if (order === 3) {
       const m = eval1stOrderHP(b.freq, f) + singleBiquadMag(4, b.freq, 0, 1.0, f);
       return Math.max(-60, Math.min(30, m));
@@ -4834,7 +4897,7 @@ function bandMagAt(b, f) {
       const m = singleBiquadMag(4, b.freq, 0, 1.30656296, f) + singleBiquadMag(4, b.freq, 0, 0.5411961, f);
       return Math.max(-60, Math.min(30, m));
     }
-    const m = singleBiquadMag(4, b.freq, 0, b.q, f);
+    const m = singleBiquadMag(4, b.freq, 0, Math.SQRT1_2, f);
     return Math.max(-60, Math.min(30, m));
   }
 
@@ -5191,7 +5254,7 @@ fCanvas.addEventListener('pointermove', (e) => {
   } else {
     const dy = d.startY - e.clientY;
     if (isPass) {
-      b.order = Math.max(1, Math.min(4, Math.round(d.startOrder + dy / 75)));
+      b.order = Math.max(2, Math.min(4, Math.round(d.startOrder + dy / 75)));
     } else {
       b.q = Math.max(0.1, Math.min(8.0, d.startQ * Math.exp(dy / 180)));
     }
@@ -5296,7 +5359,7 @@ function selectBandFilter(i, type) {
   if (!b) return;
   b.type = type;
   if (type === 3 || type === 4) {
-    if (!b.order || b.order < 1 || b.order > 4) b.order = 2;
+    if (!b.order || b.order < 2 || b.order > 4) b.order = 2;
   }
 
   document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
@@ -5352,15 +5415,15 @@ function updateBandCardParamStates(i) {
     if (qBadgeLbl) qBadgeLbl.textContent = 'SLOPE';
     if (qUnitSpan) qUnitSpan.textContent = 'dB/oct';
     if (qNumInput) {
-      qNumInput.min = '6';
+      qNumInput.min = '12';
       qNumInput.max = '24';
       qNumInput.step = '6';
-      qNumInput.value = (b.order || 2) * 6;
+      qNumInput.value = Math.max(2, b.order || 2) * 6;
     }
     if (bandKnobs[i] && bandKnobs[i].qKnob) {
       bandKnobs[i].qKnob.configure({
-        min: 6, max: 24, step: 6, decimals: 0,
-        value: (b.order || 2) * 6
+        min: 12, max: 24, step: 6, decimals: 0,
+        value: Math.max(2, b.order || 2) * 6
       });
     }
   } else {
@@ -5760,12 +5823,12 @@ function rebuildBandsUI(opts = {}) {
       const boxQ = row.querySelector(`#scrub-box-q-${i}`);
       attachScrubInput(boxQ, numQ, {
         getConfig: () => (b.type === 3 || b.type === 4)
-          ? { min: 6, max: 24, step: 6, logScale: false, pixels: 110, format: v => String(Math.round(v / 6) * 6) }
+          ? { min: 12, max: 24, step: 6, logScale: false, pixels: 110, format: v => String(Math.max(12, Math.min(24, Math.round(v / 6) * 6))) }
           : { min: 0.1, max: 8.0, step: 0.01, logScale: false, pixels: 150, format: v => v.toFixed(2) },
-        getVal: () => (b.type === 3 || b.type === 4) ? ((b.order || 2) * 6) : b.q,
+        getVal: () => (b.type === 3 || b.type === 4) ? (Math.max(2, b.order || 2) * 6) : b.q,
         onSlide: v => {
           if (b.type === 3 || b.type === 4) {
-            b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+            b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
             numQ.value = b.order * 6;
           } else {
             b.q = v;
@@ -5776,7 +5839,7 @@ function rebuildBandsUI(opts = {}) {
         },
         onApply: v => {
           if (b.type === 3 || b.type === 4) {
-            b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+            b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
             numQ.value = b.order * 6;
           } else {
             b.q = v;
@@ -5805,7 +5868,7 @@ function rebuildBandsUI(opts = {}) {
         const ref = currentRows[index] || null;
         if (ref) root.insertBefore(node, ref);
         else root.appendChild(node);
-        setTimeout(() => node.remove(), 190);
+        setTimeout(() => node.remove(), 120);
       });
     }
 
@@ -5973,7 +6036,7 @@ function rebuildBandsUI(opts = {}) {
       <div class="card-val-badge">
         <span class="badge-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
         <div class="badge-input-row">
-          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '6' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? ((b.order || 2) * 6) : b.q.toFixed(2)}">
+          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '12' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? (Math.max(2, b.order || 2) * 6) : b.q.toFixed(2)}">
           ${isPass ? '<span class="badge-unit">dB</span>' : ''}
         </div>
       </div>
@@ -6081,15 +6144,15 @@ function rebuildBandsUI(opts = {}) {
     });
 
     const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
-      min: isPass ? 6 : 0.1,
+      min: isPass ? 12 : 0.1,
       max: isPass ? 24 : 8.0,
       step: isPass ? 6 : null,
-      value: isPass ? ((b.order || 2) * 6) : b.q,
+      value: isPass ? (Math.max(2, b.order || 2) * 6) : b.q,
       defaultVal: isPass ? 12 : 0.707,
       decimals: isPass ? 0 : 2,
       onSlide: v => {
         if (b.type === 3 || b.type === 4) {
-          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+          b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
           card.querySelector(`#num-q-${i}`).value = b.order * 6;
         } else {
           b.q = v;
@@ -6100,7 +6163,7 @@ function rebuildBandsUI(opts = {}) {
       },
       onApply: v => {
         if (b.type === 3 || b.type === 4) {
-          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
+          b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
           card.querySelector(`#num-q-${i}`).value = b.order * 6;
         } else {
           b.q = v;
@@ -6114,8 +6177,8 @@ function rebuildBandsUI(opts = {}) {
     card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
       let v = parseFloat(e.target.value);
       if (b.type === 3 || b.type === 4) {
-        if (isNaN(v)) v = (b.order || 2) * 6;
-        v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
+        if (isNaN(v)) v = Math.max(2, b.order || 2) * 6;
+        v = Math.max(12, Math.min(24, Math.round(v / 6) * 6));
         e.target.value = v;
         b.order = Math.round(v / 6);
         qKnob.set(v, false);
@@ -6385,7 +6448,7 @@ function setModuleCollapsed(box, want) {
     return;
   }
 
-  const dur = '0.22s cubic-bezier(0.4, 0, 0.2, 1)';
+  const dur = '0.14s cubic-bezier(0.16, 1, 0.3, 1)';
   const trans = `height ${dur}, padding-top ${dur}, padding-bottom ${dur}`;
 
   if (want) {
@@ -6425,7 +6488,7 @@ function setModuleCollapsed(box, want) {
       }
     };
     const onEnd = (e) => { if (e.target === body && e.propertyName === 'height') finish(true); };
-    const timer = setTimeout(() => finish(true), 260);
+    const timer = setTimeout(() => finish(true), 170);
     body.addEventListener('transitionend', onEnd);
     box._cleanupCollapse = finish;
   } else {
@@ -6476,7 +6539,7 @@ function setModuleCollapsed(box, want) {
       }
     };
     const onEnd = (e) => { if (e.target === body && e.propertyName === 'height') finish(true); };
-    const timer = setTimeout(() => finish(true), 260);
+    const timer = setTimeout(() => finish(true), 170);
     body.addEventListener('transitionend', onEnd);
     box._cleanupCollapse = finish;
   }
@@ -6637,10 +6700,10 @@ function initSubsonicKnobs() {
   });
 
   subsonicKnobs.order = new Knob(document.getElementById('knob-sub-order'), {
-    min: 6, max: 24, step: 6, value: (subsonicParams.order || 2) * 6, defaultVal: 12,
+    min: 12, max: 24, step: 6, value: Math.max(2, subsonicParams.order || 2) * 6, defaultVal: 12,
     decimals: 0,
     onChange: v => {
-      const ord = Math.max(1, Math.min(4, Math.round(v / 6)));
+      const ord = Math.max(2, Math.min(4, Math.round(v / 6)));
       subsonicParams.order = ord;
       document.getElementById('num-sub-order').value = ord * 6;
       sendSubsonicThrottled(false);
@@ -6650,8 +6713,8 @@ function initSubsonicKnobs() {
   document.getElementById('num-sub-order').addEventListener('change', e => {
     let v = parseInt(e.target.value);
     if (!isNaN(v)) {
-      v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
-      const ord = Math.max(1, Math.min(4, v / 6));
+      v = Math.max(12, Math.min(24, Math.round(v / 6) * 6));
+      const ord = Math.max(2, Math.min(4, v / 6));
       subsonicParams.order = ord;
       e.target.value = ord * 6;
       subsonicKnobs.order.set(ord * 6, false);
@@ -7151,7 +7214,7 @@ function applyImportedConfig(cfg) {
         gain: clampNum(b.gain, -24, 24, 0),
         q:    clampNum(b.q, 0.1, 24, 0.707),
         type: Math.round(clampNum(b.type, 0, 4, 0)),
-        order: Math.round(clampNum(b.order, 1, 8, 2)),
+        order: Math.round(clampNum(b.order, 2, 4, 2)),
         enabled: b.enabled !== false,
         color: BAND_COLORS[idx % BAND_COLORS.length]
       }));
@@ -7171,7 +7234,7 @@ function applyImportedConfig(cfg) {
     const s = cfg.subsonic;
     Object.assign(subsonicParams, {
       freq: clampNum(s.freq, 20, 100, subsonicParams.freq),
-      order: Math.round(clampNum(s.order, 1, 4, subsonicParams.order)),
+      order: Math.round(clampNum(s.order, 2, 4, subsonicParams.order)),
       balance: clampNum(s.balance, -100, 100, 0),
       delayL: clampNum(s.delayL, -20, 20, 0),
       delayR: clampNum(s.delayR, -20, 20, 0),
@@ -7243,7 +7306,10 @@ function closeWiFiModal(e) {
 }
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeWiFiModal();
+  if (e.key === 'Escape') {
+    closeWiFiModal();
+    closePresetModal();
+  }
 });
 
 function togglePassVisibility() {

@@ -110,7 +110,7 @@ private:
     void _update(const SubsonicParams& p) {
         _enabled = p.enabled;
         _freq    = (p.freq < 20.0f) ? 20.0f : ((p.freq > 100.0f) ? 100.0f : p.freq);
-        _order   = (p.order >= 1 && p.order <= 4) ? p.order : 2;
+        _order   = (p.order >= 2 && p.order <= 4) ? p.order : 2;
 
         const float Fs   = static_cast<float>(kSampleRate);
         const float w0   = 2.0f * M_PI * _freq / Fs;
@@ -120,15 +120,7 @@ private:
 
         _hasSecondStage = false;
 
-        if (_order == 1) {
-            const float b0 = 1.0f / (1.0f + tan0);
-            const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
-            _coeffs[0][0] = b0;
-            _coeffs[0][1] = -b0;
-            _coeffs[0][2] = 0.0f;
-            _coeffs[0][3] = a1;
-            _coeffs[0][4] = 0.0f;
-        } else if (_order == 3) {
+        if (_order == 3) {
             const float b0 = 1.0f / (1.0f + tan0);
             const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
             _coeffs[0][0] = b0;
