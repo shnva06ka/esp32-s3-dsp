@@ -384,7 +384,15 @@ main {
   background: var(--card-bg);
   border: 1px solid var(--border-strong);
   border-radius: 3px;
+  overflow: visible;
+}
+.module-box.collapsed,
+.module-box.is-collapsing {
   overflow: hidden;
+}
+.module-box:has(.band-type-menu-wrap.open),
+.module-box:has(.preset-dropdown-wrap.open) {
+  z-index: 60;
 }
 .module-box.bypassed {
   border-color: transparent;
@@ -439,6 +447,7 @@ main {
   justify-content: space-between;
   padding: 10px 16px;
   background: var(--card-header);
+  border-radius: 2px 2px 0 0;
   cursor: pointer;
   user-select: none;
 }
@@ -458,6 +467,7 @@ main {
 }
 .module-box.collapsed .module-header {
   border-bottom: none;
+  border-radius: 2px;
 }
 #dsp-modules-container {
   display: flex;
