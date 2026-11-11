@@ -4,6 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <Preferences.h>
+#include <nvs.h>
 #include <atomic>
 #include <cstring>
 #include <cmath>
@@ -96,8 +97,17 @@ public:
     void begin() {
         _loadDefaults();
 
+        auto nvsNamespaceExists = [](const char* ns) -> bool {
+            nvs_handle_t h = 0;
+            if (nvs_open(ns, NVS_READONLY, &h) == ESP_OK) {
+                nvs_close(h);
+                return true;
+            }
+            return false;
+        };
+
         Preferences authPrefs;
-        if (authPrefs.begin("dsp_auth", true)) {
+        if (nvsNamespaceExists("dsp_auth") && authPrefs.begin("dsp_auth", true)) {
             String u = authPrefs.getString("user", "admin");
             String p = authPrefs.getString("pass", "admin");
             xSemaphoreTake(_mutex, portMAX_DELAY);
@@ -110,7 +120,7 @@ public:
         }
 
         Preferences prefs;
-        if (prefs.begin("dsp_cfg", true)) {
+        if (nvsNamespaceExists("dsp_cfg") && prefs.begin("dsp_cfg", true)) {
             if (prefs.isKey("init")) {
                 xSemaphoreTake(_mutex, portMAX_DELAY);
                 _eqCount  = prefs.getInt("eq_cnt", 5);

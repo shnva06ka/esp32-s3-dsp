@@ -45,18 +45,41 @@ void WirelessConsole::loop()
             if (!_telnetClient || !_telnetClient.connected()) {
                 if (_telnetClient) _telnetClient.stop();
                 _telnetClient = _telnetServer->available();
-                _telnetClient.println("\n=== Connected to ESP32-S3-DSP Live Console (Telnet) ===");
-                if (_lines && _count > 0) {
-                    size_t start = (_count < kMaxLogs) ? 0 : _head;
-                    for (size_t i = 0; i < _count; ++i) {
-                        size_t idx = (start + i) % kMaxLogs;
-                        _telnetClient.println(_lines[idx]);
+                if (_telnetClient) {
+                    _telnetClient.setNoDelay(true);
+                    static const char kBanner[] = "\n=== Connected to ESP32-S3-DSP Live Console (Telnet) ===\r\n";
+                    size_t totalLen = sizeof(kBanner) - 1;
+                    if (_lines && _count > 0) {
+                        size_t start = (_count < kMaxLogs) ? 0 : _head;
+                        for (size_t i = 0; i < _count; ++i) {
+                            size_t idx = (start + i) % kMaxLogs;
+                            totalLen += strlen(_lines[idx]) + 2;
+                        }
+                    }
+                    String replay;
+                    if (replay.reserve(totalLen)) {
+                        replay += kBanner;
+                        if (_lines && _count > 0) {
+                            size_t start = (_count < kMaxLogs) ? 0 : _head;
+                            for (size_t i = 0; i < _count; ++i) {
+                                size_t idx = (start + i) % kMaxLogs;
+                                replay += _lines[idx];
+                                replay += "\r\n";
+                            }
+                        }
+                        _telnetClient.write(reinterpret_cast<const uint8_t*>(replay.c_str()), replay.length());
+                    } else {
+                        _telnetClient.write(reinterpret_cast<const uint8_t*>(kBanner), sizeof(kBanner) - 1);
                     }
                 }
             } else {
                 WiFiClient newClient = _telnetServer->available();
-                newClient.println("ESP32-S3-DSP: another telnet session is active. Closing.");
-                newClient.stop();
+                if (newClient) {
+                    newClient.setNoDelay(true);
+                    static const char kBusyMsg[] = "ESP32-S3-DSP: another telnet session is active. Closing.\r\n";
+                    newClient.write(reinterpret_cast<const uint8_t*>(kBusyMsg), sizeof(kBusyMsg) - 1);
+                    newClient.stop();
+                }
             }
             if (_mutex) xSemaphoreGiveRecursive(_mutex);
         }
@@ -100,7 +123,13 @@ size_t WirelessConsole::write(const uint8_t *buffer, size_t size)
             }
 
             if (_telnetClient && _telnetClient.connected()) {
-                _telnetClient.println(_curLine);
+                size_t lineLen = strlen(_curLine);
+                if (lineLen > kLineBufSize - 1) lineLen = kLineBufSize - 1;
+                char lineBuf[kLineBufSize + 2];
+                memcpy(lineBuf, _curLine, lineLen);
+                lineBuf[lineLen] = '\r';
+                lineBuf[lineLen + 1] = '\n';
+                _telnetClient.write(reinterpret_cast<const uint8_t*>(lineBuf), lineLen + 2);
             }
 
             if (_broadcast) {

@@ -4,9 +4,11 @@
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
+#include <nvs.h>
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <cstring>
+#include <esp_heap_caps.h>
 #include "eq_html.h"
 #include "console_html.h"
 #include "wireless_console.h"
@@ -47,15 +49,16 @@ public:
         _startWiFi();
 
         Console.begin();
+        if (!_wsLogQueue) {
+            _wsLogQueue = static_cast<char*>(heap_caps_malloc(kWsLogQueueCap * kWsLogLineMax, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+            if (!_wsLogQueue) {
+                _wsLogQueue = static_cast<char*>(malloc(kWsLogQueueCap * kWsLogLineMax));
+            }
+        }
         Console.setBroadcastFunc([](const char* msg) {
             WebUI* inst = getInstance();
-            if (inst && inst->_ws.count() > 0) {
-                StaticJsonDocument<512> doc;
-                doc["t"] = "log";
-                doc["msg"] = msg;
-                String out;
-                serializeJson(doc, out);
-                inst->_ws.textAll(out);
+            if (inst) {
+                inst->_enqueueWsLog(msg);
             }
         });
 
@@ -71,6 +74,9 @@ public:
         Console.loop();
         OTAManager::loopArduinoOTA(_params.getAuthPass());
         _ws.cleanupClients();
+        const bool wsHasClients = (_ws.count() > 0);
+        _wsHasClients.store(wsHasClients, std::memory_order_relaxed);
+        _drainWsLogQueue(wsHasClients);
 
         InputSourceMode mode;
         ActiveInputSource active;
@@ -79,14 +85,14 @@ public:
         }
 
         if (_stateBroadcastPending.exchange(false, std::memory_order_acq_rel)) {
-            if (_ws.count() > 0) {
+            if (wsHasClients) {
                 _ws.textAll(_buildStateJson());
             }
         }
 
         WiFiStreamMetadata wifiMeta;
         if (_params.getWiFiStreamMetadataIfChanged(wifiMeta, _lastWifiMetaVersion)) {
-            if (_ws.count() > 0) {
+            if (wsHasClients) {
                 _ws.textAll(_buildWiFiMetaJson(wifiMeta));
             }
         }
@@ -117,7 +123,7 @@ public:
 
         if (now - _lastSysBroadcast >= 1000) {
             _lastSysBroadcast = now;
-            if (_ws.count() > 0) {
+            if (wsHasClients) {
                 _ws.textAll(_buildSysJson());
             }
         }
@@ -134,6 +140,61 @@ public:
     }
 
 private:
+    static constexpr size_t kWsLogQueueCap = 32;
+    static constexpr size_t kWsLogLineMax  = 256;
+
+    void _enqueueWsLog(const char* msg) {
+        if (!msg || !msg[0] || !_wsLogQueue || !_wsHasClients.load(std::memory_order_relaxed)) {
+            return;
+        }
+        portENTER_CRITICAL(&_wsLogMux);
+        size_t writeIdx;
+        if (_wsLogCount < kWsLogQueueCap) {
+            writeIdx = (_wsLogHead + _wsLogCount) % kWsLogQueueCap;
+            ++_wsLogCount;
+        } else {
+            writeIdx = _wsLogHead;
+            _wsLogHead = (_wsLogHead + 1) % kWsLogQueueCap;
+        }
+        char* slot = _wsLogQueue + (writeIdx * kWsLogLineMax);
+        strncpy(slot, msg, kWsLogLineMax - 1);
+        slot[kWsLogLineMax - 1] = '\0';
+        portEXIT_CRITICAL(&_wsLogMux);
+    }
+
+    void _drainWsLogQueue(bool hasClients) {
+        if (!_wsLogQueue) return;
+        if (!hasClients) {
+            portENTER_CRITICAL(&_wsLogMux);
+            _wsLogHead = 0;
+            _wsLogCount = 0;
+            portEXIT_CRITICAL(&_wsLogMux);
+            return;
+        }
+        char lineBuf[kWsLogLineMax];
+        for (size_t i = 0; i < 8; ++i) {
+            bool gotLine = false;
+            portENTER_CRITICAL(&_wsLogMux);
+            if (_wsLogCount > 0) {
+                char* slot = _wsLogQueue + (_wsLogHead * kWsLogLineMax);
+                memcpy(lineBuf, slot, kWsLogLineMax);
+                lineBuf[kWsLogLineMax - 1] = '\0';
+                _wsLogHead = (_wsLogHead + 1) % kWsLogQueueCap;
+                --_wsLogCount;
+                gotLine = true;
+            }
+            portEXIT_CRITICAL(&_wsLogMux);
+            if (!gotLine) break;
+
+            StaticJsonDocument<512> doc;
+            doc["t"] = "log";
+            doc["msg"] = static_cast<const char*>(lineBuf);
+            String out;
+            serializeJson(doc, out);
+            _ws.textAll(out);
+        }
+    }
+
     ParamStore&       _params;
     AsyncWebServer    _server;
     AsyncWebSocket    _ws;
@@ -142,6 +203,11 @@ private:
     uint32_t          _lastInputVersion{1};
     uint32_t          _lastWifiMetaVersion{1};
     std::atomic<bool> _stateBroadcastPending{false};
+    std::atomic<bool> _wsHasClients{false};
+    portMUX_TYPE      _wsLogMux = portMUX_INITIALIZER_UNLOCKED;
+    char*             _wsLogQueue{nullptr};
+    size_t            _wsLogHead{0};
+    size_t            _wsLogCount{0};
     portMUX_TYPE      _wifiMux = portMUX_INITIALIZER_UNLOCKED;
     bool              _wifiReconnectRequested{false};
     String            _newSSID{""};
@@ -164,10 +230,14 @@ private:
         Preferences prefs;
         String savedSSID = "";
         String savedPass = "";
-        if (prefs.begin("wifi_cfg", true)) {
-            savedSSID = prefs.getString("ssid", "");
-            savedPass = prefs.getString("pass", "");
-            prefs.end();
+        nvs_handle_t nvsH = 0;
+        if (nvs_open("wifi_cfg", NVS_READONLY, &nvsH) == ESP_OK) {
+            nvs_close(nvsH);
+            if (prefs.begin("wifi_cfg", true)) {
+                savedSSID = prefs.getString("ssid", "");
+                savedPass = prefs.getString("pass", "");
+                prefs.end();
+            }
         }
 
         String targetSSID = savedSSID.length() > 0 ? savedSSID : String(WIFI_SSID);
@@ -176,6 +246,19 @@ private:
         bool hasCredentials = (targetSSID.length() > 0 && targetSSID != "YourSSID");
 
         if (hasCredentials) {
+            static bool s_wifiEventsRegistered = false;
+            if (!s_wifiEventsRegistered) {
+                s_wifiEventsRegistered = true;
+                WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+                    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+                        Console.printf("[NET] Wi-Fi DISCONNECTED (reason=%u)\n", info.wifi_sta_disconnected.reason);
+                    } else if (event == ARDUINO_EVENT_WIFI_STA_LOST_IP) {
+                        Console.println("[NET] Wi-Fi LOST IP");
+                    } else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+                        Console.printf("[NET] Wi-Fi GOT IP: %s\n", WiFi.localIP().toString().c_str());
+                    }
+                });
+            }
             WiFi.mode(WIFI_STA);
             WiFi.setAutoReconnect(true);
             WiFi.setSleep(false);
@@ -357,7 +440,8 @@ private:
             req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Validation task dispatched to background\"}");
         });
 
-        _server.on("/api/resampler/log", HTTP_POST, [](AsyncWebServerRequest* req) {
+        _server.on("/api/resampler/log", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkAuth(req)) return;
             bool en = req->hasParam("enable") ? (req->getParam("enable")->value() == "1") : true;
             ResamplerTelemetry::setLoggingEnabled(en);
             req->send(200, "application/json", en ? "{\"status\":\"ok\",\"logging\":true}" : "{\"status\":\"ok\",\"logging\":false}");
@@ -389,11 +473,12 @@ private:
                     AwsEventType type, void* arg, uint8_t* data, size_t len) {
         switch (type) {
             case WS_EVT_CONNECT:
-                Console.printf("[WS] Client #%u connected from %s\n",
-                              client->id(), client->remoteIP().toString().c_str());
                 client->setCloseClientOnQueueFull(false);
+                _wsHasClients.store(true, std::memory_order_relaxed);
                 client->text(_buildStateJson());
                 client->text(_buildSysJson());
+                Console.printf("[WS] Client #%u connected from %s\n",
+                              client->id(), client->remoteIP().toString().c_str());
                 break;
             case WS_EVT_DISCONNECT:
                 Console.printf("[WS] Client #%u disconnected\n", client->id());
@@ -601,7 +686,7 @@ private:
     }
 
     String _buildStateJson() {
-        StaticJsonDocument<4096> doc;
+        DynamicJsonDocument doc(4096);
         doc["t"] = "state";
 
         JsonObject inObj = doc.createNestedObject("input");
