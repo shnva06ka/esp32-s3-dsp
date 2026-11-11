@@ -2757,6 +2757,16 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 
         <div class="sys-stat-card">
           <div class="sys-stat-header">
+            <span class="sys-stat-name">PSRAM Memory</span>
+            <span class="sys-stat-val" id="sys-val-psram">-- / -- MB</span>
+          </div>
+          <div class="sys-stat-bar-track">
+            <div class="sys-stat-bar-fill" id="sys-bar-psram" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="sys-stat-card">
+          <div class="sys-stat-header">
             <span class="sys-stat-name">Flash Memory</span>
             <span class="sys-stat-val" id="sys-val-flash">-- / -- MB</span>
           </div>
@@ -3838,6 +3848,7 @@ function startMockMode() {
     sys: {
       cpu0: 14.2, cpu1: 31.8,
       heap_u: 55000, heap_t: 312380,
+      psram_u: 4325376, psram_t: 8388608,
       flash_u: 1263661, flash_t: 6553600,
       wifi_ssid: mockSsid, wifi_con: true
     }
@@ -3850,6 +3861,8 @@ function startMockMode() {
         cpu1: 28 + Math.random() * 7,
         heap_u: 54000 + Math.floor(Math.random() * 2000),
         heap_t: 312380,
+        psram_u: 4300000 + Math.floor(Math.random() * 65536),
+        psram_t: 8388608,
         flash_u: 1263661,
         flash_t: 6553600,
         wifi_ssid: mockSsid,
@@ -3964,6 +3977,18 @@ function updateSysStatsUI(s) {
     const elVal  = document.getElementById('sys-val-ram');
     const elBar  = document.getElementById('sys-bar-ram');
     if (elVal) elVal.textContent = `${usedKb} / ${totKb} KB (${pct}%)`;
+    if (elBar) {
+      elBar.style.width = pct + '%';
+      elBar.style.background = pct > 85 ? 'var(--nord11)' : (pct > 70 ? 'var(--nord12)' : 'var(--nord10)');
+    }
+  }
+  if (s.psram_t && s.psram_t > 0) {
+    const usedMb = ((s.psram_u || 0) / (1024 * 1024)).toFixed(2);
+    const totMb  = (s.psram_t / (1024 * 1024)).toFixed(1);
+    const pct    = Math.min(100, Math.max(0, Math.round(((s.psram_u || 0) / s.psram_t) * 100)));
+    const elVal  = document.getElementById('sys-val-psram');
+    const elBar  = document.getElementById('sys-bar-psram');
+    if (elVal) elVal.textContent = `${usedMb} / ${totMb} MB (${pct}%)`;
     if (elBar) {
       elBar.style.width = pct + '%';
       elBar.style.background = pct > 85 ? 'var(--nord11)' : (pct > 70 ? 'var(--nord12)' : 'var(--nord10)');
