@@ -121,11 +121,13 @@ extern struct decodestate decode;
 
 static sockfd control_sock = -1;
 static in_addr_t slimproto_ip = 0;
+static portMUX_TYPE s_conn_mux = portMUX_INITIALIZER_UNLOCKED;
 static event_event wake_e;
 static TaskHandle_t slimproto_task_handle = NULL;
 static bool running = true;
 static u8_t *s_pktBuffer = NULL;
 static char *s_headerCopy = NULL;
+static u8_t *s_respBuf = NULL;
 
 static struct {
     u32_t updated;
@@ -146,6 +148,14 @@ static int autostart = 1;
 static bool sentSTMu = false, sentSTMo = false, sentSTMl = false;
 static char player_name[64] = "ESP32-S3-DSP";
 static u8_t s_mac[6] = {0};
+
+static void close_control_sock(void) {
+    portENTER_CRITICAL(&s_conn_mux);
+    sockfd old_sock = control_sock;
+    control_sock = -1;
+    portEXIT_CRITICAL(&s_conn_mux);
+    if (old_sock >= 0) closesocket(old_sock);
+}
 
 void wake_controller(void) {
     wake_signal(wake_e);
@@ -172,7 +182,8 @@ void slimproto_send_packet(const u8_t *packet, size_t len) {
 }
 
 static void sendHELO(bool reconnect, const u8_t mac[6]) {
-    const char *cap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Firmware=" VERSION ",ModelName=ESP32-S3-DSP,MaxSampleRate=96000,flc";  /* FLAC only: forces LMS to compress; raw PCM needs 1.4-2.3 MB/s */    struct HELO_packet pkt;
+    const char *cap = "Model=squeezelite,AccuratePlayPoints=1,HasDigitalOut=1,HasPolarityInversion=1,Balance=1,Firmware=" VERSION ",ModelName=ESP32-S3-DSP,MaxSampleRate=96000,flc";  /* FLAC only: forces LMS to compress; raw PCM needs 1.4-2.3 MB/s */
+    struct HELO_packet pkt;
 
     memset(&pkt, 0, sizeof(pkt));
     memcpy(pkt.opcode, "HELO", 4);
@@ -267,17 +278,20 @@ static void sendDSCO(disconnect_code disconnect) {
 }
 
 static void sendRESP(const char *header, size_t len) {
+    if (!header || len == 0 || len >= MAX_HEADER) return;
     struct RESP_header pkt;
     memset(&pkt, 0, sizeof(pkt));
     memcpy(pkt.opcode, "RESP", 4);
     pkt.length = htonl(sizeof(pkt) + len - 8);
 
     LOG_INFO("Sending RESP (%u bytes header)", len);
-    u8_t buf[sizeof(pkt) + MAX_HEADER];
-    if (sizeof(pkt) + len <= sizeof(buf)) {
-        memcpy(buf, &pkt, sizeof(pkt));
-        memcpy(buf + sizeof(pkt), header, len);
-        slimproto_send_packet(buf, sizeof(pkt) + len);
+    if (s_respBuf) {
+        memcpy(s_respBuf, &pkt, sizeof(pkt));
+        memcpy(s_respBuf + sizeof(pkt), header, len);
+        slimproto_send_packet(s_respBuf, sizeof(pkt) + len);
+    } else {
+        slimproto_send_packet((const u8_t *)&pkt, sizeof(pkt));
+        slimproto_send_packet((const u8_t *)header, len);
     }
 }
 
@@ -495,7 +509,9 @@ static void process_serv(u8_t *pkt, int len) {
     if (len < (int)sizeof(struct serv_packet)) return;
     struct serv_packet *serv = (struct serv_packet *)pkt;
     if (serv->server_ip != 0 && serv->server_ip != htonl(1)) {
+        portENTER_CRITICAL(&s_conn_mux);
         slimproto_ip = serv->server_ip;
+        portEXIT_CRITICAL(&s_conn_mux);
         LOG_INFO("Switching server to: %s", inet_ntoa(*(struct in_addr *)&slimproto_ip));
     }
 }
@@ -533,9 +549,14 @@ static void slimproto_task(void *arg) {
 
     while (running) {
         // 1. Connection phase
+        int connect_fails = 0;
         while (running && control_sock < 0) {
             if (slimproto_ip == 0) {
-                slimproto_ip = discover_server(NULL, 5);
+                in_addr_t discovered = discover_server(NULL, 5);
+                portENTER_CRITICAL(&s_conn_mux);
+                slimproto_ip = discovered;
+                portEXIT_CRITICAL(&s_conn_mux);
+                connect_fails = 0;
             }
 
             if (slimproto_ip == 0) {
@@ -569,11 +590,21 @@ static void slimproto_task(void *arg) {
             if (connect_timeout(sock, (struct sockaddr *)&addr, sizeof(addr), 5) < 0) {
                 LOG_WARN("Failed connecting to LMS control socket");
                 closesocket(sock);
+                if (++connect_fails >= 3) {
+                    LOG_WARN("Clearing cached server IP to re-discover LMS/Roon...");
+                    portENTER_CRITICAL(&s_conn_mux);
+                    slimproto_ip = 0;
+                    portEXIT_CRITICAL(&s_conn_mux);
+                    connect_fails = 0;
+                }
                 vTaskDelay(pdMS_TO_TICKS(2000));
                 continue;
             }
+            connect_fails = 0;
 
+            portENTER_CRITICAL(&s_conn_mux);
             control_sock = sock;
+            portEXIT_CRITICAL(&s_conn_mux);
             int nodelay = 1;
             setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, &nodelay, sizeof(nodelay));
             LOG_INFO("Connected to LMS control socket!");
@@ -600,8 +631,7 @@ static void slimproto_task(void *arg) {
                 if (n <= 0) {
                     if (n < 0 && last_error() == ERROR_WOULDBLOCK) continue;
                     LOG_INFO("Control socket closed or error: %s", n ? strerror(last_error()) : "closed");
-                    closesocket(control_sock);
-                    control_sock = -1;
+                    close_control_sock();
                     continue;
                 }
                 expect -= n;
@@ -615,8 +645,7 @@ static void slimproto_task(void *arg) {
                 if (n <= 0) {
                     if (n < 0 && last_error() == ERROR_WOULDBLOCK) continue;
                     LOG_INFO("Control socket closed or error: %s", n ? strerror(last_error()) : "closed");
-                    closesocket(control_sock);
-                    control_sock = -1;
+                    close_control_sock();
                     continue;
                 }
                 got += n;
@@ -625,8 +654,7 @@ static void slimproto_task(void *arg) {
                     got = 0;
                     if (expect > MAX_HEADER) {
                         LOG_ERROR("Packet too large: %d bytes", expect);
-                        closesocket(control_sock);
-                        control_sock = -1;
+                        close_control_sock();
                         continue;
                     }
                 }
@@ -638,8 +666,7 @@ static void slimproto_task(void *arg) {
             // Timeout (1 second)
             if (++timeouts > 35) {
                 LOG_WARN("No packets from LMS in 35s - reconnecting...");
-                closesocket(control_sock);
-                control_sock = -1;
+                close_control_sock();
                 continue;
             }
         }
@@ -669,13 +696,13 @@ static void slimproto_task(void *arg) {
             status.stream_bytes = stream.bytes;
             status.stream_state = stream.state;
 
-            if (stream.state == DISCONNECT) {
-                disc_code = stream.disconnect;
-                stream.state = STOPPED;
-                _sendDSCO = true;
-            }
-
-            if (!stream.sent_headers && (stream.state == STREAMING_HTTP || stream.state == STREAMING_WAIT || stream.state == STREAMING_BUFFERING)) {
+            // Snapshot RESP before transitioning DISCONNECT -> STOPPED so ultra-short
+            // streams that reach EOF before sl_control polls still emit RESP cleanly.
+            if (!stream.sent_headers &&
+                (status.stream_state == STREAMING_HTTP ||
+                 status.stream_state == STREAMING_WAIT ||
+                 status.stream_state == STREAMING_BUFFERING ||
+                 (status.stream_state == DISCONNECT && stream.disconnect == DISCONNECT_OK))) {
                 s_headerLen = stream.header_len;
                 if (s_headerLen > 0 && s_headerLen < MAX_HEADER && s_headerCopy) {
                     memcpy(s_headerCopy, stream.header, s_headerLen);
@@ -683,6 +710,12 @@ static void slimproto_task(void *arg) {
                     _sendRESP = true;
                 }
                 stream.sent_headers = true;
+            }
+
+            if (stream.state == DISCONNECT) {
+                disc_code = stream.disconnect;
+                stream.state = STOPPED;
+                _sendDSCO = true;
             }
             UNLOCK_S;
 
@@ -732,6 +765,13 @@ static void slimproto_task(void *arg) {
                 }
             }
 
+            if (output.state == OUTPUT_BUFFER && sentSTMl && !sentSTMu &&
+                status.stream_state <= DISCONNECT && cur_decode_state == DECODE_STOPPED) {
+                LOG_INFO("End of stream before pre-buffer threshold (%u bytes buffered) -> STARTING PLAYBACK",
+                         status.output_full);
+                output.state = OUTPUT_RUNNING;
+            }
+
             if (output.state == OUTPUT_RUNNING && !sentSTMu && status.output_full == 0 &&
                 status.stream_state <= DISCONNECT && cur_decode_state == DECODE_STOPPED) {
                 _sendSTMu = true;
@@ -749,7 +789,7 @@ static void slimproto_task(void *arg) {
                 } else if (!sentSTMo && (now - s_starved_start > 5000)) {
                     _sendSTMo = true;
                     sentSTMo = true;
-                    LOG_WARN("Output buffer persistently starved (>500ms) -> STMo");
+                    LOG_WARN("Output buffer persistently starved (>5000ms) -> STMo");
                 }
             } else {
                 s_starved_start = 0;
@@ -764,8 +804,8 @@ static void slimproto_task(void *arg) {
 
             if (_stream_disconnect) stream_disconnect();
 
-            if (_sendDSCO) sendDSCO(disc_code);
             if (_sendRESP) sendRESP(s_headerCopy, s_headerLen);
+            if (_sendDSCO) sendDSCO(disc_code);
             if (_sendSTMl) sendSTAT("STMl", 0);
             if (_sendSTMs) sendSTAT("STMs", 0);
             if (_sendSTMd) sendSTAT("STMd", 0);
@@ -807,6 +847,11 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
         s_headerCopy = (char *)heap_caps_malloc(MAX_HEADER, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
         if (!s_headerCopy) s_headerCopy = (char *)malloc(MAX_HEADER);
     }
+    if (!s_respBuf) {
+        const size_t respSz = sizeof(struct RESP_header) + MAX_HEADER;
+        s_respBuf = (u8_t *)heap_caps_malloc(respSz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_respBuf) s_respBuf = (u8_t *)malloc(respSz);
+    }
 
     if (!s_pktBuffer || !s_headerCopy) {
         LOG_ERROR("Failed allocating SlimProto packet buffers");
@@ -819,7 +864,7 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
     BaseType_t rc = xTaskCreatePinnedToCore(
         slimproto_task,
         "sl_control",
-        4096,
+        6144,
         NULL,
         5,
         &slimproto_task_handle,
@@ -835,10 +880,28 @@ void slimproto_stop(void) {
     running = false;
     wake_controller();
 
-    if (control_sock >= 0) {
-        closesocket(control_sock);
-        control_sock = -1;
-    }
+    close_control_sock();
 
     _wake_close(&wake_e);
+}
+
+bool slimproto_is_connected(void) {
+    portENTER_CRITICAL(&s_conn_mux);
+    bool conn = (control_sock >= 0);
+    portEXIT_CRITICAL(&s_conn_mux);
+    return conn;
+}
+
+void slimproto_get_server_ip(char *buf, size_t len) {
+    if (!buf || len == 0) return;
+    portENTER_CRITICAL(&s_conn_mux);
+    bool conn = (control_sock >= 0);
+    in_addr_t ip = slimproto_ip;
+    portEXIT_CRITICAL(&s_conn_mux);
+    if (!conn || ip == 0) {
+        buf[0] = '\0';
+        return;
+    }
+    const u8_t *b = (const u8_t *)&ip;
+    snprintf(buf, len, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
 }

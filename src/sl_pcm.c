@@ -24,10 +24,11 @@ extern volatile unsigned sl_source_bits;
 #define MAX_DECODE_FRAMES 1024
 
 static resampler_t *s_pcm_rs = NULL;
-static float *s_pcmInL  = NULL;
-static float *s_pcmInR  = NULL;
-static float *s_pcmOutL = NULL;
-static float *s_pcmOutR = NULL;
+static u8_t  *s_pcmRawIn = NULL;
+static float *s_pcmInL   = NULL;
+static float *s_pcmInR   = NULL;
+static float *s_pcmOutL  = NULL;
+static float *s_pcmOutR  = NULL;
 
 static u32_t pcm_sample_rate = 44100;
 static u32_t sample_size = 2; // bytes per sample per channel
@@ -228,14 +229,18 @@ static decode_state pcm_decode(void) {
         return DECODE_RUNNING;
     }
 
-    static u8_t s_rawIn[RS_MAX_IN * 8];
+    if (!s_pcmRawIn) {
+        UNLOCK_S;
+        return DECODE_ERROR;
+    }
+    const size_t raw_cap = RS_MAX_IN * 8;
     unsigned consumed = frames * bytes_per_frame;
-    if (consumed > sizeof(s_rawIn)) {
-        frames = sizeof(s_rawIn) / bytes_per_frame;
+    if (consumed > raw_cap) {
+        frames = raw_cap / bytes_per_frame;
         consumed = frames * bytes_per_frame;
     }
 
-    memcpy(s_rawIn, streambuf->readp, consumed);
+    memcpy(s_pcmRawIn, streambuf->readp, consumed);
     _buf_inc_readp(streambuf, consumed);
     if (limit && audio_left >= consumed) {
         audio_left -= consumed;
@@ -243,7 +248,7 @@ static decode_state pcm_decode(void) {
     u32_t out_seq = outputbuf->flush_seq;
     UNLOCK_S;
 
-    const u8_t *iptr = s_rawIn;
+    const u8_t *iptr = s_pcmRawIn;
     static const float kScale32 = 1.0f / 2147483648.0f;
 
     for (frames_t i = 0; i < frames; ++i) {
@@ -384,29 +389,29 @@ static struct codec pcm_codec = {
     pcm_decode
 };
 
+static void *pcm_alloc_staging(size_t bytes) {
+    size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
+    void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    return p;
+}
+
 struct codec *register_pcm(void) {
     if (!s_pcmInL) {
-        s_pcmInL  = (float *)heap_caps_aligned_alloc(16, RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmInL) s_pcmInL = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmInL) s_pcmInL = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_pcmRawIn = (u8_t *) pcm_alloc_staging(RS_MAX_IN * 8);
+        s_pcmInL   = (float *)pcm_alloc_staging(RS_MAX_IN * sizeof(float));
+        s_pcmInR   = (float *)pcm_alloc_staging(RS_MAX_IN * sizeof(float));
+        s_pcmOutL  = (float *)pcm_alloc_staging(RS_OUT_CAP * sizeof(float));
+        s_pcmOutR  = (float *)pcm_alloc_staging(RS_OUT_CAP * sizeof(float));
 
-        s_pcmInR  = (float *)heap_caps_aligned_alloc(16, RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmInR) s_pcmInR = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmInR) s_pcmInR = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        s_pcmOutL = (float *)heap_caps_aligned_alloc(16, RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmOutL) s_pcmOutL = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmOutL) s_pcmOutL = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        s_pcmOutR = (float *)heap_caps_aligned_alloc(16, RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmOutR) s_pcmOutR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_pcmOutR) s_pcmOutR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        if (!s_pcmInL || !s_pcmInR || !s_pcmOutL || !s_pcmOutR) {
-            if (s_pcmInL)  { free(s_pcmInL);  s_pcmInL  = NULL; }
-            if (s_pcmInR)  { free(s_pcmInR);  s_pcmInR  = NULL; }
-            if (s_pcmOutL) { free(s_pcmOutL); s_pcmOutL = NULL; }
-            if (s_pcmOutR) { free(s_pcmOutR); s_pcmOutR = NULL; }
+        if (!s_pcmRawIn || !s_pcmInL || !s_pcmInR || !s_pcmOutL || !s_pcmOutR) {
+            if (s_pcmRawIn) { heap_caps_free(s_pcmRawIn); s_pcmRawIn = NULL; }
+            if (s_pcmInL)   { heap_caps_free(s_pcmInL);   s_pcmInL   = NULL; }
+            if (s_pcmInR)   { heap_caps_free(s_pcmInR);   s_pcmInR   = NULL; }
+            if (s_pcmOutL)  { heap_caps_free(s_pcmOutL);  s_pcmOutL  = NULL; }
+            if (s_pcmOutR)  { heap_caps_free(s_pcmOutR);  s_pcmOutR  = NULL; }
             LOG_ERROR("PCM resampler buffers allocation failed");
             return NULL;
         }

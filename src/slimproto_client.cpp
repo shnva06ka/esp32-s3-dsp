@@ -82,7 +82,13 @@ void SlimprotoClient::_runTelemetry() {
         bool isStream = (output.state == OUTPUT_RUNNING || output.state == OUTPUT_BUFFER);
         bool isPaused = (output.state == OUTPUT_STOPPED || output.state == OUTPUT_PAUSE_FRAMES);
 
-        meta.connected  = _running;
+        meta.connected  = slimproto_is_connected();
+        slimproto_get_server_ip(meta.serverIp, sizeof(meta.serverIp));
+        if (meta.connected && meta.serverIp[0]) {
+            snprintf(meta.serverName, sizeof(meta.serverName), "SlimProto (%s)", meta.serverIp);
+        } else {
+            snprintf(meta.serverName, sizeof(meta.serverName), "None");
+        }
         meta.streaming  = isStream;
         meta.paused     = isPaused;
         meta.sampleRate = sl_source_rate ? sl_source_rate : (uint32_t)SAMPLE_RATE;

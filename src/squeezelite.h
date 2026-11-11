@@ -280,6 +280,8 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
 void slimproto_stop(void);
 void wake_controller(void);
 void slimproto_send_packet(const u8_t *packet, size_t len);
+bool slimproto_is_connected(void);
+void slimproto_get_server_ip(char *buf, size_t len);
 
 // utils.c
 typedef enum { EVENT_TIMEOUT = 0, EVENT_READ, EVENT_WAKE } event_type;

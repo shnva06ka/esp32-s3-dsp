@@ -207,7 +207,12 @@ in_addr_t discover_server(char *default_server, int max) {
         attempts++;
         LOG_INFO("Broadcasting LMS discovery packet (attempt %d)...", attempts);
         if (sendto(disc_sock, buf, len, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {
-            LOG_WARN("Error sending discovery packet");
+            int err = last_error();
+            LOG_WARN("Error sending discovery packet: errno=%d (%s) | intFree=%u maxBlk=%u psramFree=%u",
+                     err, strerror(err),
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
         }
 
         if (poll(&pollinfo, 1, 2000) > 0 && (pollinfo.revents & POLLIN)) {

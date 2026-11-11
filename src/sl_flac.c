@@ -30,6 +30,7 @@ static drflac_int32 *s_flacDecBuf = NULL;
 #define OUT_RATE        ((unsigned)SAMPLE_RATE)
 #define RS_OUT_CAP      4096
 static resampler_t *s_rs = NULL;
+static portMUX_TYPE s_rs_mux = portMUX_INITIALIZER_UNLOCKED;
 static float *s_inL = NULL, *s_inR = NULL, *s_outL = NULL, *s_outR = NULL;
 volatile unsigned sl_source_rate = 0;   /* sample rate of the stream currently decoded (for UI) */
 volatile unsigned sl_source_bits = 0;   /* bit depth of the stream currently decoded (for UI) */
@@ -119,19 +120,27 @@ static decode_state flac_decode(void) {
         LOG_INFO("FLAC stream opened: %u channels, %u Hz, %u bits/sample",
                  pFlac->channels, pFlac->sampleRate, pFlac->bitsPerSample);
 
-        resampler_destroy(s_rs);
+        resampler_t *old_rs = NULL;
+        portENTER_CRITICAL(&s_rs_mux);
+        old_rs = s_rs;
         s_rs = NULL;
+        portEXIT_CRITICAL(&s_rs_mux);
+        resampler_destroy(old_rs);
+
         sl_source_rate = pFlac->sampleRate;
         sl_source_bits = pFlac->bitsPerSample;
         if (pFlac->sampleRate != OUT_RATE) {
-            s_rs = resampler_create(pFlac->sampleRate, OUT_RATE);
-            if (!s_rs) {
+            resampler_t *new_rs = resampler_create(pFlac->sampleRate, OUT_RATE);
+            if (!new_rs) {
                 LOG_ERROR("Cannot resample %u Hz -> %u Hz (unsupported rate or out of memory)",
                           pFlac->sampleRate, OUT_RATE);
                 drflac_close(pFlac);
                 pFlac = NULL;
                 return DECODE_ERROR;
             }
+            portENTER_CRITICAL(&s_rs_mux);
+            s_rs = new_rs;
+            portEXIT_CRITICAL(&s_rs_mux);
             LOG_INFO("Resampling %u Hz -> %u Hz on Core %d", pFlac->sampleRate, OUT_RATE, xPortGetCoreID());
         }
     }
@@ -261,8 +270,12 @@ static void flac_close(void) {
         drflac_close(pFlac);
         pFlac = NULL;
     }
-    resampler_destroy(s_rs);
+    resampler_t *old_rs = NULL;
+    portENTER_CRITICAL(&s_rs_mux);
+    old_rs = s_rs;
     s_rs = NULL;
+    portEXIT_CRITICAL(&s_rs_mux);
+    resampler_destroy(old_rs);
     sl_source_rate = 0;
     sl_source_bits = 0;
     LOG_INFO("Closing FLAC codec");
@@ -278,35 +291,31 @@ static struct codec flac_codec = {
     flac_decode
 };
 
+static void *flac_alloc_staging(size_t bytes) {
+    size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
+    void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!p) p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    return p;
+}
+
 struct codec *register_flac(void) {
     if (!s_flacDecBuf) {
-        s_flacDecBuf = (drflac_int32 *)heap_caps_malloc(1024 * 2 * sizeof(drflac_int32), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_flacDecBuf) {
-            s_flacDecBuf = (drflac_int32 *)heap_caps_malloc(1024 * 2 * sizeof(drflac_int32), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-        }
+        s_flacDecBuf = (drflac_int32 *)flac_alloc_staging(1024 * 2 * sizeof(drflac_int32));
     }
     if (!s_inL) {
-        s_inL  = (float *)heap_caps_aligned_alloc(16, RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_inL) s_inL = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_inL) s_inL = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        s_inL  = (float *)flac_alloc_staging(RS_MAX_IN * sizeof(float));
+        s_inR  = (float *)flac_alloc_staging(RS_MAX_IN * sizeof(float));
+        s_outL = (float *)flac_alloc_staging(RS_OUT_CAP * sizeof(float));
+        s_outR = (float *)flac_alloc_staging(RS_OUT_CAP * sizeof(float));
 
-        s_inR  = (float *)heap_caps_aligned_alloc(16, RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_inR) s_inR = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_inR) s_inR = (float *)heap_caps_malloc(RS_MAX_IN * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        s_outL = (float *)heap_caps_aligned_alloc(16, RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_outL) s_outL = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_outL) s_outL = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        s_outR = (float *)heap_caps_aligned_alloc(16, RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_outR) s_outR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-        if (!s_outR) s_outR = (float *)heap_caps_malloc(RS_OUT_CAP * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-
-        if (!s_inL || !s_inR || !s_outL || !s_outR) {
-            if (s_inL)  { free(s_inL);  s_inL  = NULL; }
-            if (s_inR)  { free(s_inR);  s_inR  = NULL; }
-            if (s_outL) { free(s_outL); s_outL = NULL; }
-            if (s_outR) { free(s_outR); s_outR = NULL; }
+        if (!s_flacDecBuf || !s_inL || !s_inR || !s_outL || !s_outR) {
+            if (s_flacDecBuf) { heap_caps_free(s_flacDecBuf); s_flacDecBuf = NULL; }
+            if (s_inL)        { heap_caps_free(s_inL);        s_inL        = NULL; }
+            if (s_inR)        { heap_caps_free(s_inR);        s_inR        = NULL; }
+            if (s_outL)       { heap_caps_free(s_outL);       s_outL       = NULL; }
+            if (s_outR)       { heap_caps_free(s_outR);       s_outR       = NULL; }
             LOG_ERROR("FLAC resampler buffers allocation failed");
             return NULL;
         }
@@ -315,7 +324,13 @@ struct codec *register_flac(void) {
 }
 
 bool sl_flac_get_resampler_stats(resampler_stats_t *out) {
-    if (!s_rs || !out) return false;
-    resampler_get_stats(s_rs, out);
-    return true;
+    if (!out) return false;
+    bool ok = false;
+    portENTER_CRITICAL(&s_rs_mux);
+    if (s_rs) {
+        resampler_get_stats(s_rs, out);
+        ok = true;
+    }
+    portEXIT_CRITICAL(&s_rs_mux);
+    return ok;
 }
