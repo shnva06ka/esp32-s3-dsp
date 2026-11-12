@@ -85,9 +85,10 @@ err_t __wrap_tcp_enqueue_flags(struct tcp_pcb *pcb, u8_t flags)
 
 void __wrap_tcp_recved(struct tcp_pcb *pcb, u16_t len)
 {
-    if (pcb == NULL) {
+    if (pcb == NULL || pcb->state == LISTEN || pcb->state == CLOSED) {
         return;
     }
+    LWIP_ASSERT_CORE_LOCKED();
 
     u32_t rcv_wnd = (u32_t)pcb->rcv_wnd + (u32_t)len;
     if (rcv_wnd > TUNED_TCP_WND) {
@@ -105,7 +106,7 @@ void __wrap_tcp_recved(struct tcp_pcb *pcb, u16_t len)
 
 err_t __wrap_tcp_close(struct tcp_pcb *pcb)
 {
-    if (pcb != NULL && pcb->rcv_wnd > 0) {
+    if (pcb != NULL && pcb->state != LISTEN && pcb->rcv_wnd > 0) {
         /* Match compiled TCP_WND_MAX (5760) so tcp_close_shutdown() sees a full window
          * and performs a clean FIN close instead of sending TCP RST and purging unsent data. */
         pcb->rcv_wnd = (tcpwnd_size_t)STOCK_TCP_WND;

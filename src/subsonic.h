@@ -2,10 +2,6 @@
 
 #include <cmath>
 #include <cstring>
-#if __has_include(<esp_dsp.h>)
-#include <esp_dsp.h>
-#define HAVE_ESP_DSP 1
-#endif
 #include "audio_config.h"
 #include "param_store.h"
 
@@ -33,68 +29,36 @@ public:
             if (!std::isfinite(right[i])) right[i] = 0.0f;
         }
 
-#if defined(HAVE_ESP_DSP)
-        dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[0], _zL[0]);
-        dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[0], _zR[0]);
-        if (!std::isfinite(_zL[0][0]) || !std::isfinite(_zL[0][1])) {
-            _zL[0][0] = 0.0f; _zL[0][1] = 0.0f;
-        } else {
-            if (fabsf(_zL[0][0]) < 1e-15f) _zL[0][0] = 0.0f;
-            if (fabsf(_zL[0][1]) < 1e-15f) _zL[0][1] = 0.0f;
-        }
-        if (!std::isfinite(_zR[0][0]) || !std::isfinite(_zR[0][1])) {
-            _zR[0][0] = 0.0f; _zR[0][1] = 0.0f;
-        } else {
-            if (fabsf(_zR[0][0]) < 1e-15f) _zR[0][0] = 0.0f;
-            if (fabsf(_zR[0][1]) < 1e-15f) _zR[0][1] = 0.0f;
-        }
-        if (_hasSecondStage) {
-            dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[1], _zL[1]);
-            dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[1], _zR[1]);
-            if (!std::isfinite(_zL[1][0]) || !std::isfinite(_zL[1][1])) {
-                _zL[1][0] = 0.0f; _zL[1][1] = 0.0f;
-            } else {
-                if (fabsf(_zL[1][0]) < 1e-15f) _zL[1][0] = 0.0f;
-                if (fabsf(_zL[1][1]) < 1e-15f) _zL[1][1] = 0.0f;
-            }
-            if (!std::isfinite(_zR[1][0]) || !std::isfinite(_zR[1][1])) {
-                _zR[1][0] = 0.0f; _zR[1][1] = 0.0f;
-            } else {
-                if (fabsf(_zR[1][0]) < 1e-15f) _zR[1][0] = 0.0f;
-                if (fabsf(_zR[1][1]) < 1e-15f) _zR[1][1] = 0.0f;
-            }
-        }
-#else
         _processStage(left, right, frames, _coeffs[0], _zL[0], _zR[0]);
         if (_hasSecondStage) {
             _processStage(left, right, frames, _coeffs[1], _zL[1], _zR[1]);
         }
-#endif
     }
 
 private:
+    // Hardware-FPU 32-bit float Transposed Direct Form II keeps internal state
+    // bounded to O(1) (avoiding DF-II's ~583,000 state blowup at 20 Hz / 96 kHz).
     static inline void _processStage(float* left, float* right, size_t frames,
-                                     const float* c, float* wL, float* wR) {
+                                     const float* c, float* zL, float* zR) {
+        const float b0 = c[0], b1 = c[1], b2 = c[2], a1 = c[3], a2 = c[4];
         for (size_t i = 0; i < frames; ++i) {
-            float inL = left[i];
-            if (!std::isfinite(inL)) inL = 0.0f;
-            float d0L = inL - c[3] * wL[0] - c[4] * wL[1];
-            if (fabsf(d0L) < 1e-15f) d0L = 0.0f;
-            float outL = c[0] * d0L + c[1] * wL[0] + c[2] * wL[1];
-            if (!std::isfinite(outL)) { outL = 0.0f; d0L = 0.0f; wL[0] = 0.0f; wL[1] = 0.0f; }
-            left[i]   = outL;
-            wL[1] = wL[0];
-            wL[0] = d0L;
+            float inL = std::isfinite(left[i]) ? left[i] : 0.0f;
+            float outL = b0 * inL + zL[0];
+            zL[0] = b1 * inL - a1 * outL + zL[1];
+            zL[1] = b2 * inL - a2 * outL;
+            if (!std::isfinite(outL)) { outL = 0.0f; zL[0] = 0.0f; zL[1] = 0.0f; }
+            if (fabsf(zL[0]) < 1e-15f) zL[0] = 0.0f;
+            if (fabsf(zL[1]) < 1e-15f) zL[1] = 0.0f;
+            left[i] = outL;
 
-            float inR = right[i];
-            if (!std::isfinite(inR)) inR = 0.0f;
-            float d0R = inR - c[3] * wR[0] - c[4] * wR[1];
-            if (fabsf(d0R) < 1e-15f) d0R = 0.0f;
-            float outR = c[0] * d0R + c[1] * wR[0] + c[2] * wR[1];
-            if (!std::isfinite(outR)) { outR = 0.0f; d0R = 0.0f; wR[0] = 0.0f; wR[1] = 0.0f; }
-            right[i]  = outR;
-            wR[1] = wR[0];
-            wR[0] = d0R;
+            float inR = std::isfinite(right[i]) ? right[i] : 0.0f;
+            float outR = b0 * inR + zR[0];
+            zR[0] = b1 * inR - a1 * outR + zR[1];
+            zR[1] = b2 * inR - a2 * outR;
+            if (!std::isfinite(outR)) { outR = 0.0f; zR[0] = 0.0f; zR[1] = 0.0f; }
+            if (fabsf(zR[0]) < 1e-15f) zR[0] = 0.0f;
+            if (fabsf(zR[1]) < 1e-15f) zR[1] = 0.0f;
+            right[i] = outR;
         }
     }
 
@@ -109,57 +73,67 @@ private:
 
     void _update(const SubsonicParams& p) {
         _enabled = p.enabled;
-        _freq    = (p.freq < 20.0f) ? 20.0f : ((p.freq > 100.0f) ? 100.0f : p.freq);
-        _order   = (p.order >= 2 && p.order <= 4) ? p.order : 2;
+        const double rawFreq = std::isfinite(p.freq) ? static_cast<double>(p.freq) : 80.0;
+        const double safeFreq = (rawFreq < 20.0) ? 20.0 : ((rawFreq > 100.0) ? 100.0 : rawFreq);
+        _freq    = static_cast<float>(safeFreq);
+        _order   = (p.order >= 1 && p.order <= 4) ? p.order : 2;
 
-        const float Fs   = static_cast<float>(kSampleRate);
-        const float w0   = 2.0f * M_PI * _freq / Fs;
-        const float cos0 = cosf(w0);
-        const float sin0 = sinf(w0);
-        const float tan0 = tanf(w0 * 0.5f);
+        const double Fs   = static_cast<double>(kSampleRate);
+        const double w0   = 2.0 * M_PI * safeFreq / Fs;
+        const double cos0 = cos(w0);
+        const double sin0 = sin(w0);
+        const double tan0 = tan(w0 * 0.5);
 
         _hasSecondStage = false;
 
-        if (_order == 3) {
-            const float b0 = 1.0f / (1.0f + tan0);
-            const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
-            _coeffs[0][0] = b0;
-            _coeffs[0][1] = -b0;
+        if (_order == 1) {
+            const double b0 = 1.0 / (1.0 + tan0);
+            const double a1 = (tan0 - 1.0) / (1.0 + tan0);
+            _coeffs[0][0] = static_cast<float>(b0);
+            _coeffs[0][1] = static_cast<float>(-b0);
             _coeffs[0][2] = 0.0f;
-            _coeffs[0][3] = a1;
+            _coeffs[0][3] = static_cast<float>(a1);
+            _coeffs[0][4] = 0.0f;
+        } else if (_order == 3) {
+            const double b0 = 1.0 / (1.0 + tan0);
+            const double a1 = (tan0 - 1.0) / (1.0 + tan0);
+            _coeffs[0][0] = static_cast<float>(b0);
+            _coeffs[0][1] = static_cast<float>(-b0);
+            _coeffs[0][2] = 0.0f;
+            _coeffs[0][3] = static_cast<float>(a1);
             _coeffs[0][4] = 0.0f;
 
-            const float alpha = sin0 / (2.0f * 1.0f);
-            const float a0_2  = 1.0f + alpha;
-            const float invA0 = (fabsf(a0_2) > 1e-12f) ? (1.0f / a0_2) : 1.0f;
-            _coeffs[1][0] = (1.0f + cos0) * 0.5f * invA0;
-            _coeffs[1][1] = -(1.0f + cos0) * invA0;
-            _coeffs[1][2] = (1.0f + cos0) * 0.5f * invA0;
-            _coeffs[1][3] = (-2.0f * cos0) * invA0;
-            _coeffs[1][4] = (1.0f - alpha) * invA0;
+            const double alpha = sin0 / 2.0;
+            const double a0_2  = 1.0 + alpha;
+            const double invA0 = (fabs(a0_2) > 1e-12) ? (1.0 / a0_2) : 1.0;
+            _coeffs[1][0] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+            _coeffs[1][1] = static_cast<float>(-(1.0 + cos0) * invA0);
+            _coeffs[1][2] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+            _coeffs[1][3] = static_cast<float>((-2.0 * cos0) * invA0);
+            _coeffs[1][4] = static_cast<float>((1.0 - alpha) * invA0);
             _hasSecondStage = true;
         } else if (_order == 4) {
-            constexpr float Q_stages[2] = { 1.30656296f, 0.5411961f };
+            constexpr double Q_stages[2] = { 0.541196100146197, 1.3065629648763766 };
             for (int s = 0; s < 2; ++s) {
-                const float alpha = sin0 / (2.0f * Q_stages[s]);
-                const float a0_s  = 1.0f + alpha;
-                const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
-                _coeffs[s][0] = (1.0f + cos0) * 0.5f * invA0;
-                _coeffs[s][1] = -(1.0f + cos0) * invA0;
-                _coeffs[s][2] = (1.0f + cos0) * 0.5f * invA0;
-                _coeffs[s][3] = (-2.0f * cos0) * invA0;
-                _coeffs[s][4] = (1.0f - alpha) * invA0;
+                const double alpha = sin0 / (2.0 * Q_stages[s]);
+                const double a0_s  = 1.0 + alpha;
+                const double invA0 = (fabs(a0_s) > 1e-12) ? (1.0 / a0_s) : 1.0;
+                _coeffs[s][0] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                _coeffs[s][1] = static_cast<float>(-(1.0 + cos0) * invA0);
+                _coeffs[s][2] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                _coeffs[s][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                _coeffs[s][4] = static_cast<float>((1.0 - alpha) * invA0);
             }
             _hasSecondStage = true;
         } else {
-            const float alpha = sin0 / (2.0f * 0.70710678f);
-            const float a0_s  = 1.0f + alpha;
-            const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
-            _coeffs[0][0] = (1.0f + cos0) * 0.5f * invA0;
-            _coeffs[0][1] = -(1.0f + cos0) * invA0;
-            _coeffs[0][2] = (1.0f + cos0) * 0.5f * invA0;
-            _coeffs[0][3] = (-2.0f * cos0) * invA0;
-            _coeffs[0][4] = (1.0f - alpha) * invA0;
+            const double alpha = sin0 / (2.0 * 0.7071067811865476);
+            const double a0_s  = 1.0 + alpha;
+            const double invA0 = (fabs(a0_s) > 1e-12) ? (1.0 / a0_s) : 1.0;
+            _coeffs[0][0] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+            _coeffs[0][1] = static_cast<float>(-(1.0 + cos0) * invA0);
+            _coeffs[0][2] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+            _coeffs[0][3] = static_cast<float>((-2.0 * cos0) * invA0);
+            _coeffs[0][4] = static_cast<float>((1.0 - alpha) * invA0);
         }
     }
 };

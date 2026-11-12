@@ -21,6 +21,7 @@ I2SAudio   g_audio(g_params);
 
 static TaskHandle_t s_audioTaskHandle = nullptr;
 static TaskHandle_t s_webTaskHandle   = nullptr;
+static std::atomic<bool> s_audioReady{false};
 
 void setup()
 {
@@ -34,7 +35,7 @@ void setup()
     Console.println("========================================================");
     Console.printf("[BOOT] Chip: ESP32-S3 (Rev %d, %d Cores @ %d MHz)\n",
                   ESP.getChipRevision(), ESP.getChipCores(), ESP.getCpuFreqMHz());
-    Console.printf("[BOOT] Flash: %u MB (Mode: QIO)\n", ESP.getFlashChipSize() / (1024 * 1024));
+    Console.printf("[BOOT] Flash: %u MB (Mode: DIO)\n", ESP.getFlashChipSize() / (1024 * 1024));
 
     if (psramFound()) {
         Console.printf("[BOOT] PSRAM: %u MB Octal PSRAM (OPI) Active\n",
@@ -57,16 +58,6 @@ void setup()
     esp_task_wdt_init(10, true);
 
     xTaskCreatePinnedToCore(
-        audioTask,
-        "AudioTask",
-        5120,
-        nullptr,
-        configMAX_PRIORITIES - 1,
-        &s_audioTaskHandle,
-        1
-    );
-
-    xTaskCreatePinnedToCore(
         webTask,
         "WebTask",
         10240,
@@ -74,6 +65,16 @@ void setup()
         2,
         &s_webTaskHandle,
         0
+    );
+
+    xTaskCreatePinnedToCore(
+        audioTask,
+        "AudioTask",
+        5120,
+        nullptr,
+        configMAX_PRIORITIES - 1,
+        &s_audioTaskHandle,
+        1
     );
 
     ResamplerTelemetry::setTaskHandles(g_audio.getBtTaskHandle(), s_audioTaskHandle, s_webTaskHandle, sl_decode_task_handle());
@@ -89,9 +90,11 @@ static void audioTask(void* /*pvParameters*/)
     Console.println("[AUDIO] Initialising Dual-I2S Audio Driver...");
     if (!g_audio.begin()) {
         Console.println("[AUDIO] FATAL: I2S peripheral initialisation failed");
+        ResamplerTelemetry::setAudioTaskHandle(nullptr);
         vTaskDelete(nullptr);
     }
     ResamplerTelemetry::setBtTaskHandle(g_audio.getBtTaskHandle());
+    s_audioReady.store(true, std::memory_order_release);
 
     Console.println("[AUDIO] I2S_NUM_0 Master (PCM1808 ADC + PCM5102A DAC) ready");
     Console.println("[AUDIO] I2S_NUM_1 Slave (Bluetooth A2DP Receiver) ready");
@@ -122,13 +125,14 @@ static void webTask(void* /*pvParameters*/)
     esp_task_wdt_add(nullptr);
 
     bool otaConfirmed = false;
-    uint32_t bootConfirmTimer = millis() + 5000;
+    uint32_t bootStartMs = millis();
 
     for (;;) {
         ui.loop();
         ResamplerTelemetry::poll();
 
-        if (!otaConfirmed && millis() >= bootConfirmTimer) {
+        if (!otaConfirmed && s_audioReady.load(std::memory_order_acquire) &&
+            (uint32_t)(millis() - bootStartMs) >= 5000U) {
             esp_ota_mark_app_valid_cancel_rollback();
             otaConfirmed = true;
             Console.println("[OTA] Firmware verified healthy - rollback cancelled.");

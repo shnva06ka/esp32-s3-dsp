@@ -1,6 +1,10 @@
 /*
  * Squeezelite FLAC codec ported for ESP32-S3 using dr_flac
- * Integrates into Squeezelite codec interface
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * and dr_flac (c) 2023 David Reid (Public Domain / MIT-0).
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #define DR_FLAC_IMPLEMENTATION
 #define DR_FLAC_NO_STDIO
@@ -107,7 +111,7 @@ static decode_state flac_decode(void) {
         pFlac = drflac_open(_flac_read_cb, _flac_seek_cb, NULL, NULL, NULL);
         if (!pFlac) {
             LOG_WARN("drflac_open failed (avail=%u, toend=%d)", avail, toend);
-            return toend ? DECODE_COMPLETE : DECODE_RUNNING;
+            return DECODE_ERROR;
         }
 
         if (pFlac->channels > 2) {
@@ -167,7 +171,6 @@ static decode_state flac_decode(void) {
         frames_t cap = space_frames < RS_OUT_CAP ? space_frames : RS_OUT_CAP;
         frames_t in_fit = (frames_t)resampler_in_for_out(s_rs, cap);
         if (in_fit < max_decode) max_decode = in_fit;
-        if (max_decode < 1) max_decode = 1;
     } else if (space_frames < max_decode) {
         max_decode = space_frames;
     }
@@ -182,6 +185,33 @@ static decode_state flac_decode(void) {
         bool toend = (stream.state <= DISCONNECT && _buf_used(streambuf) == 0);
         UNLOCK_S;
         return toend ? DECODE_COMPLETE : DECODE_RUNNING;
+    }
+
+    if (pFlac->channels == 0 || pFlac->channels > 2) {
+        LOG_ERROR("Unsupported mid-stream FLAC channels: %u", pFlac->channels);
+        return DECODE_ERROR;
+    }
+
+    if (pFlac->sampleRate != sl_source_rate) {
+        resampler_t *old_rs = NULL;
+        portENTER_CRITICAL(&s_rs_mux);
+        old_rs = s_rs;
+        s_rs = NULL;
+        portEXIT_CRITICAL(&s_rs_mux);
+        resampler_destroy(old_rs);
+
+        sl_source_rate = pFlac->sampleRate;
+        sl_source_bits = pFlac->bitsPerSample;
+        if (pFlac->sampleRate != OUT_RATE) {
+            resampler_t *new_rs = resampler_create(pFlac->sampleRate, OUT_RATE);
+            if (!new_rs) {
+                LOG_ERROR("Mid-stream FLAC rate %u Hz unsupported", pFlac->sampleRate);
+                return DECODE_ERROR;
+            }
+            portENTER_CRITICAL(&s_rs_mux);
+            s_rs = new_rs;
+            portEXIT_CRITICAL(&s_rs_mux);
+        }
     }
 
     if (s_rs) {
@@ -201,20 +231,21 @@ static decode_state flac_decode(void) {
             return DECODE_RUNNING;
         }
 
+        LOCK_O;
         if (s_rs && outputbuf) {
             uint32_t occ = (uint32_t)(_buf_used(outputbuf) / BYTES_PER_FRAME);
             uint32_t cap = (uint32_t)(OUTPUTBUF_SIZE / BYTES_PER_FRAME);
             resampler_record_flow(s_rs, 0, 0, 0, occ, cap);
         }
-
-        LOCK_O;
         ISAMPLE_T *rptr = (ISAMPLE_T *)(void *)outputbuf->writep;
         ISAMPLE_T *buf_start = (ISAMPLE_T *)(void *)outputbuf->buf;
         ISAMPLE_T *buf_wrap  = (ISAMPLE_T *)(void *)outputbuf->wrap;
 
         for (size_t i = 0; i < outN; ++i) {
-            float l = fmaxf(-1.0f, fminf(1.0f, s_outL[i]));
-            float r = fmaxf(-1.0f, fminf(1.0f, s_outR[i]));
+            float rawL = isfinite(s_outL[i]) ? s_outL[i] : 0.0f;
+            float rawR = isfinite(s_outR[i]) ? s_outR[i] : 0.0f;
+            float l = fmaxf(-1.0f, fminf(1.0f, rawL));
+            float r = fmaxf(-1.0f, fminf(1.0f, rawR));
             *rptr++ = (s32_t)(l * 2147483392.0f);
             *rptr++ = (s32_t)(r * 2147483392.0f);
             if (rptr >= buf_wrap) {

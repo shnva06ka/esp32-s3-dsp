@@ -53,14 +53,15 @@ pio device monitor -e yd_esp32s3_n16r8  # Serial monitor
 ## Security & LAN-Only Architecture
 
 - **100% LAN-Only Operation**: Designed strictly for private local networks. No external cloud endpoints, external telemetry, or internet access is required or attempted.
-- **Access Control**: Administrative endpoints (`/update`, `/api/reboot`, `/console`, `/api/logs`) are protected by HTTP Basic Authentication.
+- **Access Control**: Administrative endpoints (`/update`, `/api/ota/auth`, `/api/reboot`, `/console`, `/api/logs`) are protected by HTTP Digest Authentication.
   - **Default Credentials**: Username `admin`, Password `admin`.
-  - **Change Password**: Update credentials via `POST /api/auth` or the Settings card in the Web UI. Credentials are encrypted and persisted in NVS (`dsp_auth`).
-- **OTA Safety & Anti-Brick Protection**:
+  - **Change Password**: Update credentials via `POST /api/auth` (e.g., `curl -X POST --digest -u admin:admin -d "user=admin&pass=newpass" http://dsp.local/api/auth`). Credentials are persisted in NVS (`dsp_auth`).
+- **OTA Safety, Rollback & Bad-OTA Recovery**:
   - Dual 6.25 MB partition layout (`app0` and `app1`) with ESP-IDF hardware bootloader rollback support.
   - Binary header validation (0xE9 magic byte check) prevents flashing corrupted images.
-  - Rollback cancellation is deferred for 5 seconds of healthy system runtime after boot. If a watchdog reset or crash occurs during initial startup, the device automatically reverts to the previous working partition.
+  - Rollback cancellation is deferred for 5 seconds of healthy system and audio task runtime after boot. If a watchdog reset or crash occurs during initial startup, the device automatically reverts to the previous working partition.
   - ArduinoOTA network flashing requires an NVS password and is automatically disabled when operating in Access Point (AP) mode.
+  - **USB Recovery & Factory Reset**: If a bad flash or misconfiguration prevents booting or network access, connect via USB (`COM4` or auto-detected port) and run `pio run -e yd_esp32s3_n16r8 -t upload` (and `pio run -e yd_esp32s3_n16r8 -t erase` to factory-reset NVS settings, Wi-Fi config, and auth credentials).
 
 ## Architecture
 
@@ -118,13 +119,13 @@ The board exposes a REST API and a WebSocket at `/ws`:
 
 ## License & Credits
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See the [LICENSE](LICENSE) file for the full license text.
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and [SECURITY.md](SECURITY.md) for license terms, corresponding source notices, and security guidance.
 
 ### Third-Party Acknowledgements
 
 - **Squeezelite**: (c) 2012–2015 Adrian Smith, 2015–2021 Ralph Irving (GPLv3).
-- **squeezelite-esp32**: (c) Philippe G. / sle118 (GPLv3/MIT).
+- **squeezelite-esp32**: (c) Philippe G. / sle118 (GPLv3).
 - **dr_flac**: (c) 2023 David Reid (Public Domain / MIT-0).
-- **ESP32-A2DP**: (c) Phil Schatzmann (MIT).
+- **ESP32-A2DP**: (c) Phil Schatzmann (Apache-2.0).
 - **ESPAsyncWebServer & AsyncTCP**: (c) Mathieu Carbou (LGPLv3).
 - **ArduinoJson**: (c) Benoit Blanchon (MIT).

@@ -1,6 +1,8 @@
 /*
  * Squeezelite stream task ported for ESP32-S3
- * Based on squeezelite (c) Adrian Smith, Ralph Irving
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #include "squeezelite.h"
 
@@ -12,7 +14,8 @@ struct streamstate stream;
 #define UNLOCK_S mutex_unlock(streambuf->mutex)
 
 static sockfd fd = -1;
-static bool running = true;
+static volatile bool running = true;
+static volatile bool stream_task_exited = true;
 static volatile u32_t s_stream_gen = 0;
 static TaskHandle_t stream_task_handle = NULL;
 
@@ -32,14 +35,15 @@ static void _disconnect(stream_state state, disconnect_code disconnect) {
 static bool _send_header(void) {
     const char *ptr = stream.header;
     int len = stream.header_len;
-    unsigned try_count = 0;
 
     while (len > 0) {
         int n = send(fd, ptr, len, 0);
         if (n <= 0) {
-            if (n < 0 && last_error() == ERROR_WOULDBLOCK && try_count++ < 10) {
-                vTaskDelay(pdMS_TO_TICKS(2));
-                continue;
+            if (n < 0 && last_error() == ERROR_WOULDBLOCK) {
+                struct pollfd pfd = { .fd = fd, .events = POLLOUT, .revents = 0 };
+                if (poll(&pfd, 1, 500) > 0 && (pfd.revents & POLLOUT)) {
+                    continue;
+                }
             }
             LOG_WARN("Failed writing HTTP header to stream socket: %s", strerror(last_error()));
             _disconnect(DISCONNECT, LOCAL_DISCONNECT);
@@ -82,11 +86,18 @@ static void stream_task(void *arg) {
 
         pollinfo.fd = cur_fd;
         pollinfo.events = POLLIN;
+        pollinfo.revents = 0;
         if (cur_state == SEND_HEADERS) {
             pollinfo.events |= POLLOUT;
         }
 
-        if (poll(&pollinfo, 1, 10) > 0) {
+        int pret = poll(&pollinfo, 1, 10);
+        if (pret > 0) {
+            if (pollinfo.revents & POLLNVAL) {
+                _disconnect(DISCONNECT, LOCAL_DISCONNECT);
+                vTaskDelay(pdMS_TO_TICKS(2));
+                continue;
+            }
             if ((pollinfo.revents & POLLOUT) && cur_state == SEND_HEADERS) {
                 LOCK_S;
                 if (fd >= 0 && stream.state == SEND_HEADERS) {
@@ -116,7 +127,7 @@ static void stream_task(void *arg) {
                             break;
                         }
 
-                        if (stream.header_len >= MAX_HEADER - 1) {
+                        if (!stream.header || stream.header_len >= MAX_HEADER - 1) {
                             LOG_WARN("HTTP response headers exceeded MAX_HEADER (%d)", MAX_HEADER);
                             UNLOCK_S;
                             _disconnect(DISCONNECT, LOCAL_DISCONNECT);
@@ -139,7 +150,8 @@ static void stream_task(void *arg) {
                 }
 
                 // Drain socket via bounce buffer WITHOUT holding LOCK_S during recv()
-                while (running) {
+                int drain_iters = 0;
+                while (running && drain_iters++ < 8) {
                     LOCK_S;
                     cur_fd = fd;
                     space = _buf_space(streambuf);
@@ -175,7 +187,10 @@ static void stream_task(void *arg) {
                     }
 
                     if (n == 0) {
-                        LOG_INFO("End of audio stream (%llu bytes received)", stream.bytes);
+                        LOCK_S;
+                        u64_t tot = stream.bytes;
+                        UNLOCK_S;
+                        LOG_INFO("End of audio stream (%llu bytes received)", tot);
                         _disconnect(DISCONNECT, DISCONNECT_OK);
                         break;
                     } else {
@@ -186,10 +201,15 @@ static void stream_task(void *arg) {
                         break;
                     }
                 }
+            } else {
+                vTaskDelay(pdMS_TO_TICKS(1));
             }
+        } else if (pret < 0 && last_error() != EINTR) {
+            vTaskDelay(pdMS_TO_TICKS(5));
         }
     }
 
+    stream_task_exited = true;
     vTaskDelete(NULL);
 }
 
@@ -212,15 +232,21 @@ void stream_init(log_level level, unsigned stream_buf_size) {
     fd = -1;
 
     running = true;
-    xTaskCreatePinnedToCore(
-        stream_task,
-        "sl_stream",
-        4096,
-        NULL,
-        7,
-        &stream_task_handle,
-        0
-    );
+    stream_task_exited = false;
+    if (xTaskCreatePinnedToCore(
+            stream_task,
+            "sl_stream",
+            6144,
+            NULL,
+            7,
+            &stream_task_handle,
+            0
+        ) != pdPASS) {
+        stream_task_handle = NULL;
+        running = false;
+        stream_task_exited = true;
+        LOG_ERROR("Failed to create sl_stream task!");
+    }
 }
 
 void stream_close(void) {
@@ -229,7 +255,9 @@ void stream_close(void) {
     stream_disconnect();
 
     if (stream_task_handle) {
-        vTaskDelay(pdMS_TO_TICKS(50));
+        for (int w = 0; w < 50 && !stream_task_exited; ++w) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
         stream_task_handle = NULL;
     }
 
@@ -244,7 +272,7 @@ void stream_close(void) {
     buf_destroy(streambuf);
 }
 
-void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *header, size_t header_len, unsigned threshold, bool cont_wait) {
+bool stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *header, size_t header_len, unsigned threshold, bool cont_wait) {
     (void)use_ssl;
     (void)use_ogg;
 
@@ -254,7 +282,7 @@ void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *h
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) {
         LOG_ERROR("Failed to create stream socket");
-        return;
+        return false;
     }
 
     int rxBufSize = 65536; // 64 KB TCP window for high-throughput streaming
@@ -267,7 +295,9 @@ void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *h
     addr.sin_addr.s_addr = ip;
     addr.sin_port = port;
 
-    LOG_INFO("Connecting to audio stream at %s:%u", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    char ipStr[16] = "0.0.0.0";
+    inet_ntoa_r(addr.sin_addr, ipStr, sizeof(ipStr));
+    LOG_INFO("Connecting to audio stream at %s:%u", ipStr, ntohs(addr.sin_port));
 
     set_nonblock(sock);
 
@@ -279,7 +309,7 @@ void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *h
         stream.disconnect = UNREACHABLE;
         UNLOCK_S;
         wake_controller();
-        return;
+        return false;
     }
 
     buf_flush(streambuf);
@@ -307,6 +337,7 @@ void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *h
     UNLOCK_S;
 
     LOG_INFO("Stream socket connected successfully, threshold = %u bytes", threshold);
+    return true;
 }
 
 bool stream_disconnect(void) {

@@ -30,21 +30,21 @@ public:
 
             if (peak <= _lowerLin || peak <= 1e-9f) continue;
 
-            float gain = 1.0f;
+            float sGain = 1.0f;
             if (peak >= _upperLin) {
-                gain = _ceilingLin / peak;
+                sGain = _ceilingLin / peak;
             } else {
                 const float peakDb = 20.0f * log10f(peak);
                 const float t      = (peakDb - _lowerDb) * _invKneeDb;
                 const float gainDb = -0.5f * _kneeDb * t * t;
-                gain = powf(10.0f, gainDb * 0.05f);
+                sGain = powf(10.0f, gainDb * 0.05f);
             }
 
-            if (!std::isfinite(gain) || gain < 0.0f) gain = 1.0f;
-            if (gain > 1.0f) gain = 1.0f;
+            if (!std::isfinite(sGain) || sGain < 0.0f) sGain = 1.0f;
+            if (sGain > 1.0f) sGain = 1.0f;
 
-            left[i]  *= gain;
-            right[i] *= gain;
+            left[i]  *= sGain;
+            right[i] *= sGain;
         }
     }
 
@@ -62,8 +62,10 @@ private:
 
     void _update(const LimiterParams& p) {
         _enabled    = p.enabled;
-        _ceilingDb  = (p.ceilingDb < -30.0f) ? -30.0f : ((p.ceilingDb > 0.0f) ? 0.0f : p.ceilingDb);
-        _kneeDb     = (p.kneeDb < 0.1f) ? 0.1f : ((p.kneeDb > 12.0f) ? 12.0f : p.kneeDb);
+        const float rawCeiling = std::isfinite(p.ceilingDb) ? p.ceilingDb : -0.5f;
+        const float rawKnee    = std::isfinite(p.kneeDb)    ? p.kneeDb    : 3.0f;
+        _ceilingDb  = (rawCeiling < -30.0f) ? -30.0f : ((rawCeiling > 0.0f) ? 0.0f : rawCeiling);
+        _kneeDb     = (rawKnee < 0.1f) ? 0.1f : ((rawKnee > 12.0f) ? 12.0f : rawKnee);
         _invKneeDb  = 1.0f / _kneeDb;
         _halfKnee   = _kneeDb * 0.5f;
         _lowerDb    = _ceilingDb - _halfKnee;

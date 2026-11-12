@@ -1,6 +1,8 @@
 /*
  * Squeezelite buffer management ported for ESP32-S3
- * Based on squeezelite (c) Adrian Smith, Ralph Irving
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #include "squeezelite.h"
 
@@ -45,6 +47,7 @@ void buf_flush(struct buffer *buf) {
     mutex_lock(buf->mutex);
     buf->readp  = buf->buf;
     buf->writep = buf->buf;
+    buf->flush_seq++;
     mutex_unlock(buf->mutex);
 }
 

@@ -47,33 +47,13 @@ public:
 #if defined(HAVE_ESP_DSP)
             dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[b][0], _zL[b][0]);
             dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[b][0], _zR[b][0]);
-            if (!std::isfinite(_zL[b][0][0]) || !std::isfinite(_zL[b][0][1])) {
-                _zL[b][0][0] = 0.0f; _zL[b][0][1] = 0.0f;
-            } else {
-                if (fabsf(_zL[b][0][0]) < 1e-15f) _zL[b][0][0] = 0.0f;
-                if (fabsf(_zL[b][0][1]) < 1e-15f) _zL[b][0][1] = 0.0f;
-            }
-            if (!std::isfinite(_zR[b][0][0]) || !std::isfinite(_zR[b][0][1])) {
-                _zR[b][0][0] = 0.0f; _zR[b][0][1] = 0.0f;
-            } else {
-                if (fabsf(_zR[b][0][0]) < 1e-15f) _zR[b][0][0] = 0.0f;
-                if (fabsf(_zR[b][0][1]) < 1e-15f) _zR[b][0][1] = 0.0f;
-            }
+            _sanitizeBlockAndState(left, frames, _zL[b][0]);
+            _sanitizeBlockAndState(right, frames, _zR[b][0]);
             if (_hasSecondStage[b]) {
                 dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[b][1], _zL[b][1]);
                 dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[b][1], _zR[b][1]);
-                if (!std::isfinite(_zL[b][1][0]) || !std::isfinite(_zL[b][1][1])) {
-                    _zL[b][1][0] = 0.0f; _zL[b][1][1] = 0.0f;
-                } else {
-                    if (fabsf(_zL[b][1][0]) < 1e-15f) _zL[b][1][0] = 0.0f;
-                    if (fabsf(_zL[b][1][1]) < 1e-15f) _zL[b][1][1] = 0.0f;
-                }
-                if (!std::isfinite(_zR[b][1][0]) || !std::isfinite(_zR[b][1][1])) {
-                    _zR[b][1][0] = 0.0f; _zR[b][1][1] = 0.0f;
-                } else {
-                    if (fabsf(_zR[b][1][0]) < 1e-15f) _zR[b][1][0] = 0.0f;
-                    if (fabsf(_zR[b][1][1]) < 1e-15f) _zR[b][1][1] = 0.0f;
-                }
+                _sanitizeBlockAndState(left, frames, _zL[b][1]);
+                _sanitizeBlockAndState(right, frames, _zR[b][1]);
             }
 #else
             _processStage(left, right, frames, _coeffs[b][0], _zL[b][0], _zR[b][0]);
@@ -85,6 +65,19 @@ public:
     }
 
 private:
+    static inline void _sanitizeBlockAndState(float* buf, size_t frames, float* z) {
+        if (!std::isfinite(z[0]) || !std::isfinite(z[1])) {
+            z[0] = 0.0f;
+            z[1] = 0.0f;
+            for (size_t i = 0; i < frames; ++i) {
+                if (!std::isfinite(buf[i])) buf[i] = 0.0f;
+            }
+        } else {
+            if (fabsf(z[0]) < 1e-15f) z[0] = 0.0f;
+            if (fabsf(z[1]) < 1e-15f) z[1] = 0.0f;
+        }
+    }
+
     static inline void _processStage(float* left, float* right, size_t frames,
                                      const float* c, float* wL, float* wR) {
         for (size_t i = 0; i < frames; ++i) {
@@ -117,16 +110,22 @@ private:
     bool  _enabled[kEQBands]{};
 
     void _calcCoeffs(int b, const EQBandParams& p) {
-        const float Fs       = static_cast<float>(kSampleRate);
-        const float safeFreq = (p.freq < 20.0f) ? 20.0f : ((p.freq > (Fs * 0.49f)) ? (Fs * 0.49f) : p.freq);
-        const float safeQ    = (p.q < 0.05f) ? 0.05f : p.q;
-        const float w0       = 2.0f * M_PI * safeFreq / Fs;
-        const float cos0     = cosf(w0);
-        const float sin0     = sinf(w0);
-        const float tan0     = tanf(w0 * 0.5f);
+        const double Fs       = static_cast<double>(kSampleRate);
+        const double rawFreq  = std::isfinite(p.freq) ? static_cast<double>(p.freq) : 1000.0;
+        const double rawGain  = std::isfinite(p.gain) ? static_cast<double>(p.gain) : 0.0;
+        const double rawQ     = std::isfinite(p.q)    ? static_cast<double>(p.q)    : 0.70710678;
+
+        const double safeFreq = (rawFreq < 20.0) ? 20.0 : ((rawFreq > (Fs * 0.49)) ? (Fs * 0.49) : rawFreq);
+        const double safeGain = (rawGain < -24.0) ? -24.0 : ((rawGain > 24.0) ? 24.0 : rawGain);
+        const double safeQ    = (rawQ < 0.05) ? 0.05 : ((rawQ > 10.0) ? 10.0 : rawQ);
+
+        const double w0       = 2.0 * M_PI * safeFreq / Fs;
+        const double cos0     = cos(w0);
+        const double sin0     = sin(w0);
+        const double tan0     = tan(w0 * 0.5);
 
         uint8_t type  = p.type;
-        uint8_t order = (p.order >= 2 && p.order <= 4) ? p.order : 2;
+        uint8_t order = (p.order >= 1 && p.order <= 4) ? p.order : 2;
 
         if (type == EQ_FILTER_FLAT_LOW_PASS) {
             type = EQ_FILTER_LOW_PASS;
@@ -139,142 +138,158 @@ private:
         _hasSecondStage[b] = false;
 
         if (type == EQ_FILTER_LOW_PASS) {
-            if (order == 3) {
-                const float b0 = tan0 / (1.0f + tan0);
-                const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
-                _coeffs[b][0][0] = b0;
-                _coeffs[b][0][1] = b0;
+            if (order == 1) {
+                const double b0_1 = tan0 / (1.0 + tan0);
+                const double a1_1 = (tan0 - 1.0) / (1.0 + tan0);
+                _coeffs[b][0][0] = static_cast<float>(b0_1);
+                _coeffs[b][0][1] = static_cast<float>(b0_1);
                 _coeffs[b][0][2] = 0.0f;
-                _coeffs[b][0][3] = a1;
+                _coeffs[b][0][3] = static_cast<float>(a1_1);
+                _coeffs[b][0][4] = 0.0f;
+            } else if (order == 3) {
+                const double b0_1 = tan0 / (1.0 + tan0);
+                const double a1_1 = (tan0 - 1.0) / (1.0 + tan0);
+                _coeffs[b][0][0] = static_cast<float>(b0_1);
+                _coeffs[b][0][1] = static_cast<float>(b0_1);
+                _coeffs[b][0][2] = 0.0f;
+                _coeffs[b][0][3] = static_cast<float>(a1_1);
                 _coeffs[b][0][4] = 0.0f;
 
-                const float alpha = sin0 / (2.0f * 1.0f);
-                const float a0_2  = 1.0f + alpha;
-                const float invA0 = (fabsf(a0_2) > 1e-12f) ? (1.0f / a0_2) : 1.0f;
-                _coeffs[b][1][0] = (1.0f - cos0) * 0.5f * invA0;
-                _coeffs[b][1][1] = (1.0f - cos0) * invA0;
-                _coeffs[b][1][2] = (1.0f - cos0) * 0.5f * invA0;
-                _coeffs[b][1][3] = (-2.0f * cos0) * invA0;
-                _coeffs[b][1][4] = (1.0f - alpha) * invA0;
+                const double alpha = sin0 / 2.0;
+                const double a0_2  = 1.0 + alpha;
+                const double invA0 = (fabs(a0_2) > 1e-12) ? (1.0 / a0_2) : 1.0;
+                _coeffs[b][1][0] = static_cast<float>((1.0 - cos0) * 0.5 * invA0);
+                _coeffs[b][1][1] = static_cast<float>((1.0 - cos0) * invA0);
+                _coeffs[b][1][2] = static_cast<float>((1.0 - cos0) * 0.5 * invA0);
+                _coeffs[b][1][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                _coeffs[b][1][4] = static_cast<float>((1.0 - alpha) * invA0);
                 _hasSecondStage[b] = true;
             } else if (order == 4) {
-                constexpr float Q_stages[2] = { 1.30656296f, 0.5411961f };
+                constexpr double Q_stages[2] = { 0.541196100146197, 1.3065629648763766 };
                 for (int s = 0; s < 2; ++s) {
-                    const float alpha = sin0 / (2.0f * Q_stages[s]);
-                    const float a0_s  = 1.0f + alpha;
-                    const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
-                    _coeffs[b][s][0] = (1.0f - cos0) * 0.5f * invA0;
-                    _coeffs[b][s][1] = (1.0f - cos0) * invA0;
-                    _coeffs[b][s][2] = (1.0f - cos0) * 0.5f * invA0;
-                    _coeffs[b][s][3] = (-2.0f * cos0) * invA0;
-                    _coeffs[b][s][4] = (1.0f - alpha) * invA0;
+                    const double alpha = sin0 / (2.0 * Q_stages[s]);
+                    const double a0_s  = 1.0 + alpha;
+                    const double invA0 = (fabs(a0_s) > 1e-12) ? (1.0 / a0_s) : 1.0;
+                    _coeffs[b][s][0] = static_cast<float>((1.0 - cos0) * 0.5 * invA0);
+                    _coeffs[b][s][1] = static_cast<float>((1.0 - cos0) * invA0);
+                    _coeffs[b][s][2] = static_cast<float>((1.0 - cos0) * 0.5 * invA0);
+                    _coeffs[b][s][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                    _coeffs[b][s][4] = static_cast<float>((1.0 - alpha) * invA0);
                 }
                 _hasSecondStage[b] = true;
             } else {
-                constexpr float kButterQ2 = 0.70710678f;
-                const float alpha = sin0 / (2.0f * kButterQ2);
-                const float a0_s  = 1.0f + alpha;
-                const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
-                _coeffs[b][0][0] = (1.0f - cos0) * 0.5f * invA0;
-                _coeffs[b][0][1] = (1.0f - cos0) * invA0;
-                _coeffs[b][0][2] = (1.0f - cos0) * 0.5f * invA0;
-                _coeffs[b][0][3] = (-2.0f * cos0) * invA0;
-                _coeffs[b][0][4] = (1.0f - alpha) * invA0;
+                constexpr double kButterQ2 = 0.7071067811865476;
+                const double alpha = sin0 / (2.0 * kButterQ2);
+                const double a0_s  = 1.0 + alpha;
+                const double invA0 = (fabs(a0_s) > 1e-12) ? (1.0 / a0_s) : 1.0;
+                _coeffs[b][0][0] = static_cast<float>((1.0 - cos0) * 0.5 * invA0);
+                _coeffs[b][0][1] = static_cast<float>((1.0 - cos0) * invA0);
+                _coeffs[b][0][2] = static_cast<float>((1.0 - cos0) * 0.5 * invA0);
+                _coeffs[b][0][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                _coeffs[b][0][4] = static_cast<float>((1.0 - alpha) * invA0);
             }
             return;
         }
 
         if (type == EQ_FILTER_HIGH_PASS) {
-            if (order == 3) {
-                const float b0 = 1.0f / (1.0f + tan0);
-                const float a1 = (tan0 - 1.0f) / (1.0f + tan0);
-                _coeffs[b][0][0] = b0;
-                _coeffs[b][0][1] = -b0;
+            if (order == 1) {
+                const double b0_1 = 1.0 / (1.0 + tan0);
+                const double a1_1 = (tan0 - 1.0) / (1.0 + tan0);
+                _coeffs[b][0][0] = static_cast<float>(b0_1);
+                _coeffs[b][0][1] = static_cast<float>(-b0_1);
                 _coeffs[b][0][2] = 0.0f;
-                _coeffs[b][0][3] = a1;
+                _coeffs[b][0][3] = static_cast<float>(a1_1);
+                _coeffs[b][0][4] = 0.0f;
+            } else if (order == 3) {
+                const double b0_1 = 1.0 / (1.0 + tan0);
+                const double a1_1 = (tan0 - 1.0) / (1.0 + tan0);
+                _coeffs[b][0][0] = static_cast<float>(b0_1);
+                _coeffs[b][0][1] = static_cast<float>(-b0_1);
+                _coeffs[b][0][2] = 0.0f;
+                _coeffs[b][0][3] = static_cast<float>(a1_1);
                 _coeffs[b][0][4] = 0.0f;
 
-                const float alpha = sin0 / (2.0f * 1.0f);
-                const float a0_2  = 1.0f + alpha;
-                const float invA0 = (fabsf(a0_2) > 1e-12f) ? (1.0f / a0_2) : 1.0f;
-                _coeffs[b][1][0] = (1.0f + cos0) * 0.5f * invA0;
-                _coeffs[b][1][1] = -(1.0f + cos0) * invA0;
-                _coeffs[b][1][2] = (1.0f + cos0) * 0.5f * invA0;
-                _coeffs[b][1][3] = (-2.0f * cos0) * invA0;
-                _coeffs[b][1][4] = (1.0f - alpha) * invA0;
+                const double alpha = sin0 / 2.0;
+                const double a0_2  = 1.0 + alpha;
+                const double invA0 = (fabs(a0_2) > 1e-12) ? (1.0 / a0_2) : 1.0;
+                _coeffs[b][1][0] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                _coeffs[b][1][1] = static_cast<float>(-(1.0 + cos0) * invA0);
+                _coeffs[b][1][2] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                _coeffs[b][1][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                _coeffs[b][1][4] = static_cast<float>((1.0 - alpha) * invA0);
                 _hasSecondStage[b] = true;
             } else if (order == 4) {
-                constexpr float Q_stages[2] = { 1.30656296f, 0.5411961f };
+                constexpr double Q_stages[2] = { 0.541196100146197, 1.3065629648763766 };
                 for (int s = 0; s < 2; ++s) {
-                    const float alpha = sin0 / (2.0f * Q_stages[s]);
-                    const float a0_s  = 1.0f + alpha;
-                    const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
-                    _coeffs[b][s][0] = (1.0f + cos0) * 0.5f * invA0;
-                    _coeffs[b][s][1] = -(1.0f + cos0) * invA0;
-                    _coeffs[b][s][2] = (1.0f + cos0) * 0.5f * invA0;
-                    _coeffs[b][s][3] = (-2.0f * cos0) * invA0;
-                    _coeffs[b][s][4] = (1.0f - alpha) * invA0;
+                    const double alpha = sin0 / (2.0 * Q_stages[s]);
+                    const double a0_s  = 1.0 + alpha;
+                    const double invA0 = (fabs(a0_s) > 1e-12) ? (1.0 / a0_s) : 1.0;
+                    _coeffs[b][s][0] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                    _coeffs[b][s][1] = static_cast<float>(-(1.0 + cos0) * invA0);
+                    _coeffs[b][s][2] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                    _coeffs[b][s][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                    _coeffs[b][s][4] = static_cast<float>((1.0 - alpha) * invA0);
                 }
                 _hasSecondStage[b] = true;
             } else {
-                constexpr float kButterQ2 = 0.70710678f;
-                const float alpha = sin0 / (2.0f * kButterQ2);
-                const float a0_s  = 1.0f + alpha;
-                const float invA0 = (fabsf(a0_s) > 1e-12f) ? (1.0f / a0_s) : 1.0f;
-                _coeffs[b][0][0] = (1.0f + cos0) * 0.5f * invA0;
-                _coeffs[b][0][1] = -(1.0f + cos0) * invA0;
-                _coeffs[b][0][2] = (1.0f + cos0) * 0.5f * invA0;
-                _coeffs[b][0][3] = (-2.0f * cos0) * invA0;
-                _coeffs[b][0][4] = (1.0f - alpha) * invA0;
+                constexpr double kButterQ2 = 0.7071067811865476;
+                const double alpha = sin0 / (2.0 * kButterQ2);
+                const double a0_s  = 1.0 + alpha;
+                const double invA0 = (fabs(a0_s) > 1e-12) ? (1.0 / a0_s) : 1.0;
+                _coeffs[b][0][0] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                _coeffs[b][0][1] = static_cast<float>(-(1.0 + cos0) * invA0);
+                _coeffs[b][0][2] = static_cast<float>((1.0 + cos0) * 0.5 * invA0);
+                _coeffs[b][0][3] = static_cast<float>((-2.0 * cos0) * invA0);
+                _coeffs[b][0][4] = static_cast<float>((1.0 - alpha) * invA0);
             }
             return;
         }
 
-        const float alpha = sin0 / (2.0f * safeQ);
-        float b0 = 1.0f, b1 = 0.0f, b2 = 0.0f;
-        float a0 = 1.0f, a1 = 0.0f, a2 = 0.0f;
+        const double alpha = sin0 / (2.0 * safeQ);
+        double b0 = 1.0, b1 = 0.0, b2 = 0.0;
+        double a0 = 1.0, a1 = 0.0, a2 = 0.0;
 
         switch (type) {
             case EQ_FILTER_LOW_SHELF: {
-                const float A = powf(10.0f, p.gain / 40.0f);
-                const float twoSqrtAAlpha = 2.0f * sqrtf(A) * alpha;
-                b0 =    A * ((A + 1.0f) - (A - 1.0f) * cos0 + twoSqrtAAlpha);
-                b1 = 2.0f * A * ((A - 1.0f) - (A + 1.0f) * cos0);
-                b2 =    A * ((A + 1.0f) - (A - 1.0f) * cos0 - twoSqrtAAlpha);
-                a0 =         (A + 1.0f) + (A - 1.0f) * cos0 + twoSqrtAAlpha;
-                a1 = -2.0f * ((A - 1.0f) + (A + 1.0f) * cos0);
-                a2 =         (A + 1.0f) + (A - 1.0f) * cos0 - twoSqrtAAlpha;
+                const double A = pow(10.0, safeGain / 40.0);
+                const double twoSqrtAAlpha = 2.0 * sqrt(A) * alpha;
+                b0 =    A * ((A + 1.0) - (A - 1.0) * cos0 + twoSqrtAAlpha);
+                b1 = 2.0 * A * ((A - 1.0) - (A + 1.0) * cos0);
+                b2 =    A * ((A + 1.0) - (A - 1.0) * cos0 - twoSqrtAAlpha);
+                a0 =         (A + 1.0) + (A - 1.0) * cos0 + twoSqrtAAlpha;
+                a1 = -2.0 * ((A - 1.0) + (A + 1.0) * cos0);
+                a2 =         (A + 1.0) + (A - 1.0) * cos0 - twoSqrtAAlpha;
                 break;
             }
             case EQ_FILTER_HIGH_SHELF: {
-                const float A = powf(10.0f, p.gain / 40.0f);
-                const float twoSqrtAAlpha = 2.0f * sqrtf(A) * alpha;
-                b0 =    A * ((A + 1.0f) + (A - 1.0f) * cos0 + twoSqrtAAlpha);
-                b1 = -2.0f * A * ((A - 1.0f) + (A + 1.0f) * cos0);
-                b2 =    A * ((A + 1.0f) + (A - 1.0f) * cos0 - twoSqrtAAlpha);
-                a0 =         (A + 1.0f) - (A - 1.0f) * cos0 + twoSqrtAAlpha;
-                a1 =  2.0f * ((A - 1.0f) - (A + 1.0f) * cos0);
-                a2 =         (A + 1.0f) - (A - 1.0f) * cos0 - twoSqrtAAlpha;
+                const double A = pow(10.0, safeGain / 40.0);
+                const double twoSqrtAAlpha = 2.0 * sqrt(A) * alpha;
+                b0 =    A * ((A + 1.0) + (A - 1.0) * cos0 + twoSqrtAAlpha);
+                b1 = -2.0 * A * ((A - 1.0) + (A + 1.0) * cos0);
+                b2 =    A * ((A + 1.0) + (A - 1.0) * cos0 - twoSqrtAAlpha);
+                a0 =         (A + 1.0) - (A - 1.0) * cos0 + twoSqrtAAlpha;
+                a1 =  2.0 * ((A - 1.0) - (A + 1.0) * cos0);
+                a2 =         (A + 1.0) - (A - 1.0) * cos0 - twoSqrtAAlpha;
                 break;
             }
             case EQ_FILTER_PEAK:
             default: {
-                const float A = powf(10.0f, p.gain / 40.0f);
-                b0 =  1.0f + alpha * A;
-                b1 = -2.0f * cos0;
-                b2 =  1.0f - alpha * A;
-                a0 =  1.0f + alpha / A;
-                a1 = -2.0f * cos0;
-                a2 =  1.0f - alpha / A;
+                const double A = pow(10.0, safeGain / 40.0);
+                b0 =  1.0 + alpha * A;
+                b1 = -2.0 * cos0;
+                b2 =  1.0 - alpha * A;
+                a0 =  1.0 + alpha / A;
+                a1 = -2.0 * cos0;
+                a2 =  1.0 - alpha / A;
                 break;
             }
         }
 
-        const float invA0 = (fabsf(a0) > 1e-12f) ? (1.0f / a0) : 1.0f;
-        _coeffs[b][0][0] = b0 * invA0;
-        _coeffs[b][0][1] = b1 * invA0;
-        _coeffs[b][0][2] = b2 * invA0;
-        _coeffs[b][0][3] = a1 * invA0;
-        _coeffs[b][0][4] = a2 * invA0;
+        const double invA0 = (fabs(a0) > 1e-12) ? (1.0 / a0) : 1.0;
+        _coeffs[b][0][0] = static_cast<float>(b0 * invA0);
+        _coeffs[b][0][1] = static_cast<float>(b1 * invA0);
+        _coeffs[b][0][2] = static_cast<float>(b2 * invA0);
+        _coeffs[b][0][3] = static_cast<float>(a1 * invA0);
+        _coeffs[b][0][4] = static_cast<float>(a2 * invA0);
     }
 };

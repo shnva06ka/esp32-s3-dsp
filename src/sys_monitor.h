@@ -2,10 +2,13 @@
 
 #include <Arduino.h>
 #include <esp_freertos_hooks.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
 
 class SystemMonitor {
 private:
     struct State {
+        portMUX_TYPE      mux = portMUX_INITIALIZER_UNLOCKED;
         volatile uint32_t idleCount0{0};
         volatile uint32_t idleCount1{0};
         uint32_t          maxIdleRate0{0};
@@ -72,51 +75,59 @@ public:
         update();
         auto& st = _s();
         Stats s;
-        s.cpu0       = st.cpu0Usage;
-        s.cpu1       = st.cpu1Usage;
-        s.tempC      = temperatureRead();
-        s.heapTotal  = st.heapTotal;
-        s.heapUsed   = st.heapTotal - ESP.getFreeHeap();
-        s.psramTotal = st.psramTotal;
-        s.psramUsed  = (st.psramTotal > 0) ? (st.psramTotal - ESP.getFreePsram()) : 0;
-        s.flashUsed  = st.flashUsed;
-        s.flashTotal = st.flashTotal;
-        s.idleRate0 = st.idleRate0;
-        s.idleRate1 = st.idleRate1;
+        portENTER_CRITICAL(&st.mux);
+        s.cpu0          = st.cpu0Usage;
+        s.cpu1          = st.cpu1Usage;
+        s.heapTotal     = st.heapTotal;
+        s.psramTotal    = st.psramTotal;
+        s.flashUsed     = st.flashUsed;
+        s.flashTotal    = st.flashTotal;
+        s.idleRate0     = st.idleRate0;
+        s.idleRate1     = st.idleRate1;
         s.idleBaseline0 = st.maxIdleRate0;
         s.idleBaseline1 = st.maxIdleRate1;
+        portEXIT_CRITICAL(&st.mux);
+        s.tempC      = temperatureRead();
+        s.heapUsed   = s.heapTotal - ESP.getFreeHeap();
+        s.psramUsed  = (s.psramTotal > 0) ? (s.psramTotal - ESP.getFreePsram()) : 0;
         return s;
     }
 
     static void update() {
+        auto& st = _s();
+        portENTER_CRITICAL(&st.mux);
         unsigned long now = millis();
-        unsigned long elapsed = now - _s().lastSampleTime;
-        if (elapsed < 500) return;
+        unsigned long elapsed = now - st.lastSampleTime;
+        if (elapsed < 500) {
+            portEXIT_CRITICAL(&st.mux);
+            return;
+        }
 
-        uint32_t count0 = _s().idleCount0;
-        uint32_t count1 = _s().idleCount1;
-        _s().idleCount0 = 0;
-        _s().idleCount1 = 0;
-        _s().lastSampleTime = now;
+        uint32_t count0 = st.idleCount0;
+        uint32_t count1 = st.idleCount1;
+        st.idleCount0 = 0;
+        st.idleCount1 = 0;
+        st.lastSampleTime = now;
 
         uint32_t rate0 = (uint32_t)(((uint64_t)count0 * 1000) / elapsed);
         uint32_t rate1 = (uint32_t)(((uint64_t)count1 * 1000) / elapsed);
 
-        if (rate0 > _s().maxIdleRate0) _s().maxIdleRate0 = rate0;
-        if (rate1 > _s().maxIdleRate1) _s().maxIdleRate1 = rate1;
-        _s().idleRate0 = rate0;
-        _s().idleRate1 = rate1;
+        if (rate0 > st.maxIdleRate0) st.maxIdleRate0 = rate0;
+        if (rate1 > st.maxIdleRate1) st.maxIdleRate1 = rate1;
+        st.idleRate0 = rate0;
+        st.idleRate1 = rate1;
 
-        if (_s().maxIdleRate0 > 1000) {
-            float idlePct0 = ((float)rate0 / (float)_s().maxIdleRate0) * 100.0f;
+        if (st.maxIdleRate0 > 1000) {
+            float idlePct0 = ((float)rate0 / (float)st.maxIdleRate0) * 100.0f;
             float raw0 = _clamp(100.0f - idlePct0, 0.0f, 100.0f);
-            _s().cpu0Usage = (_s().cpu0Usage * 0.4f) + (raw0 * 0.6f);
+            st.cpu0Usage = (st.cpu0Usage * 0.4f) + (raw0 * 0.6f);
         }
 
-        if (_s().maxIdleRate1 > 1000) {
-            float idlePct1 = ((float)rate1 / (float)_s().maxIdleRate1) * 100.0f;
+        if (st.maxIdleRate1 > 1000) {
+            float idlePct1 = ((float)rate1 / (float)st.maxIdleRate1) * 100.0f;
             float raw1 = _clamp(100.0f - idlePct1, 0.0f, 100.0f);
-            _s().cpu1Usage = (_s().cpu1Usage * 0.4f) + (raw1 * 0.6f);
+            st.cpu1Usage = (st.cpu1Usage * 0.4f) + (raw1 * 0.6f);
         }
+        portEXIT_CRITICAL(&st.mux);
     }
 };

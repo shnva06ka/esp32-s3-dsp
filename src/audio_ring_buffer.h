@@ -9,6 +9,7 @@
 
 template <size_t CapacityFrames>
 class AudioRingBuffer {
+    static_assert(CapacityFrames >= 2, "AudioRingBuffer requires at least 2 frames");
 public:
     AudioRingBuffer() = default;
 
@@ -41,7 +42,7 @@ public:
 
     size_t available() const {
         size_t w = _writeIdx.load(std::memory_order_acquire);
-        size_t r = _readIdx.load(std::memory_order_relaxed);
+        size_t r = _readIdx.load(std::memory_order_acquire);
         if (w >= r) return w - r;
         return CapacityFrames - (r - w);
     }
@@ -51,8 +52,8 @@ public:
     }
 
     size_t write(const float* left, const float* right, size_t frames) {
-        if (!_left || !_right || !left || !right) {
-            if (!allocate()) return 0;
+        if (!left || !right || !_left || !_right || frames == 0) {
+            return 0;
         }
 
         size_t toWrite = frames;
@@ -131,6 +132,6 @@ public:
 private:
     float* _left{nullptr};
     float* _right{nullptr};
-    std::atomic<size_t> _readIdx{0};
-    std::atomic<size_t> _writeIdx{0};
+    alignas(64) std::atomic<size_t> _readIdx{0};
+    alignas(64) std::atomic<size_t> _writeIdx{0};
 };

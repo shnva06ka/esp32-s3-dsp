@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <cstddef>
+#include <atomic>
 #include <driver/i2s.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -27,7 +28,8 @@ public:
 
 private:
     ParamStore& _params;
-    volatile bool _running{false};
+    std::atomic<bool> _running{false};
+    std::atomic<bool> _btTaskExited{true};
     TaskHandle_t  _btTaskHandle{nullptr};
 
     int32_t* _rxBufAux{nullptr};
@@ -51,7 +53,7 @@ private:
     AudioRingBuffer<RuntimeTuning::kBtRingBufferFrames> _btRingBuffer;
 
     float _gainAux{1.0f};
-    float _gainBt{0.0f};
+    std::atomic<float> _gainBt{0.0f};
     float _gainWifi{0.0f};
 
     ActiveInputSource _lastActiveSource{ACTIVE_SRC_AUX};

@@ -65,7 +65,7 @@ private:
     BiquadEQ _eq;
     uint32_t _localEqVersion{0};
     int      _localEqCount{5};
-    bool     _localEqEnabled{true};
+    bool     _localEqEnabled{false};
     float    _localPreampDb{0.0f};
     float    _localPreampGain{1.0f};
 };
@@ -113,7 +113,9 @@ public:
         _comp.process(left, right, frames);
     }
 
-    void reset() override {}
+    void reset() override {
+        _comp.reset();
+    }
 
 private:
     Compander _comp;
@@ -137,7 +139,9 @@ public:
         _limiter.process(left, right, frames);
     }
 
-    void reset() override {}
+    void reset() override {
+        _limiter.reset();
+    }
 
 private:
     SoftLimiter _limiter;
@@ -184,7 +188,7 @@ private:
     size_t            _activeModuleCount{0};
 
     uint32_t          _localOrderVersion{0};
-    uint32_t          _syncCounter{0};
+    uint32_t          _syncCounter{kSyncInterval - 1};
     static constexpr uint32_t kSyncInterval = 4;
 
     void _registerModule(IDSPModule* mod) {
@@ -210,17 +214,26 @@ private:
         strncpy(buf, orderStr, sizeof(buf) - 1);
         buf[sizeof(buf) - 1] = '\0';
 
-        char* token = strtok(buf, ",");
+        char* savePtr = nullptr;
+        char* token = strtok_r(buf, ",", &savePtr);
         while (token && _activeModuleCount < kMaxModules) {
             while (*token == ' ') token++;
-            char* end = token + strlen(token) - 1;
-            while (end > token && *end == ' ') { *end = '\0'; end--; }
+            if (*token != '\0') {
+                char* end = token + strlen(token) - 1;
+                while (end > token && *end == ' ') { *end = '\0'; end--; }
 
-            IDSPModule* m = _findModule(parseDspModuleId(token));
-            if (m) {
-                _activeModules[_activeModuleCount++] = m;
+                IDSPModule* m = _findModule(parseDspModuleId(token));
+                if (m) {
+                    bool dup = false;
+                    for (size_t k = 0; k < _activeModuleCount; ++k) {
+                        if (_activeModules[k] == m) { dup = true; break; }
+                    }
+                    if (!dup) {
+                        _activeModules[_activeModuleCount++] = m;
+                    }
+                }
             }
-            token = strtok(nullptr, ",");
+            token = strtok_r(nullptr, ",", &savePtr);
         }
 
         if (_activeModuleCount == 0) {
@@ -238,7 +251,6 @@ private:
         char orderBuf[64];
         if (_params.getModuleOrderIfChanged(orderBuf, sizeof(orderBuf), _localOrderVersion)) {
             _updateOrder(orderBuf);
-            Console.printf("[DSP] Updated signal processing order: %s\n", orderBuf);
         }
 
         for (size_t i = 0; i < _registeredCount; ++i) {

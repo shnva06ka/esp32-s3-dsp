@@ -1,6 +1,8 @@
 /*
  * Squeezelite utilities ported for ESP32-S3
- * Based on squeezelite (c) Adrian Smith, Ralph Irving
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #include "squeezelite.h"
 
@@ -46,19 +48,18 @@ int connect_timeout(sockfd sock, const struct sockaddr *addr, socklen_t addrlen,
         return 0; // Immediate connection
     }
 
-    fd_set w, e;
-    struct timeval tval;
-    FD_ZERO(&w);
-    FD_SET(sock, &w);
-    e = w;
-    tval.tv_sec = timeout;
-    tval.tv_usec = 0;
+    struct pollfd pfd;
+    pfd.fd = sock;
+    pfd.events = POLLOUT;
+    pfd.revents = 0;
 
-    if (select(sock + 1, NULL, &w, &e, timeout ? &tval : NULL) == 1 && FD_ISSET(sock, &w)) {
+    int ret = poll(&pfd, 1, timeout > 0 ? timeout * 1000 : -1);
+    if (ret > 0 && (pfd.revents & (POLLOUT | POLLERR | POLLHUP))) {
         int error = 0;
         socklen_t len = sizeof(error);
-        getsockopt(sock, SOL_SOCKET, SO_ERROR, (void *)&error, &len);
-        return error == 0 ? 0 : -1;
+        if (getsockopt(sock, SOL_SOCKET, SO_ERROR, (void *)&error, &len) == 0 && error == 0) {
+            return 0;
+        }
     }
 
     return -1;
@@ -145,12 +146,21 @@ event_type wait_readwake(event_handle handles[], int timeout) {
     int nfds = (handles[1].fd >= 0) ? 2 : 1;
     int ret = poll(handles, nfds, timeout);
     if (ret > 0) {
-        if (handles[0].revents & (POLLIN | POLLHUP | POLLERR)) {
+        if (handles[0].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL)) {
             return EVENT_READ;
         }
-        if (nfds > 1 && (handles[1].revents & (POLLIN | POLLHUP | POLLERR))) {
-            wake_clear(handles[1].fd);
+        if (nfds > 1 && (handles[1].revents & (POLLIN | POLLHUP | POLLERR | POLLNVAL))) {
+            if (handles[1].revents & POLLNVAL) {
+                vTaskDelay(pdMS_TO_TICKS(5));
+            } else {
+                wake_clear(handles[1].fd);
+            }
             return EVENT_WAKE;
+        }
+    } else if (ret < 0) {
+        if (last_error() != EINTR) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+            return EVENT_READ;
         }
     }
     return EVENT_TIMEOUT;
@@ -220,7 +230,9 @@ in_addr_t discover_server(char *default_server, int max) {
             int rlen = recvfrom(disc_sock, buf, sizeof(buf) - 1, 0, (struct sockaddr *)&s, &slen);
             if (rlen > 0 && buf[0] == 'E') {
                 closesocket(disc_sock);
-                LOG_INFO("Discovered LMS server at %s", inet_ntoa(s.sin_addr));
+                char ipStr[16] = "0.0.0.0";
+                inet_ntoa_r(s.sin_addr, ipStr, sizeof(ipStr));
+                LOG_INFO("Discovered LMS server at %s", ipStr);
                 return s.sin_addr.s_addr;
             }
         }

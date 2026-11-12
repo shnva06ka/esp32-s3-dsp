@@ -1,6 +1,10 @@
 /*
  * Squeezelite port for ESP32-S3-DSP
- * Based on squeezelite-esp32 (c) Adrian Smith, Ralph Irving, Philippe G.
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * and squeezelite-esp32 (c) Philippe G. (sle118).
+ *
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #pragma once
 
@@ -160,7 +164,7 @@ struct streamstate {
 
 void stream_init(log_level level, unsigned stream_buf_size);
 void stream_close(void);
-void stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *header, size_t header_len, unsigned threshold, bool cont_wait);
+bool stream_sock(u32_t ip, u16_t port, bool use_ssl, bool use_ogg, const char *header, size_t header_len, unsigned threshold, bool cont_wait);
 bool stream_disconnect(void);
 
 // decode.c
@@ -278,6 +282,7 @@ s32_t to_gain(float f);
 // slimproto.c
 void slimproto_start(log_level level, const char *server, const u8_t mac[6], const char *name, int maxSampleRate);
 void slimproto_stop(void);
+void slimproto_pause_for_ota(void);
 void wake_controller(void);
 void slimproto_send_packet(const u8_t *packet, size_t len);
 bool slimproto_is_connected(void);

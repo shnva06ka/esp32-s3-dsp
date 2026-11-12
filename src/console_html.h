@@ -11,10 +11,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #27272a; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
 .title { font-size: 18px; font-weight: 700; color: #a855f7; display: flex; align-items: center; gap: 8px; }
 .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-button { background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: 0.2s; }
-button:hover { background: #3f3f46; }
+button, .btn-link { background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: 0.2s; text-decoration: none; display: inline-flex; align-items: center; }
+button:hover, .btn-link:hover { background: #3f3f46; }
 button.active { background: #7c3aed; border-color: #a855f7; color: #fff; }
 button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
+.btn-link.ota { background: #9333ea; border-color: #a855f7; color: #fff; }
+.btn-link.ota:hover { background: #7e22ce; }
 .badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #18181b; border: 1px solid #27272a; color: #a1a1aa; }
 .badge.green { color: #4ade80; border-color: #166534; background: #052e16; }
 .badge.red { color: #f87171; border-color: #991b1b; background: #450a0a; }
@@ -25,7 +27,7 @@ button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
 .log-line.slim { color: #4ade80; }
 .log-line.warn { color: #fbbf24; }
 .log-line.err { color: #f87171; }
-.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: #71717a; flex-shrink: 0; }
+.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: #9ca3af; flex-shrink: 0; }
 .footer a { color: #a855f7; text-decoration: none; }
 .footer a:hover { text-decoration: underline; }
 </style>
@@ -41,7 +43,7 @@ button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
     <button onclick="clearLogs()">Clear</button>
     <button onclick="copyLogs()">Copy</button>
     <button class="danger" onclick="rebootEsp()">Reboot</button>
-    <a href="/update"><button style="background: #9333ea; border-color: #a855f7; color: #fff;">OTA Update</button></a>
+    <a class="btn-link ota" href="/?ota=1">OTA Update</a>
   </div>
 </div>
 
@@ -49,7 +51,7 @@ button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
 
 <div class="footer">
   <div>Telnet mirror: <code>port 23</code> &bull; WebSocket: <code>/ws</code></div>
-  <div><a href="/">&larr; Return to DSP Dashboard</a> &bull; <a href="/update">Firmware Update (OTA) &rarr;</a></div>
+  <div><a href="/">&larr; Return to DSP Dashboard</a> &bull; <a href="/?ota=1">Firmware Update (OTA) &rarr;</a></div>
 </div>
 
 <script>
@@ -117,14 +119,22 @@ function appendLog(line) {
   else if (line.includes('ERR') || line.includes('error') || line.includes('FAIL') || line.includes('FATAL')) el.classList.add('err');
   el.innerText = line;
   term.appendChild(el);
+  while (term.childElementCount > 1000) {
+    term.removeChild(term.firstElementChild);
+  }
   if (autoScroll) {
     term.scrollTop = term.scrollHeight;
   }
 }
 
 // Fetch historical buffer first
-fetch('/api/logs').then(r => r.text()).then(txt => {
+fetch('/api/logs').then(r => {
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+}).then(txt => {
   txt.split('\n').forEach(appendLog);
+}).catch(err => {
+  appendLog('[WARN] Failed to load log history: ' + err.message);
 });
 
 // Setup WebSocket

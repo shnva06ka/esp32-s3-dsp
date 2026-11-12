@@ -24,45 +24,51 @@ SlimprotoClient::~SlimprotoClient() {
 }
 
 bool SlimprotoClient::begin() {
-    if (_running) return true;
+    if (_running.load(std::memory_order_acquire)) return true;
 
     Console.println("[SLIMPROTO] Starting Squeezelite streaming pipeline...");
 
     uint8_t mac[6];
     WiFi.macAddress(mac);
 
+    output_init(lINFO, OUTPUTBUF_SIZE, NULL);
     stream_init(lINFO, STREAMBUF_SIZE);
     decode_init(lINFO, "pcm,flc", "");
 
     slimproto_start(lINFO, NULL, mac, "ESP32-S3-DSP", SAMPLE_RATE);
 
-    _running = true;
-    xTaskCreatePinnedToCore(
-        _telemetryTaskTrampoline,
-        "sl_telemetry",
-        4096,
-        this,
-        2,
-        &_telemetryTaskHandle,
-        0
-    );
+    _running.store(true, std::memory_order_release);
+    _telemetryExited.store(false, std::memory_order_release);
+    if (xTaskCreatePinnedToCore(
+            _telemetryTaskTrampoline,
+            "sl_telemetry",
+            4096,
+            this,
+            2,
+            &_telemetryTaskHandle,
+            0
+        ) != pdPASS) {
+        _telemetryTaskHandle = nullptr;
+        _telemetryExited.store(true, std::memory_order_release);
+    }
 
     return true;
 }
 
 void SlimprotoClient::stop() {
-    if (!_running) return;
-    _running = false;
+    if (!_running.exchange(false, std::memory_order_acq_rel)) return;
 
     slimproto_stop();
-    output_close();
-    decode_close();
-    stream_close();
-
     if (_telemetryTaskHandle) {
-        vTaskDelay(pdMS_TO_TICKS(50));
+        for (int w = 0; w < 60 && !_telemetryExited.load(std::memory_order_acquire); ++w) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
         _telemetryTaskHandle = nullptr;
     }
+    decode_close();
+    stream_close();
+    output_close();
+
     Console.println("[SLIMPROTO] Squeezelite pipeline stopped");
 }
 
@@ -74,13 +80,31 @@ void SlimprotoClient::_runTelemetry() {
     uint32_t lastPrintMs = 0;
     uint32_t idleSinceMs = 0;
 
-    while (_running) {
+    while (_running.load(std::memory_order_acquire)) {
         vTaskDelay(pdMS_TO_TICKS(250));
 
         WiFiStreamMetadata meta = _params.getWiFiStreamMetadata();
 
-        bool isStream = (output.state == OUTPUT_RUNNING || output.state == OUTPUT_BUFFER);
-        bool isPaused = (output.state == OUTPUT_STOPPED || output.state == OUTPUT_PAUSE_FRAMES);
+        output_state curOutState = OUTPUT_STOPPED;
+        u32_t curFramesPlayed = 0;
+        unsigned outUsedBytes = 0;
+        if (outputbuf && outputbuf->mutex) {
+            mutex_lock(outputbuf->mutex);
+            curOutState = output.state;
+            curFramesPlayed = output.frames_played;
+            outUsedBytes = _buf_used(outputbuf);
+            mutex_unlock(outputbuf->mutex);
+        }
+
+        unsigned streamUsedBytes = 0;
+        if (streambuf && streambuf->mutex) {
+            mutex_lock(streambuf->mutex);
+            streamUsedBytes = _buf_used(streambuf);
+            mutex_unlock(streambuf->mutex);
+        }
+
+        bool isStream = (curOutState == OUTPUT_RUNNING || curOutState == OUTPUT_BUFFER);
+        bool isPaused = (curOutState == OUTPUT_STOPPED || curOutState == OUTPUT_PAUSE_FRAMES);
 
         meta.connected  = slimproto_is_connected();
         slimproto_get_server_ip(meta.serverIp, sizeof(meta.serverIp));
@@ -93,7 +117,7 @@ void SlimprotoClient::_runTelemetry() {
         meta.paused     = isPaused;
         meta.sampleRate = sl_source_rate ? sl_source_rate : (uint32_t)SAMPLE_RATE;
         meta.bitDepth   = sl_source_bits ? sl_source_bits : 16;
-        meta.pos        = output.frames_played / (uint32_t)SAMPLE_RATE;
+        meta.pos        = curFramesPlayed / (uint32_t)SAMPLE_RATE;
 
         if (isStream) {
             idleSinceMs = 0;
@@ -107,7 +131,7 @@ void SlimprotoClient::_runTelemetry() {
             }
         } else {
             snprintf(meta.formatInfo, sizeof(meta.formatInfo), "Idle");
-            if (!isPaused && _params.getInputMode() == INPUT_MODE_WIFI && output.state == OUTPUT_OFF) {
+            if (!isPaused && _params.getInputMode() == INPUT_MODE_WIFI && curOutState == OUTPUT_OFF) {
                 if (idleSinceMs == 0) idleSinceMs = millis();
                 if (millis() - idleSinceMs >= 3000) {
                     _params.setInputMode(INPUT_MODE_AUX, false);
@@ -126,15 +150,16 @@ void SlimprotoClient::_runTelemetry() {
             wifi_ps_type_t ps = WIFI_PS_NONE;
             esp_wifi_get_ps(&ps);
             Console.printf("[SLIMPROTO STATS] state=%d | stream_buf=%u KB | out_buf=%u KB (%u frames) | played=%u s | rssi=%d dBm | ps=%d\n",
-                          output.state,
-                          (unsigned)(_buf_used(streambuf) / 1024),
-                          (unsigned)(_buf_used(outputbuf) / 1024),
-                          (unsigned)(_buf_used(outputbuf) / BYTES_PER_FRAME),
+                          curOutState,
+                          (unsigned)(streamUsedBytes / 1024),
+                          (unsigned)(outUsedBytes / 1024),
+                          (unsigned)(outUsedBytes / BYTES_PER_FRAME),
                           (unsigned)meta.pos,
                           (int)WiFi.RSSI(),
                           (int)ps);
         }
     }
 
+    _telemetryExited.store(true, std::memory_order_release);
     vTaskDelete(NULL);
 }

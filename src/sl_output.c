@@ -1,6 +1,8 @@
 /*
  * Squeezelite output subsystem ported for ESP32-S3
- * Based on squeezelite (c) Adrian Smith, Ralph Irving
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  * Directly feeds synchronized SAMPLE_RATE (96 kHz) stereo float PCM to the DSP/I2S pipeline
  * Hardware I2S DMA clock is the master clock pacing the entire pipeline
  */
@@ -110,7 +112,7 @@ frames_t _output_frames(frames_t avail) {
     // Start at jiffies
     if (output.state == OUTPUT_START_AT) {
         u32_t now = gettime_ms();
-        if (now >= output.start_at || output.start_at > now + 10000) {
+        if ((s32_t)(now - output.start_at) >= 0 || (s32_t)(output.start_at - now) > 10000) {
             output.state = OUTPUT_RUNNING;
         } else {
             u32_t delta_frames = ((output.start_at - now) * output.current_sample_rate) / 1000;
@@ -284,6 +286,7 @@ bool output_flush_streaming(void) {
     if (output.track_start) {
         outputbuf->writep = output.track_start;
         output.track_start = NULL;
+        outputbuf->flush_seq++;
     }
     UNLOCK_O;
     return flushed;

@@ -3,14 +3,14 @@ import gzip
 with open("data/index.html", "rb") as f:
     data = f.read()
 
-gz = gzip.compress(data, compresslevel=9)
+gz = gzip.compress(data, compresslevel=9, mtime=0)
 
-with open("src/eq_html.h", "w") as f:
+with open("src/eq_html.h", "w", encoding="utf-8", newline="\n") as f:
     f.write("// Auto-generated from data/index.html\n")
     f.write("#pragma once\n")
     f.write("#include <Arduino.h>\n\n")
-    f.write(f"const uint32_t PAGE_INDEX_HTML_GZ_LEN = {len(gz)};\n")
-    f.write("const uint8_t PAGE_INDEX_HTML_GZ[] PROGMEM = {\n")
+    f.write(f"inline const uint32_t PAGE_INDEX_HTML_GZ_LEN = {len(gz)};\n")
+    f.write("inline const uint8_t PAGE_INDEX_HTML_GZ[] PROGMEM = {\n")
     for i in range(0, len(gz), 16):
         chunk = gz[i:i+16]
         hex_str = ", ".join(f"0x{b:02X}" for b in chunk)

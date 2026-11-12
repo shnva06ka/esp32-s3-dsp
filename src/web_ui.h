@@ -67,12 +67,16 @@ public:
         _server.begin();
         Console.println("[WEB] HTTP & WebSocket server started");
 
-        OTAManager::beginArduinoOTA(_params.getAuthPass());
+        char otaPass[64];
+        _params.getAuth(nullptr, 0, otaPass, sizeof(otaPass));
+        OTAManager::beginArduinoOTA(otaPass);
     }
 
     void loop() {
         Console.loop();
-        OTAManager::loopArduinoOTA(_params.getAuthPass());
+        char otaPass[64];
+        _params.getAuth(nullptr, 0, otaPass, sizeof(otaPass));
+        OTAManager::loopArduinoOTA(otaPass);
         _ws.cleanupClients();
         const bool wsHasClients = (_ws.count() > 0);
         _wsHasClients.store(wsHasClients, std::memory_order_relaxed);
@@ -128,12 +132,28 @@ public:
             }
         }
 
-        if (_wifiReconnectRequested && now >= _wifiReconnectTimer) {
-            _performWiFiReconnect();
+        _pollWiFiReconnect();
+
+        if (_wifiStaCleanupPending && (int32_t)(now - _wifiStaCleanupTimer) >= 0) {
+            _wifiStaCleanupPending = false;
+            if (WiFi.status() == WL_CONNECTED && (WiFi.getMode() & WIFI_MODE_AP)) {
+                WiFi.softAPdisconnect(true);
+                WiFi.mode(WIFI_STA);
+                Console.println("[NET] Switched from AP_STA to pure STA mode.");
+            }
         }
 
-        if (_rebootRequested && now >= _rebootTimer) {
+        bool doReboot = false;
+        portENTER_CRITICAL(&_wifiMux);
+        if (_rebootRequested && (int32_t)(now - _rebootTimer) >= 0) {
             _rebootRequested = false;
+            doReboot = true;
+        }
+        portEXIT_CRITICAL(&_wifiMux);
+        if (doReboot) {
+            if (_params.isDirty()) {
+                _params.save();
+            }
             Console.println("[SYS] Rebooting system on request...");
             ESP.restart();
         }
@@ -210,11 +230,32 @@ private:
     size_t            _wsLogCount{0};
     portMUX_TYPE      _wifiMux = portMUX_INITIALIZER_UNLOCKED;
     bool              _wifiReconnectRequested{false};
-    String            _newSSID{""};
-    String            _newPass{""};
+    bool              _wifiConnecting{false};
+    bool              _wifiStaCleanupPending{false};
+    unsigned long     _wifiStaCleanupTimer{0};
+    unsigned long     _wifiConnectDeadline{0};
+    unsigned long     _wifiLastDotMs{0};
+    char              _newSSID[33]{};
+    char              _newPass[64]{};
+    char              _activeSSID[33]{};
+    char              _activePass[64]{};
     unsigned long     _wifiReconnectTimer{0};
     bool              _rebootRequested{false};
     unsigned long     _rebootTimer{0};
+
+    bool _checkSameOrigin(AsyncWebServerRequest* req) {
+        if (!req->hasHeader("Origin")) return true;
+        String origin = req->header("Origin");
+        String host = req->host();
+        if (host.length() == 0) return true;
+        String expectedHttp = "http://" + host;
+        String expectedHttps = "https://" + host;
+        if (origin.equalsIgnoreCase(expectedHttp) || origin.equalsIgnoreCase(expectedHttps)) {
+            return true;
+        }
+        req->send(403, "application/json", "{\"error\":\"Cross-origin request rejected\"}");
+        return false;
+    }
 
     bool _checkAuth(AsyncWebServerRequest* req) {
         char u[32], p[64];
@@ -294,31 +335,48 @@ private:
         Console.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
     }
 
-    void _performWiFiReconnect() {
-        _wifiReconnectRequested = false;
-        Console.printf("\n[WEB] Attempting Wi-Fi connection to SSID '%s'...\n", _newSSID.c_str());
+    void _pollWiFiReconnect() {
+        const unsigned long now = millis();
 
-        WiFi.mode(WIFI_AP_STA);
-        WiFi.setSleep(false);
-        esp_wifi_set_ps(WIFI_PS_NONE);
-        WiFi.setTxPower(WIFI_POWER_19_5dBm);
-        WiFi.begin(_newSSID.c_str(), _newPass.c_str());
+        if (!_wifiConnecting) {
+            bool start = false;
+            portENTER_CRITICAL(&_wifiMux);
+            if (_wifiReconnectRequested && (int32_t)(now - _wifiReconnectTimer) >= 0) {
+                _wifiReconnectRequested = false;
+                strncpy(_activeSSID, _newSSID, sizeof(_activeSSID) - 1);
+                _activeSSID[sizeof(_activeSSID) - 1] = '\0';
+                strncpy(_activePass, _newPass, sizeof(_activePass) - 1);
+                _activePass[sizeof(_activePass) - 1] = '\0';
+                start = true;
+            }
+            portEXIT_CRITICAL(&_wifiMux);
 
-        for (uint8_t i = 0; i < 25 && WiFi.status() != WL_CONNECTED; ++i) {
-            delay(400);
-            Console.print('.');
-        }
+            if (!start) return;
 
-        if (WiFi.status() == WL_CONNECTED) {
+            Console.printf("\n[WEB] Attempting Wi-Fi connection to SSID '%s'...\n", _activeSSID);
+            WiFi.mode(WIFI_AP_STA);
             WiFi.setSleep(false);
             esp_wifi_set_ps(WIFI_PS_NONE);
             WiFi.setTxPower(WIFI_POWER_19_5dBm);
-            Console.printf("\n[WEB] Connected to '%s'! Station IP: %s (Max Signal Quality: PS_NONE, Tx: 19.5dBm)\n", _newSSID.c_str(), WiFi.localIP().toString().c_str());
+            WiFi.begin(_activeSSID, _activePass);
+            _wifiConnecting = true;
+            _wifiConnectDeadline = now + 10000UL;
+            _wifiLastDotMs = now;
+            return;
+        }
+
+        if (WiFi.status() == WL_CONNECTED) {
+            _wifiConnecting = false;
+            WiFi.setSleep(false);
+            esp_wifi_set_ps(WIFI_PS_NONE);
+            WiFi.setTxPower(WIFI_POWER_19_5dBm);
+            Console.printf("\n[WEB] Connected to '%s'! Station IP: %s (Max Signal Quality: PS_NONE, Tx: 19.5dBm)\n",
+                           _activeSSID, WiFi.localIP().toString().c_str());
 
             Preferences prefs;
             if (prefs.begin("wifi_cfg", false)) {
-                prefs.putString("ssid", _newSSID);
-                prefs.putString("pass", _newPass);
+                prefs.putString("ssid", _activeSSID);
+                prefs.putString("pass", _activePass);
                 prefs.end();
             }
 
@@ -331,18 +389,30 @@ private:
             StaticJsonDocument<512> doc;
             doc["t"] = "wifi_status";
             doc["status"] = "connected";
-            doc["ssid"] = _newSSID;
+            doc["ssid"] = _activeSSID;
             doc["ip"] = WiFi.localIP().toString();
-            doc["msg"] = "Connected successfully to " + _newSSID;
+            doc["msg"] = String("Connected successfully to ") + _activeSSID;
             String out;
             serializeJson(doc, out);
             _ws.textAll(out);
-        } else {
+
+            _wifiStaCleanupPending = true;
+            _wifiStaCleanupTimer = millis() + 2000UL;
+            return;
+        }
+
+        if ((int32_t)(now - _wifiLastDotMs) >= 400) {
+            _wifiLastDotMs = now;
+            Console.print('.');
+        }
+
+        if ((int32_t)(now - _wifiConnectDeadline) >= 0) {
+            _wifiConnecting = false;
             Console.println("\n[WEB] Wi-Fi connection failed! Remaining in current mode.");
             StaticJsonDocument<512> doc;
             doc["t"] = "wifi_status";
             doc["status"] = "failed";
-            doc["msg"] = "Could not connect to '" + _newSSID + "'. Please check password and try again.";
+            doc["msg"] = String("Could not connect to '") + _activeSSID + "'. Please check password and try again.";
             String out;
             serializeJson(doc, out);
             _ws.textAll(out);
@@ -350,6 +420,13 @@ private:
     }
 
     void _setupRoutes() {
+        _ws.handleHandshake([](AsyncWebServerRequest* req) -> bool {
+            if (!req->hasHeader("Origin")) return true;
+            String origin = req->header("Origin");
+            String host = req->host();
+            if (host.length() == 0) return true;
+            return origin.equalsIgnoreCase("http://" + host) || origin.equalsIgnoreCase("https://" + host);
+        });
         _ws.onEvent([this](AsyncWebSocket* s, AsyncWebSocketClient* c,
                            AwsEventType type, void* arg, uint8_t* data, size_t len) {
             _onWsEvent(s, c, type, arg, data, len);
@@ -378,13 +455,18 @@ private:
         });
 
         _server.on("/api/wifi", HTTP_POST, [this](AsyncWebServerRequest* req) {
-            if (!_checkAuth(req)) return;
+            if (!_checkSameOrigin(req)) return;
+            if (!(WiFi.getMode() & WIFI_MODE_AP) || WiFi.status() == WL_CONNECTED) {
+                if (!_checkAuth(req)) return;
+            }
             String ssid = req->hasParam("ssid", true) ? req->getParam("ssid", true)->value() : "";
             String pass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
             if (ssid.length() >= 1 && ssid.length() <= 32 && (pass.length() == 0 || (pass.length() >= 8 && pass.length() <= 63))) {
                 portENTER_CRITICAL(&_wifiMux);
-                _newSSID = ssid;
-                _newPass = pass;
+                strncpy(_newSSID, ssid.c_str(), sizeof(_newSSID) - 1);
+                _newSSID[sizeof(_newSSID) - 1] = '\0';
+                strncpy(_newPass, pass.c_str(), sizeof(_newPass) - 1);
+                _newPass[sizeof(_newPass) - 1] = '\0';
                 _wifiReconnectRequested = true;
                 _wifiReconnectTimer = millis() + 300;
                 portEXIT_CRITICAL(&_wifiMux);
@@ -396,10 +478,12 @@ private:
 
         _server.on("/api/wifi", HTTP_GET, [](AsyncWebServerRequest* req) {
             StaticJsonDocument<512> doc;
-            doc["connected"] = (WiFi.status() == WL_CONNECTED);
-            doc["ssid"] = (WiFi.status() == WL_CONNECTED) ? WiFi.SSID() : (WiFi.getMode() == WIFI_AP ? "ESP32-S3-DSP" : "");
-            doc["ip"] = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
-            doc["mode"] = (WiFi.status() == WL_CONNECTED) ? "sta" : (WiFi.getMode() == WIFI_AP ? "ap" : "other");
+            bool staConn = (WiFi.status() == WL_CONNECTED);
+            bool hasAp = ((WiFi.getMode() & WIFI_MODE_AP) != 0);
+            doc["connected"] = staConn;
+            doc["ssid"] = staConn ? WiFi.SSID() : (hasAp ? "ESP32-S3-DSP" : "");
+            doc["ip"] = staConn ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+            doc["mode"] = staConn ? (hasAp ? "ap+sta" : "sta") : (hasAp ? "ap" : "other");
             doc["rssi"] = WiFi.RSSI();
             String out;
             serializeJson(doc, out);
@@ -407,11 +491,13 @@ private:
         });
 
         _server.on("/api/auth", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkSameOrigin(req)) return;
             if (!_checkAuth(req)) return;
             String user = req->hasParam("user", true) ? req->getParam("user", true)->value() : "";
             String pass = req->hasParam("pass", true) ? req->getParam("pass", true)->value() : "";
             if (user.length() >= 1 && user.length() < 32 && pass.length() >= 4 && pass.length() < 64) {
                 if (_params.setAuth(user.c_str(), pass.c_str())) {
+                    OTAManager::updatePassword(pass.c_str());
                     req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Credentials updated\"}");
                 } else {
                     req->send(500, "application/json", "{\"error\":\"Failed to save to NVS\"}");
@@ -424,7 +510,7 @@ private:
         OTAManager::setupWebRoutes(_server, _params);
 
         _server.on("/api/resampler", HTTP_GET, [this](AsyncWebServerRequest* req) {
-            StaticJsonDocument<1024> doc;
+            StaticJsonDocument<1536> doc;
             _appendResamplerJson(doc);
             String out;
             serializeJson(doc, out);
@@ -432,6 +518,7 @@ private:
         });
 
         _server.on("/api/resampler/validate", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkSameOrigin(req)) return;
             if (!_checkAuth(req)) return;
             xTaskCreate([](void*) {
                 resampler_run_validation();
@@ -441,8 +528,14 @@ private:
         });
 
         _server.on("/api/resampler/log", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkSameOrigin(req)) return;
             if (!_checkAuth(req)) return;
-            bool en = req->hasParam("enable") ? (req->getParam("enable")->value() == "1") : true;
+            bool en = true;
+            if (req->hasParam("enable", true)) {
+                en = (req->getParam("enable", true)->value() == "1");
+            } else if (req->hasParam("enable", false)) {
+                en = (req->getParam("enable", false)->value() == "1");
+            }
             ResamplerTelemetry::setLoggingEnabled(en);
             req->send(200, "application/json", en ? "{\"status\":\"ok\",\"logging\":true}" : "{\"status\":\"ok\",\"logging\":false}");
         });
@@ -458,10 +551,13 @@ private:
         });
 
         _server.on("/api/reboot", HTTP_POST, [this](AsyncWebServerRequest* req) {
+            if (!_checkSameOrigin(req)) return;
             if (!_checkAuth(req)) return;
             req->send(200, "application/json", "{\"status\":\"ok\",\"msg\":\"Rebooting ESP32-S3...\"}");
+            portENTER_CRITICAL(&_wifiMux);
             _rebootRequested = true;
             _rebootTimer = millis() + 400;
+            portEXIT_CRITICAL(&_wifiMux);
         });
 
         _server.onNotFound([](AsyncWebServerRequest* req) {
@@ -558,14 +654,27 @@ private:
             _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "wifi_save") == 0 || strcmp(t, "wifi_config") == 0) {
-            const char* ssid = doc["ssid"] | "";
-            const char* pass = doc["pass"] | "";
-            if (strlen(ssid) > 0) {
-                _newSSID = ssid;
-                _newPass = pass;
-                _wifiReconnectRequested = true;
-                _wifiReconnectTimer = millis() + 300;
-                client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Initiating Wi-Fi connection...\"}");
+            // Unauthenticated WS Wi-Fi provisioning is restricted exclusively to AP initial setup mode
+            if ((WiFi.getMode() & WIFI_MODE_AP) && WiFi.status() != WL_CONNECTED) {
+                const char* ssid = doc["ssid"] | "";
+                const char* pass = doc["pass"] | "";
+                size_t slen = strlen(ssid);
+                size_t plen = strlen(pass);
+                if (slen >= 1 && slen <= 32 && (plen == 0 || (plen >= 8 && plen <= 63))) {
+                    portENTER_CRITICAL(&_wifiMux);
+                    strncpy(_newSSID, ssid, sizeof(_newSSID) - 1);
+                    _newSSID[sizeof(_newSSID) - 1] = '\0';
+                    strncpy(_newPass, pass, sizeof(_newPass) - 1);
+                    _newPass[sizeof(_newPass) - 1] = '\0';
+                    _wifiReconnectRequested = true;
+                    _wifiReconnectTimer = millis() + 300;
+                    portEXIT_CRITICAL(&_wifiMux);
+                    client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Initiating Wi-Fi connection...\"}");
+                } else {
+                    client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Invalid SSID or password length (SSID 1-32, Pass 8-63)\"}");
+                }
+            } else {
+                client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Use authenticated HTTP /api/wifi when connected to LAN\"}");
             }
         }
         else if (strcmp(t, "boot_defaults") == 0) {
@@ -594,7 +703,8 @@ private:
                 char tmp[64];
                 strncpy(tmp, rawOrder ? rawOrder : "", sizeof(tmp) - 1);
                 tmp[sizeof(tmp) - 1] = '\0';
-                char* token = strtok(tmp, ",");
+                char* savePtr = nullptr;
+                char* token = strtok_r(tmp, ",", &savePtr);
                 while (token) {
                     while (*token == ' ') token++;
                     DspModuleId module = parseDspModuleId(token);
@@ -602,7 +712,7 @@ private:
                         if (orderStr.length() > 0) orderStr += ",";
                         orderStr += toDspModuleToken(module);
                     }
-                    token = strtok(nullptr, ",");
+                    token = strtok_r(nullptr, ",", &savePtr);
                 }
             }
             if (orderStr.length() > 0) {
@@ -627,10 +737,10 @@ private:
         if (doc.containsKey("type"))    p.type    = doc["type"].as<uint8_t>();
         if (doc.containsKey("order"))   p.order   = doc["order"].as<uint8_t>();
 
-        p.gain = _clamp(p.gain, -18.0f,  18.0f);
-        p.q    = _clamp(p.q,     0.05f,   10.0f);
-        p.freq = _clamp(p.freq,  20.0f,  20000.0f);
-        if (p.order < 2 || p.order > 4) p.order = 2;
+        p.gain = _clamp(std::isfinite(p.gain) ? p.gain : 0.0f,   -18.0f,  18.0f);
+        p.q    = _clamp(std::isfinite(p.q)    ? p.q    : 0.707f,  0.05f,  10.0f);
+        p.freq = _clamp(std::isfinite(p.freq) ? p.freq : 1000.0f, 20.0f, 20000.0f);
+        if (p.order < 1 || p.order > 4) p.order = 2;
         if (p.type == 5) {
             p.type  = EQ_FILTER_LOW_PASS;
             p.order = 4;
@@ -655,13 +765,13 @@ private:
         if (doc.containsKey("phaseL"))  p.phaseL   = doc["phaseL"].as<int16_t>();
         if (doc.containsKey("phaseR"))  p.phaseR   = doc["phaseR"].as<int16_t>();
 
-        p.freq = _clamp(p.freq, 20.0f, 100.0f);
-        if (p.order < 2 || p.order > 4) p.order = 2;
-        p.balance  = _clamp(p.balance, -100.0f, 100.0f);
-        p.delayMsL = _clamp(p.delayMsL, 0.0f, 20.0f);
-        p.delayMsR = _clamp(p.delayMsR, 0.0f, 20.0f);
-        if (p.phaseL < 0 || p.phaseL > 180) p.phaseL = 0;
-        if (p.phaseR < 0 || p.phaseR > 180) p.phaseR = 0;
+        p.freq = _clamp(std::isfinite(p.freq) ? p.freq : 80.0f, 20.0f, 100.0f);
+        if (p.order < 1 || p.order > 4) p.order = 2;
+        p.balance  = _clamp(std::isfinite(p.balance)  ? p.balance  : 0.0f, -100.0f, 100.0f);
+        p.delayMsL = _clamp(std::isfinite(p.delayMsL) ? p.delayMsL : 0.0f, -20.0f,   20.0f);
+        p.delayMsR = _clamp(std::isfinite(p.delayMsR) ? p.delayMsR : 0.0f, -20.0f,   20.0f);
+        if (p.phaseL < -180 || p.phaseL > 180) p.phaseL = 0;
+        if (p.phaseR < -180 || p.phaseR > 180) p.phaseR = 0;
 
         _params.setSubsonic(p);
     }
@@ -847,7 +957,7 @@ private:
 
     String _buildSysJson() {
         auto s = SystemMonitor::getStats();
-        StaticJsonDocument<1024> doc;
+        StaticJsonDocument<2048> doc;
         doc["t"]         = "sys";
         doc["cpu0"]      = roundf(s.cpu0 * 10.0f) / 10.0f;
         doc["cpu1"]      = roundf(s.cpu1 * 10.0f) / 10.0f;
@@ -862,11 +972,16 @@ private:
         doc["idle1"]     = s.idleRate1;
         doc["idle_base0"] = s.idleBaseline0;
         doc["idle_base1"] = s.idleBaseline1;
-        doc["wifi_con"]  = (WiFi.status() == WL_CONNECTED);
-        doc["wifi_ssid"] = (WiFi.status() == WL_CONNECTED) ? WiFi.SSID() : (WiFi.getMode() == WIFI_AP ? "ESP32-S3-DSP (AP)" : "Disconnected");
-        doc["wifi_ip"]   = (WiFi.status() == WL_CONNECTED) ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+        bool staConn = (WiFi.status() == WL_CONNECTED);
+        bool hasAp = ((WiFi.getMode() & WIFI_MODE_AP) != 0);
+        doc["wifi_con"]  = staConn;
+        doc["wifi_ssid"] = staConn ? WiFi.SSID() : (hasAp ? "ESP32-S3-DSP (AP)" : "Disconnected");
+        doc["wifi_ip"]   = staConn ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
         _appendResamplerJson(doc);
 
+        if (doc.overflowed()) {
+            Console.println("[WEB] WARN: _buildSysJson StaticJsonDocument overflowed!");
+        }
         String out;
         serializeJson(doc, out);
         return out;

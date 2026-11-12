@@ -13,6 +13,7 @@
 class SpeakerCorrection {
 public:
     static constexpr size_t kDelayBufSize = 4096;
+    static_assert((kDelayBufSize & (kDelayBufSize - 1)) == 0, "kDelayBufSize must be a power of 2");
 
     SpeakerCorrection() {
         reset();
@@ -162,8 +163,8 @@ private:
     float          _delayBufR[kDelayBufSize]{};
     size_t         _delayWriteIdx{0};
 
-    float          _hStateL[4]{};
-    float          _hStateR[4]{};
+    float          _hStateL[14]{};
+    float          _hStateR[14]{};
 
     static inline int16_t _quantizePhase(int16_t deg) {
         if (deg < -157) return -180;
@@ -178,8 +179,14 @@ private:
     }
 
     static inline float _ap1(float x, float c, float& s) {
+        if (!std::isfinite(s)) s = 0.0f;
         float y = c * x + s;
         s = x - c * y;
+        if (!std::isfinite(y) || !std::isfinite(s)) {
+            s = 0.0f;
+            return 0.0f;
+        }
+        if (fabsf(s) < 1e-15f) s = 0.0f;
         return y;
     }
 
@@ -187,8 +194,20 @@ private:
         if (deg == 0) return x;
         if (deg == 180 || deg == -180) return -x;
 
-        float xI = _ap1(_ap1(x, 0.161758f, state[0]), 0.733029f, state[1]);
-        float xQ = _ap1(_ap1(x, 0.460144f, state[2]), 0.902267f, state[3]);
+        // 7+7 first-order all-pass Hilbert network tuned for 96 kHz (20 Hz..20 kHz, <= 1.1 deg error)
+        static constexpr float kCoeffsI[7] = {
+            -0.99972040f, -0.99822995f, -0.98883874f, -0.93133342f, -0.63232144f, 0.17593976f, 0.85340188f
+        };
+        static constexpr float kCoeffsQ[7] = {
+            -0.99992052f, -0.99929639f, -0.99555072f, -0.97214268f, -0.83572099f, -0.27635952f, 0.56445904f
+        };
+
+        float xI = x;
+        float xQ = x;
+        for (int k = 0; k < 7; ++k) {
+            xI = _ap1(xI, kCoeffsI[k], state[k]);
+            xQ = _ap1(xQ, kCoeffsQ[k], state[7 + k]);
+        }
 
         if (deg == 90)   return -xQ;
         if (deg == -90)  return  xQ;

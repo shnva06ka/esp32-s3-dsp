@@ -32,8 +32,16 @@ public:
             sumR += right[i] * right[i];
         }
 #endif
-        if (!std::isfinite(sumL) || sumL < 0.0f) sumL = 0.0f;
-        if (!std::isfinite(sumR) || sumR < 0.0f) sumR = 0.0f;
+        if (!std::isfinite(sumL) || sumL < 0.0f || !std::isfinite(sumR) || sumR < 0.0f) {
+            sumL = 0.0f;
+            sumR = 0.0f;
+            for (size_t i = 0; i < frames; ++i) {
+                if (!std::isfinite(left[i]))  left[i]  = 0.0f;
+                if (!std::isfinite(right[i])) right[i] = 0.0f;
+                sumL += left[i]  * left[i];
+                sumR += right[i] * right[i];
+            }
+        }
 
         const float rmsL = sqrtf(sumL / static_cast<float>(frames));
         const float rmsR = sqrtf(sumR / static_cast<float>(frames));
@@ -41,7 +49,15 @@ public:
         if (!std::isfinite(rms)) rms = 0.0f;
 
         if (!std::isfinite(_envRMS)) _envRMS = 0.0f;
-        const float coeff = (rms > _envRMS) ? _attackCoeff : _releaseCoeff;
+        if (!std::isfinite(_currentGain) || _currentGain < 0.0f) _currentGain = 1.0f;
+        float attackCoeff  = _attackCoeff;
+        float releaseCoeff = _releaseCoeff;
+        if (frames != kBufferFrames) {
+            const float blockRate = static_cast<float>(kSampleRate) / static_cast<float>(frames);
+            attackCoeff  = expf(-2.2f / (blockRate * (_attackMs * 0.001f)));
+            releaseCoeff = expf(-2.2f / (blockRate * (_releaseMs * 0.001f)));
+        }
+        const float coeff = (rms > _envRMS) ? attackCoeff : releaseCoeff;
         _envRMS = _envRMS * coeff + rms * (1.0f - coeff);
         if (fabsf(_envRMS) < 1e-15f) _envRMS = 0.0f;
 
@@ -84,6 +100,8 @@ private:
     float _thresholdDb{-18.f};
     float _ratio{4.f};
     float _makeupGainDb{0.f};
+    float _attackMs{5.0f};
+    float _releaseMs{150.0f};
     float _attackCoeff{0.f};
     float _releaseCoeff{0.f};
     float _envRMS{0.f};
@@ -91,19 +109,25 @@ private:
 
     void _update(const CompanderParams& p) {
         _enabled      = p.enabled;
-        _thresholdDb  = (p.threshold < -60.0f) ? -60.0f : ((p.threshold > 0.0f) ? 0.0f : p.threshold);
-        _ratio        = (p.ratio < 1.0f) ? 1.0f : ((p.ratio > 20.0f) ? 20.0f : p.ratio);
-        _makeupGainDb = (p.makeupGain < -24.0f) ? -24.0f : ((p.makeupGain > 24.0f) ? 24.0f : p.makeupGain);
+        const float rawThresh = std::isfinite(p.threshold)  ? p.threshold  : -18.0f;
+        const float rawRatio  = std::isfinite(p.ratio)      ? p.ratio      : 4.0f;
+        const float rawMakeup = std::isfinite(p.makeupGain) ? p.makeupGain : 0.0f;
+        const float rawAtt    = std::isfinite(p.attackMs)   ? p.attackMs   : 5.0f;
+        const float rawRel    = std::isfinite(p.releaseMs)  ? p.releaseMs  : 150.0f;
 
-        float safeAttack  = (p.attackMs < 0.1f) ? 0.1f : ((p.attackMs > 500.0f) ? 500.0f : p.attackMs);
-        float safeRelease = (p.releaseMs < 10.0f) ? 10.0f : ((p.releaseMs > 2000.0f) ? 2000.0f : p.releaseMs);
+        _thresholdDb  = (rawThresh < -60.0f) ? -60.0f : ((rawThresh > 0.0f) ? 0.0f : rawThresh);
+        _ratio        = (rawRatio < 1.0f) ? 1.0f : ((rawRatio > 20.0f) ? 20.0f : rawRatio);
+        _makeupGainDb = (rawMakeup < -24.0f) ? -24.0f : ((rawMakeup > 24.0f) ? 24.0f : rawMakeup);
+
+        _attackMs  = (rawAtt < 0.1f) ? 0.1f : ((rawAtt > 500.0f) ? 500.0f : rawAtt);
+        _releaseMs = (rawRel < 10.0f) ? 10.0f : ((rawRel > 2000.0f) ? 2000.0f : rawRel);
 
         const float F_block = static_cast<float>(kSampleRate) / static_cast<float>(kBufferFrames);
         auto tc = [&](float ms) -> float {
             float sec = ms / 1000.0f;
             return expf(-2.2f / (F_block * sec));
         };
-        _attackCoeff  = tc(safeAttack);
-        _releaseCoeff = tc(safeRelease);
+        _attackCoeff  = tc(_attackMs);
+        _releaseCoeff = tc(_releaseMs);
     }
 };

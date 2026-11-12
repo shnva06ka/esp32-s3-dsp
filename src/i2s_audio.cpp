@@ -60,6 +60,7 @@ bool I2SAudio::begin()
     };
 
     if (i2s_driver_install(kI2SPortMaster, &cfg_master, 0, nullptr) != ESP_OK) {
+        _freeBuffers();
         return false;
     }
 
@@ -73,6 +74,7 @@ bool I2SAudio::begin()
 
     if (i2s_set_pin(kI2SPortMaster, &pins_master) != ESP_OK) {
         i2s_driver_uninstall(kI2SPortMaster);
+        _freeBuffers();
         return false;
     }
     i2s_zero_dma_buffer(kI2SPortMaster);
@@ -95,6 +97,7 @@ bool I2SAudio::begin()
 
     if (i2s_driver_install(kI2SPortSlave, &cfg_slave, 0, nullptr) != ESP_OK) {
         i2s_driver_uninstall(kI2SPortMaster);
+        _freeBuffers();
         return false;
     }
 
@@ -109,21 +112,31 @@ bool I2SAudio::begin()
     if (i2s_set_pin(kI2SPortSlave, &pins_slave) != ESP_OK) {
         i2s_driver_uninstall(kI2SPortSlave);
         i2s_driver_uninstall(kI2SPortMaster);
+        _freeBuffers();
         return false;
     }
     i2s_zero_dma_buffer(kI2SPortSlave);
 
-    _running = true;
+    _running.store(true, std::memory_order_release);
+    _btTaskExited.store(false, std::memory_order_release);
 
-    xTaskCreatePinnedToCore(
-        _btTaskTrampoline,
-        "BtResample",
-        8192,
-        this,
-        4,
-        &_btTaskHandle,
-        0
-    );
+    if (xTaskCreatePinnedToCore(
+            _btTaskTrampoline,
+            "BtResample",
+            8192,
+            this,
+            4,
+            &_btTaskHandle,
+            0
+        ) != pdPASS) {
+        _btTaskHandle = nullptr;
+        _running.store(false, std::memory_order_release);
+        _btTaskExited.store(true, std::memory_order_release);
+        i2s_driver_uninstall(kI2SPortSlave);
+        i2s_driver_uninstall(kI2SPortMaster);
+        _freeBuffers();
+        return false;
+    }
 
     return true;
 }
@@ -138,11 +151,14 @@ void I2SAudio::_runBtTask()
     const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
     bool wasBtActive = false;
 
-    while (_running) {
+    while (_running.load(std::memory_order_acquire)) {
         const InputSourceMode targetSource = _params.getInputMode();
-        const bool btActive = (targetSource == INPUT_MODE_BT || _gainBt > 0.0f);
+        const bool btActive = (targetSource == INPUT_MODE_BT || _gainBt.load(std::memory_order_acquire) > 0.0f);
         if (!btActive) {
-            wasBtActive = false;
+            if (wasBtActive) {
+                _btRingBuffer.clear();
+                wasBtActive = false;
+            }
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;
         }
@@ -161,12 +177,13 @@ void I2SAudio::_runBtTask()
         }
     }
 
+    _btTaskExited.store(true, std::memory_order_release);
     vTaskDelete(nullptr);
 }
 
 void I2SAudio::process(const AudioCallback& cb)
 {
-    if (!_running) return;
+    if (!_running.load(std::memory_order_acquire)) return;
 
     const size_t byteCount = kBufferFrames * kChannels * sizeof(int32_t);
     const InputSourceMode targetSource = _params.getInputMode();
@@ -194,7 +211,9 @@ void I2SAudio::process(const AudioCallback& cb)
         }
     }
 
-    if (targetSource == INPUT_MODE_BT || _gainBt > 0.0f) {
+    float gBt = _gainBt.load(std::memory_order_relaxed);
+
+    if (targetSource == INPUT_MODE_BT || gBt > 0.0f) {
         if (_btRingBuffer.available() > RuntimeTuning::kBtLatencyCapFrames) {
             _btRingBuffer.skip(RuntimeTuning::kBtLatencyTrimFrames);
         }
@@ -233,13 +252,13 @@ void I2SAudio::process(const AudioCallback& cb)
         targetSource == INPUT_MODE_WIFI &&
         wifiFramesRead == 0 &&
         _gainAux == 0.0f &&
-        _gainBt == 0.0f &&
+        gBt == 0.0f &&
         _gainWifi == 1.0f;
 
     if (wifiSilenceFastPath) {
         memset(_leftMix, 0, kBufferFrames * sizeof(float));
         memset(_rightMix, 0, kBufferFrames * sizeof(float));
-    } else if (_gainAux == targetGainAux && _gainBt == targetGainBt && _gainWifi == targetGainWifi) {
+    } else if (_gainAux == targetGainAux && gBt == targetGainBt && _gainWifi == targetGainWifi) {
         const float* srcL = (targetSource == INPUT_MODE_BT)   ? _leftBt   :
                             (targetSource == INPUT_MODE_WIFI) ? _leftWifi : _leftAux;
         const float* srcR = (targetSource == INPUT_MODE_BT)   ? _rightBt   :
@@ -251,15 +270,16 @@ void I2SAudio::process(const AudioCallback& cb)
             if (_gainAux < targetGainAux) _gainAux = std::min(targetGainAux, _gainAux + kFadeStep);
             else if (_gainAux > targetGainAux) _gainAux = std::max(targetGainAux, _gainAux - kFadeStep);
 
-            if (_gainBt < targetGainBt) _gainBt = std::min(targetGainBt, _gainBt + kFadeStep);
-            else if (_gainBt > targetGainBt) _gainBt = std::max(targetGainBt, _gainBt - kFadeStep);
+            if (gBt < targetGainBt) gBt = std::min(targetGainBt, gBt + kFadeStep);
+            else if (gBt > targetGainBt) gBt = std::max(targetGainBt, gBt - kFadeStep);
 
             if (_gainWifi < targetGainWifi) _gainWifi = std::min(targetGainWifi, _gainWifi + kFadeStep);
             else if (_gainWifi > targetGainWifi) _gainWifi = std::max(targetGainWifi, _gainWifi - kFadeStep);
 
-            _leftMix[i]  = _gainAux * _leftAux[i]  + _gainBt * _leftBt[i]  + _gainWifi * _leftWifi[i];
-            _rightMix[i] = _gainAux * _rightAux[i] + _gainBt * _rightBt[i] + _gainWifi * _rightWifi[i];
+            _leftMix[i]  = _gainAux * _leftAux[i]  + gBt * _leftBt[i]  + _gainWifi * _leftWifi[i];
+            _rightMix[i] = _gainAux * _rightAux[i] + gBt * _rightBt[i] + _gainWifi * _rightWifi[i];
         }
+        _gainBt.store(gBt, std::memory_order_release);
     }
 
     ActiveInputSource currentActive = (targetSource == INPUT_MODE_BT)   ? ACTIVE_SRC_BT :
@@ -275,8 +295,10 @@ void I2SAudio::process(const AudioCallback& cb)
     }
 
     for (size_t i = 0; i < kBufferFrames; ++i) {
-        float sL = fminf(fmaxf(_leftMix[i],  -1.0f), 1.0f);
-        float sR = fminf(fmaxf(_rightMix[i], -1.0f), 1.0f);
+        float rawL = std::isfinite(_leftMix[i])  ? _leftMix[i]  : 0.0f;
+        float rawR = std::isfinite(_rightMix[i]) ? _rightMix[i] : 0.0f;
+        float sL = fminf(fmaxf(rawL, -1.0f), 1.0f);
+        float sR = fminf(fmaxf(rawR, -1.0f), 1.0f);
         _txBuf[i * 2    ] = static_cast<int32_t>(sL * 2147483392.0f);
         _txBuf[i * 2 + 1] = static_cast<int32_t>(sR * 2147483392.0f);
     }
@@ -287,10 +309,11 @@ void I2SAudio::process(const AudioCallback& cb)
 
 void I2SAudio::end()
 {
-    if (_running) {
-        _running = false;
+    if (_running.exchange(false, std::memory_order_acq_rel)) {
         if (_btTaskHandle) {
-            vTaskDelay(pdMS_TO_TICKS(30));
+            for (int w = 0; w < 50 && !_btTaskExited.load(std::memory_order_acquire); ++w) {
+                vTaskDelay(pdMS_TO_TICKS(5));
+            }
             _btTaskHandle = nullptr;
         }
         i2s_driver_uninstall(kI2SPortSlave);
@@ -351,6 +374,7 @@ void I2SAudio::_freeBuffers()
 void I2SAudio::_writeBtFrames(size_t frames)
 {
     if (frames == 0) return;
+    if (frames > kBufferFrames) frames = kBufferFrames;
 
     float bufL[kBufferFrames];
     float bufR[kBufferFrames];

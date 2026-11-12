@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Preferences.h>
+#include <atomic>
 #include "BluetoothA2DPSink.h"
 
 #define I2S_BCK_PIN   22
@@ -13,9 +14,9 @@
 BluetoothA2DPSink a2dp_sink;
 
 static Preferences g_prefs;
-static uint8_t g_btVolume = 100;
-static volatile bool g_volDirty = false;
-static volatile unsigned long g_lastVolChangeTime = 0;
+static std::atomic<uint8_t> g_btVolume{100};
+static std::atomic<bool> g_volDirty{false};
+static std::atomic<unsigned long> g_lastVolChangeTime{0};
 static const unsigned long kVolSaveDebounceMs = 2500;
 
 enum BtState {
@@ -23,15 +24,17 @@ enum BtState {
     BT_CONNECTED_IDLE,
     BT_PLAYING
 };
-static volatile BtState g_btState = BT_DISCONNECTED;
+static std::atomic<BtState> g_btState{BT_DISCONNECTED};
 
 void save_volume_to_nvs() {
-    if (!g_volDirty) return;
-    g_volDirty = false;
-    uint8_t vol = g_btVolume;
+    if (!g_volDirty.load(std::memory_order_acquire)) return;
+    uint8_t vol = g_btVolume.load(std::memory_order_acquire);
     if (g_prefs.begin("bt_cfg", false)) {
         g_prefs.putUChar("vol", vol);
         g_prefs.end();
+        if (g_btVolume.load(std::memory_order_acquire) == vol) {
+            g_volDirty.store(false, std::memory_order_release);
+        }
         Serial.printf("[NVS] Persisted Bluetooth volume %d / 127 (%d%%) to flash.\n",
                       vol, (uint32_t)vol * 100 / 127);
     }
@@ -40,34 +43,38 @@ void save_volume_to_nvs() {
 void avrc_volume_change_callback(int vol) {
     if (vol < 0) vol = 0;
     if (vol > 127) vol = 127;
-    if (static_cast<uint8_t>(vol) != g_btVolume) {
-        g_btVolume = static_cast<uint8_t>(vol);
-        g_lastVolChangeTime = millis();
-        g_volDirty = true;
+    uint8_t uvol = static_cast<uint8_t>(vol);
+    if (uvol != g_btVolume.load(std::memory_order_relaxed)) {
+        g_btVolume.store(uvol, std::memory_order_release);
+        g_lastVolChangeTime.store(millis(), std::memory_order_release);
+        g_volDirty.store(true, std::memory_order_release);
         Serial.printf("[AVRC] Volume updated by host: %d / 127 (%d%%)\n",
-                      g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+                      uvol, (uint32_t)uvol * 100 / 127);
     }
 }
 
 void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
+    (void)ptr;
     switch (state) {
         case ESP_A2D_CONNECTION_STATE_DISCONNECTED:
             Serial.println("[BT] Device disconnected. Ready for pairing...");
-            if (g_volDirty) {
-                g_lastVolChangeTime = 0;
+            if (g_volDirty.load(std::memory_order_acquire)) {
+                g_lastVolChangeTime.store(0, std::memory_order_release);
             }
-            g_btState = BT_DISCONNECTED;
+            g_btState.store(BT_DISCONNECTED, std::memory_order_release);
             break;
         case ESP_A2D_CONNECTION_STATE_CONNECTING:
             Serial.println("[BT] Connecting to Bluetooth source...");
             break;
-        case ESP_A2D_CONNECTION_STATE_CONNECTED:
+        case ESP_A2D_CONNECTION_STATE_CONNECTED: {
             Serial.println("[BT] Connected to Bluetooth source!");
-            g_btState = BT_CONNECTED_IDLE;
-            a2dp_sink.set_volume(g_btVolume);
+            g_btState.store(BT_CONNECTED_IDLE, std::memory_order_release);
+            uint8_t vol = g_btVolume.load(std::memory_order_acquire);
+            a2dp_sink.set_volume(vol);
             Serial.printf("[BT] Enforced remembered volume: %d / 127 (%d%%)\n",
-                          g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+                          vol, (uint32_t)vol * 100 / 127);
             break;
+        }
         case ESP_A2D_CONNECTION_STATE_DISCONNECTING:
             Serial.println("[BT] Disconnecting...");
             break;
@@ -75,15 +82,18 @@ void connection_state_changed(esp_a2d_connection_state_t state, void *ptr) {
 }
 
 void audio_state_changed(esp_a2d_audio_state_t state, void *ptr) {
+    (void)ptr;
     switch (state) {
         case ESP_A2D_AUDIO_STATE_REMOTE_SUSPEND:
         case ESP_A2D_AUDIO_STATE_STOPPED:
             Serial.println("[BT] Audio stopped/paused");
-            if (g_btState != BT_DISCONNECTED) g_btState = BT_CONNECTED_IDLE;
+            if (g_btState.load(std::memory_order_acquire) != BT_DISCONNECTED) {
+                g_btState.store(BT_CONNECTED_IDLE, std::memory_order_release);
+            }
             break;
         case ESP_A2D_AUDIO_STATE_STARTED:
             Serial.println("[BT] Audio streaming active -> transmitting I2S to S3");
-            g_btState = BT_PLAYING;
+            g_btState.store(BT_PLAYING, std::memory_order_release);
             break;
     }
 }
@@ -128,19 +138,23 @@ void setup() {
     a2dp_sink.set_pin_config(pin_config);
     a2dp_sink.set_i2s_config(i2s_config);
 
-    g_prefs.begin("bt_cfg", false);
-    g_btVolume = g_prefs.getUChar("vol", 100);
-    g_prefs.end();
+    uint8_t savedVol = 100;
+    if (g_prefs.begin("bt_cfg", true)) {
+        savedVol = g_prefs.getUChar("vol", 100);
+        g_prefs.end();
+    }
+    if (savedVol > 127) savedVol = 127;
+    g_btVolume.store(savedVol, std::memory_order_release);
     Serial.printf("[INIT] Loaded Bluetooth volume from NVS: %d / 127 (%d%%)\n",
-                  g_btVolume, (uint32_t)g_btVolume * 100 / 127);
+                  savedVol, (uint32_t)savedVol * 100 / 127);
 
     a2dp_sink.set_on_connection_state_changed(connection_state_changed);
     a2dp_sink.set_on_audio_state_changed(audio_state_changed);
     a2dp_sink.set_on_volumechange(avrc_volume_change_callback);
 
     a2dp_sink.start(BT_DEV_NAME);
-    a2dp_sink.set_volume(g_btVolume);
-    Serial.printf("[INIT] Bluetooth A2DP Sink started. Initial volume: %d / 127.\n", g_btVolume);
+    a2dp_sink.set_volume(savedVol);
+    Serial.printf("[INIT] Bluetooth A2DP Sink started. Initial volume: %d / 127.\n", savedVol);
 }
 
 void loop() {
@@ -148,7 +162,7 @@ void loop() {
     static unsigned long lastLedUpdate = 0;
     static bool ledState = false;
 
-    switch (g_btState) {
+    switch (g_btState.load(std::memory_order_acquire)) {
         case BT_DISCONNECTED:
             if (now - lastLedUpdate >= 250) {
                 lastLedUpdate = now;
@@ -173,7 +187,8 @@ void loop() {
             break;
     }
 
-    if (g_volDirty && (now - g_lastVolChangeTime >= kVolSaveDebounceMs)) {
+    if (g_volDirty.load(std::memory_order_acquire) &&
+        (now - g_lastVolChangeTime.load(std::memory_order_acquire) >= kVolSaveDebounceMs)) {
         save_volume_to_nvs();
     }
 

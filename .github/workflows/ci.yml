@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify data/index.html and src/eq_html.h are in sync
+        run: |
+          python3 -c "import gzip, hashlib, pathlib, re; h=pathlib.Path('data/index.html').read_bytes(); hdr=pathlib.Path('src/eq_html.h').read_text(); raw=bytes(int(x,16) for x in re.findall(r'0x([0-9A-Fa-f]{2})', hdr)); assert hashlib.sha256(h).hexdigest()==hashlib.sha256(gzip.decompress(raw)).hexdigest(), 'eq_html.h out of sync with data/index.html'"
+
+      - name: Install PlatformIO
+        run: python3 -m pip install --upgrade platformio
+
+      - name: Build ESP32-S3 DSP firmware
+        run: pio run -e yd_esp32s3_n16r8
+
+      - name: Build ESP32-WROOM BT bridge firmware
+        run: pio run -e wroom_bt
+
+      - name: Run PlatformIO static analysis
+        run: pio check -e yd_esp32s3_n16r8 -e wroom_bt --skip-packages --fail-on-defect=high

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <atomic>
 #include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -23,23 +24,23 @@ public:
     };
 
     static void setTaskHandles(TaskHandle_t bt, TaskHandle_t audio, TaskHandle_t web, TaskHandle_t decode) {
-        _s().btTask     = bt;
-        _s().audioTask  = audio;
-        _s().webTask    = web;
-        _s().decodeTask = decode;
+        _s().btTask.store(bt, std::memory_order_release);
+        _s().audioTask.store(audio, std::memory_order_release);
+        _s().webTask.store(web, std::memory_order_release);
+        _s().decodeTask.store(decode, std::memory_order_release);
     }
 
-    static void setBtTaskHandle(TaskHandle_t h)     { _s().btTask = h; }
-    static void setAudioTaskHandle(TaskHandle_t h)  { _s().audioTask = h; }
-    static void setWebTaskHandle(TaskHandle_t h)    { _s().webTask = h; }
-    static void setDecodeTaskHandle(TaskHandle_t h) { _s().decodeTask = h; }
+    static void setBtTaskHandle(TaskHandle_t h)     { _s().btTask.store(h, std::memory_order_release); }
+    static void setAudioTaskHandle(TaskHandle_t h)  { _s().audioTask.store(h, std::memory_order_release); }
+    static void setWebTaskHandle(TaskHandle_t h)    { _s().webTask.store(h, std::memory_order_release); }
+    static void setDecodeTaskHandle(TaskHandle_t h) { _s().decodeTask.store(h, std::memory_order_release); }
 
     static void setLoggingEnabled(bool en) {
-        _s().loggingEnabled = en;
+        _s().loggingEnabled.store(en, std::memory_order_release);
     }
 
     static bool isLoggingEnabled() {
-        return _s().loggingEnabled;
+        return _s().loggingEnabled.load(std::memory_order_acquire);
     }
 
     static bool getBtStats(resampler_stats_t* out) {
@@ -71,16 +72,21 @@ public:
         d.resetReason = getResetReasonString();
         d.temperatureC = temperatureRead();
 
-        if (_s().btTask && eTaskGetState(_s().btTask) != eDeleted) {
-            d.btStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(_s().btTask) * sizeof(StackType_t);
+        TaskHandle_t bt  = _s().btTask.load(std::memory_order_acquire);
+        TaskHandle_t aud = _s().audioTask.load(std::memory_order_acquire);
+        TaskHandle_t web = _s().webTask.load(std::memory_order_acquire);
+        TaskHandle_t dec = _s().decodeTask.load(std::memory_order_acquire);
+        if (!dec) dec = sl_decode_task_handle();
+
+        if (bt && eTaskGetState(bt) != eDeleted) {
+            d.btStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(bt) * sizeof(StackType_t);
         }
-        if (_s().audioTask && eTaskGetState(_s().audioTask) != eDeleted) {
-            d.audioStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(_s().audioTask) * sizeof(StackType_t);
+        if (aud && eTaskGetState(aud) != eDeleted) {
+            d.audioStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(aud) * sizeof(StackType_t);
         }
-        if (_s().webTask && eTaskGetState(_s().webTask) != eDeleted) {
-            d.webStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(_s().webTask) * sizeof(StackType_t);
+        if (web && eTaskGetState(web) != eDeleted) {
+            d.webStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(web) * sizeof(StackType_t);
         }
-        TaskHandle_t dec = _s().decodeTask ? _s().decodeTask : sl_decode_task_handle();
         if (dec && eTaskGetState(dec) != eDeleted) {
             d.decodeStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(dec) * sizeof(StackType_t);
         }
@@ -92,7 +98,7 @@ public:
      * Only emits logs when resampling is active so normal playback is not disturbed.
      */
     static void periodicReport(const resampler_stats_t* btStats, const resampler_stats_t* flacStats) {
-        if (!_s().loggingEnabled) return;
+        if (!_s().loggingEnabled.load(std::memory_order_acquire)) return;
 
         unsigned long now = millis();
         if (now - _s().lastReportMs < 5000) return;
@@ -145,12 +151,12 @@ public:
 
 private:
     struct State {
-        TaskHandle_t  btTask{nullptr};
-        TaskHandle_t  audioTask{nullptr};
-        TaskHandle_t  webTask{nullptr};
-        TaskHandle_t  decodeTask{nullptr};
-        bool          loggingEnabled{true};
-        unsigned long lastReportMs{0};
+        std::atomic<TaskHandle_t> btTask{nullptr};
+        std::atomic<TaskHandle_t> audioTask{nullptr};
+        std::atomic<TaskHandle_t> webTask{nullptr};
+        std::atomic<TaskHandle_t> decodeTask{nullptr};
+        std::atomic<bool>         loggingEnabled{true};
+        unsigned long             lastReportMs{0};
     };
 
     static State& _s() {

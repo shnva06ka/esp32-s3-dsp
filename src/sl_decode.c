@@ -1,6 +1,8 @@
 /*
  * Squeezelite decode scheduling ported for ESP32-S3
- * Based on squeezelite (c) Adrian Smith, Ralph Irving
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #include "squeezelite.h"
 
@@ -13,6 +15,7 @@ struct decodestate decode;
 static struct codec *codecs[MAX_CODECS];
 static struct codec *codec = NULL;
 bool decode_running = true;
+static volatile bool decode_task_exited = true;
 static TaskHandle_t decode_task_handle = NULL;
 
 #define LOCK_S   mutex_lock(streambuf->mutex)
@@ -66,6 +69,7 @@ static void decode_task(void *arg) {
         }
     }
 
+    decode_task_exited = true;
     vTaskDelete(NULL);
 }
 
@@ -86,32 +90,39 @@ void decode_init(log_level level, const char *include_codecs, const char *exclud
     codec = NULL;
 
     decode_running = true;
+    decode_task_exited = false;
     /* Run FLAC decoding + resampling on Core 0 so Core 1 is dedicated to 96 kHz DSP + I2S */
-    xTaskCreatePinnedToCore(
-        decode_task,
-        "sl_decode",
-        8192,
-        NULL,
-        4,
-        &decode_task_handle,
-        0
-    );
+    if (xTaskCreatePinnedToCore(
+            decode_task,
+            "sl_decode",
+            8192,
+            NULL,
+            4,
+            &decode_task_handle,
+            0
+        ) != pdPASS) {
+        decode_task_handle = NULL;
+        decode_running = false;
+        decode_task_exited = true;
+        LOG_ERROR("Failed to create sl_decode task!");
+    }
 }
 
 void decode_close(void) {
     LOG_INFO("Closing decode subsystem");
     decode_running = false;
+    if (decode_task_handle) {
+        for (int w = 0; w < 50 && !decode_task_exited; ++w) {
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
+        decode_task_handle = NULL;
+    }
     LOCK_D;
     if (codec) {
         codec->close();
         codec = NULL;
     }
     UNLOCK_D;
-
-    if (decode_task_handle) {
-        vTaskDelay(pdMS_TO_TICKS(50));
-        decode_task_handle = NULL;
-    }
     mutex_destroy(decode.mutex);
 }
 

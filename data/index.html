@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>ESP32-S3-DSP</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%232e3440'/%3E%3Cpath d='M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12' fill='none' stroke='%2388c0d0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"/>
 <script>
@@ -73,7 +73,7 @@
   --ok-text: #A3BE8C;
   --err-text: #D08770;
   --cv-bg: #1A1E25; --cv-grid: #232831; --cv-grid-zero: #5C667A; --cv-label: #7D879B;
-  --cv-dim: #353C49; --cv-curve: #ECEFF4; --cv-node-stroke: #ECEFF4; --cv-tip: rgba(26, 30, 37, 0.94);
+  --cv-dim: #353C49; --cv-curve: #B8C2D1; --cv-node-stroke: #ECEFF4; --cv-tip: rgba(26, 30, 37, 0.94);
   --cv-tip-grid: #2B313C; --cv-tip-text: #9AA5BA; --cv-tip-text-strong: #ECEFF4; --cv-off: #4A5262;
 }
 :root[data-theme="dark"] .band-card:not(.band-bypassed):not(.eq-row-desktop) {
@@ -945,6 +945,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   overflow-x: auto;
   overflow-y: hidden;
   overflow-y: clip;
+  overflow-anchor: none;
   padding: 18px 0 20px 0;
   position: relative;
 }
@@ -993,7 +994,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   position: relative;
   z-index: 1;
 }
-.band-card:hover,
+.band-card:not(.eq-row-desktop):hover,
 .band-card:focus-within {
   border-color: var(--nord0);
   z-index: 50;
@@ -1462,7 +1463,6 @@ body.is-scrubbing-val * {
   justify-content: flex-start;
   gap: 18px;
 }
-.band-card.eq-row-desktop:hover,
 .band-card.eq-row-desktop:focus-within,
 .band-card.eq-row-desktop:has(.band-type-menu-wrap.open) {
   border-color: var(--nord0) !important;
@@ -1880,6 +1880,25 @@ body.is-scrubbing-val * {
   color-scheme: light;
   accent-color: #2E3440;
 }
+:root[data-theme="dark"] .preamp-slider::-webkit-slider-thumb,
+:root[data-theme="dark"] .band-vslider::-webkit-slider-thumb {
+  border-color: #9AA5BA !important;
+}
+:root[data-theme="dark"] .preamp-slider::-webkit-slider-thumb:hover,
+:root[data-theme="dark"] .band-vslider::-webkit-slider-thumb:hover {
+  border-color: #C2CAD8 !important;
+}
+:root[data-theme="dark"] .preamp-slider::-moz-range-thumb,
+:root[data-theme="dark"] .band-vslider::-moz-range-thumb {
+  border-color: #9AA5BA !important;
+}
+:root[data-theme="dark"] .preamp-slider::-moz-range-thumb:hover,
+:root[data-theme="dark"] .band-vslider::-moz-range-thumb:hover {
+  border-color: #C2CAD8 !important;
+}
+:root[data-theme="dark"] .knob-notch {
+  stroke: #9AA5BA;
+}
 :root[data-theme="dark"] .preamp-slider::-webkit-slider-runnable-track,
 :root[data-theme="dark"] .band-vslider::-webkit-slider-runnable-track {
   background: #2B313C;
@@ -1981,6 +2000,7 @@ body.is-scrubbing-val * {
   overflow-x: auto;
   overflow-y: hidden;
   overflow-y: clip;
+  overflow-anchor: none;
   padding: 6px 4px 10px;
   scroll-behavior: smooth;
 }
@@ -2268,6 +2288,43 @@ body.is-scrubbing-val * {
 .btn-wifi-connect:active {
   transform: scale(0.98);
 }
+.btn-wifi-connect:disabled {
+  background: var(--border-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+  transform: none;
+}
+.ota-drop-zone {
+  border: 2px dashed var(--border-strong);
+  border-radius: 6px;
+  padding: 22px 16px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--nord1);
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.ota-drop-zone:hover, .ota-drop-zone.dragover {
+  border-color: var(--nord10);
+  background: var(--accent-soft);
+}
+.ota-bar-wrap {
+  width: 100%;
+  height: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  display: none;
+}
+.ota-bar {
+  width: 0%;
+  height: 100%;
+  background: var(--nord10);
+  transition: width 0.12s linear;
+}
 .wifi-status-msg {
   font-size: 12px;
   font-weight: 600;
@@ -2319,6 +2376,11 @@ select:focus-visible, input:focus-visible {
 .card-val-badge .badge-lbl { width: 100%; text-align: center; }
 .card-val-badge input.badge-val-input { text-align: center; -moz-appearance: textfield; appearance: textfield; }
 .sys-actions-grid { margin-top: 0; }
+@media (min-width: 681px) {
+  .sys-actions-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
 body.processing-off #dsp-modules-container {
   filter: grayscale(1);
   opacity: 0.45;
@@ -2372,9 +2434,13 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     min-width: 0;
     max-width: 100%;
   }
-  @keyframes tab-fade {
-    from { opacity: 0; }
-    to   { opacity: 1; }
+  @keyframes tab-slide-from-right {
+    from { opacity: 0; transform: translateX(28px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes tab-slide-from-left {
+    from { opacity: 0; transform: translateX(-28px); }
+    to   { opacity: 1; transform: translateX(0); }
   }
   .mobile-tabs {
     display: grid;
@@ -2488,6 +2554,10 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     width: auto;
     flex-direction: row;
     padding: 9px 16px;
+    border: 1px solid var(--border);
+  }
+  .reorder-bar .btn-card-action:hover {
+    border-style: solid;
   }
   .btn-action-reorder {
     display: flex;
@@ -2534,8 +2604,9 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-select-overlay {
     display: flex;
   }
-  main[data-tab="system"] [data-tabpanel="system"],
-  main[data-tab="dsp"] [data-tabpanel="dsp"] { animation: tab-fade 0.18s ease-out; }
+  main[data-tab] { overflow-x: hidden; }
+  main[data-tab="system"] [data-tabpanel="system"] { animation: tab-slide-from-left 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
+  main[data-tab="dsp"] [data-tabpanel="dsp"] { animation: tab-slide-from-right 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
   .input-selector-grid {
     grid-template-columns: 1fr;
   }
@@ -2722,6 +2793,19 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <div class="input-card-title">Network</div>
           </div>
         </button>
+
+        <button class="input-card" id="ota-open-btn" onclick="openOtaModal()" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <div class="input-card-title">Firmware Update</div>
+          </div>
+        </button>
       </div>
 
       <div class="sys-stats-container">
@@ -2860,7 +2944,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   </div>
 
   <div class="reorder-bar" data-tabpanel="dsp">
-    <button type="button" class="btn-card-action" id="reorder-modules-btn"><span>Reorder modules</span></button>
+    <button type="button" class="btn-card-action" id="reorder-modules-btn"><span>Reorder</span></button>
   </div>
 
   <div id="dsp-modules-container" data-tabpanel="dsp">
@@ -3233,9 +3317,68 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importConfig(event)">
           <span class="backup-msg" id="backup-msg" role="status" aria-live="polite"></span>
         </div>
+        <div class="submodule-separator"></div>
+        <div class="submodule-title">System &amp; Legal</div>
+        <div class="backup-row" style="flex-wrap: wrap;">
+          <a class="btn-primary" href="/console" style="text-decoration:none;display:inline-flex;align-items:center;">Live Console</a>
+          <button type="button" class="btn-primary" onclick="openAboutModal()">Licenses &amp; About</button>
+        </div>
       </div>
     </div>
   </section>
+
+  <div class="wifi-modal-backdrop" id="ota-modal" onclick="closeOtaModal(event)">
+    <div class="wifi-cfg-panel" onclick="event.stopPropagation()">
+      <div class="wifi-cfg-header">
+        <div class="wifi-cfg-title-row">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span class="wifi-cfg-title">Firmware Update (OTA)</span>
+        </div>
+        <button type="button" class="wifi-modal-close" onclick="closeOtaModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="wifi-cfg-body" style="gap: 12px;">
+        <p class="wifi-cfg-note">Select or drag and drop <code>firmware.bin</code> compiled by PlatformIO.</p>
+        <div class="ota-drop-zone" id="ota-drop-zone" role="button" tabindex="0" aria-label="Choose firmware.bin file" onclick="document.getElementById('ota-file-input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('ota-file-input').click();}">
+          <div id="ota-drop-text">Click to choose firmware.bin or drop file here</div>
+          <input type="file" id="ota-file-input" accept=".bin" hidden onchange="otaFileSelected(this.files && this.files[0])">
+        </div>
+        <div class="ota-bar-wrap" id="ota-bar-wrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="ota-bar" id="ota-bar"></div>
+        </div>
+        <div class="wifi-actions-row">
+          <span class="wifi-status-msg" id="ota-status" role="status" aria-live="polite"></span>
+          <button type="button" class="btn-wifi-connect" id="ota-up-btn" disabled onclick="uploadOtaFirmware()">Upload Firmware</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wifi-modal-backdrop" id="about-modal" onclick="closeAboutModal(event)">
+    <div class="wifi-cfg-panel" onclick="event.stopPropagation()">
+      <div class="wifi-cfg-header">
+        <div class="wifi-cfg-title-row">
+          <span class="wifi-cfg-title">ESP32-S3-DSP — Licenses &amp; About</span>
+        </div>
+        <button type="button" class="wifi-modal-close" onclick="closeAboutModal()" aria-label="Close">✕</button>
+      </div>
+      <div class="wifi-cfg-body" style="gap: 10px; font-size: 11px; line-height: 1.5;">
+        <p><strong>License:</strong> GNU General Public License v3.0 (GPLv3). NO WARRANTY; see the repository LICENSE file for full terms and Corresponding Source.</p>
+        <p><strong>Third-Party Components:</strong></p>
+        <ul style="padding-left: 16px; display: flex; flex-direction: column; gap: 4px;">
+          <li><strong>Squeezelite / squeezelite-esp32</strong> — GPLv3 (© Adrian Smith, Ralph Irving, Philippe G.)</li>
+          <li><strong>dr_flac</strong> — Public Domain / MIT-0 (© David Reid)</li>
+          <li><strong>ESPAsyncWebServer &amp; AsyncTCP</strong> — LGPLv3 (© Mathieu Carbou, Hristo Gochkov)</li>
+          <li><strong>ArduinoJson</strong> — MIT (© Benoit Blanchon)</li>
+          <li><strong>ESP32-A2DP</strong> — Apache-2.0 (© Phil Schatzmann)</li>
+        </ul>
+        <p style="color: var(--muted);">Squeezebox / Squeezelite are trademarks of their respective owners, used for compatibility identification only.</p>
+      </div>
+    </div>
+  </div>
 
   </main>
 
@@ -3480,7 +3623,7 @@ function importPresetFile(event) {
         let ord = parseInt(b.order) || 2;
         if (t === 5) { t = 3; ord = 4; }
         else if (t === 6) { t = 4; ord = 4; }
-        if (ord < 2 || ord > 4) ord = 2;
+        if (ord < 1 || ord > 4) ord = 2;
         return {
           band: idx,
           freq: parseFloat(b.freq) || 1000,
@@ -4094,7 +4237,7 @@ function handleMsg(d) {
         let ord = parseInt(b.order) || 2;
         if (t === 5) { t = 3; ord = 4; }
         else if (t === 6) { t = 4; ord = 4; }
-        if (ord < 2 || ord > 4) ord = 2;
+        if (ord < 1 || ord > 4) ord = 2;
         return {
           band: b.band,
           freq: parseFloat(b.freq) || 1000,
@@ -4466,11 +4609,22 @@ function applyModuleOrder(orderList) {
   const container = document.getElementById('dsp-modules-container');
   if (!container) return;
 
+  const curOrder = getCurrentModuleOrder();
+  const targetOrder = orderList.filter(id => !!container.querySelector(`[data-module="${id}"]`));
+  if (targetOrder.length === curOrder.length && targetOrder.every((id, idx) => curOrder[idx] === id)) {
+    lastSentModuleOrder = curOrder.join(',');
+    return;
+  }
+
+  const bandsEl = document.getElementById('bands-container');
+  const prevBandsScroll = bandsEl ? bandsEl.scrollLeft : 0;
+
   orderList.forEach(id => {
     const el = container.querySelector(`[data-module="${id}"]`);
     if (el) container.appendChild(el);
   });
 
+  if (bandsEl) bandsEl.scrollLeft = prevBandsScroll;
   updateDraggerNumbers();
   lastSentModuleOrder = getCurrentModuleOrder().join(',');
 }
@@ -4895,11 +5049,14 @@ function bandMagAt(b, f) {
   let order = b.order || 2;
   if (type === 5) { type = 3; order = 4; }
   else if (type === 6) { type = 4; order = 4; }
-  if (order < 2 || order > 4) order = 2;
+  if (order < 1 || order > 4) order = 2;
 
   if ((type === 0 || type === 1 || type === 2) && Math.abs(b.gain) < 0.001) return 0;
 
   if (type === 3) {
+    if (order === 1) {
+      return Math.max(-60, Math.min(30, eval1stOrderLP(b.freq, f)));
+    }
     if (order === 3) {
       const m = eval1stOrderLP(b.freq, f) + singleBiquadMag(3, b.freq, 0, 1.0, f);
       return Math.max(-60, Math.min(30, m));
@@ -4913,6 +5070,9 @@ function bandMagAt(b, f) {
   }
 
   if (type === 4) {
+    if (order === 1) {
+      return Math.max(-60, Math.min(30, eval1stOrderHP(b.freq, f)));
+    }
     if (order === 3) {
       const m = eval1stOrderHP(b.freq, f) + singleBiquadMag(4, b.freq, 0, 1.0, f);
       return Math.max(-60, Math.min(30, m));
@@ -5278,7 +5438,7 @@ fCanvas.addEventListener('pointermove', (e) => {
   } else {
     const dy = d.startY - e.clientY;
     if (isPass) {
-      b.order = Math.max(2, Math.min(4, Math.round(d.startOrder + dy / 75)));
+      b.order = Math.max(1, Math.min(4, Math.round(d.startOrder + dy / 75)));
     } else {
       b.q = Math.max(0.1, Math.min(8.0, d.startQ * Math.exp(dy / 180)));
     }
@@ -5383,7 +5543,7 @@ function selectBandFilter(i, type) {
   if (!b) return;
   b.type = type;
   if (type === 3 || type === 4) {
-    if (!b.order || b.order < 2 || b.order > 4) b.order = 2;
+    if (!b.order || b.order < 1 || b.order > 4) b.order = 2;
   }
 
   document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
@@ -5439,15 +5599,15 @@ function updateBandCardParamStates(i) {
     if (qBadgeLbl) qBadgeLbl.textContent = 'SLOPE';
     if (qUnitSpan) qUnitSpan.textContent = 'dB/oct';
     if (qNumInput) {
-      qNumInput.min = '12';
+      qNumInput.min = '6';
       qNumInput.max = '24';
       qNumInput.step = '6';
-      qNumInput.value = Math.max(2, b.order || 2) * 6;
+      qNumInput.value = Math.max(1, b.order || 2) * 6;
     }
     if (bandKnobs[i] && bandKnobs[i].qKnob) {
       bandKnobs[i].qKnob.configure({
-        min: 12, max: 24, step: 6, decimals: 0,
-        value: Math.max(2, b.order || 2) * 6
+        min: 6, max: 24, step: 6, decimals: 0,
+        value: Math.max(1, b.order || 2) * 6
       });
     }
   } else {
@@ -5847,12 +6007,12 @@ function rebuildBandsUI(opts = {}) {
       const boxQ = row.querySelector(`#scrub-box-q-${i}`);
       attachScrubInput(boxQ, numQ, {
         getConfig: () => (b.type === 3 || b.type === 4)
-          ? { min: 12, max: 24, step: 6, logScale: false, pixels: 110, format: v => String(Math.max(12, Math.min(24, Math.round(v / 6) * 6))) }
+          ? { min: 6, max: 24, step: 6, logScale: false, pixels: 110, format: v => String(Math.max(6, Math.min(24, Math.round(v / 6) * 6))) }
           : { min: 0.1, max: 8.0, step: 0.01, logScale: false, pixels: 150, format: v => v.toFixed(2) },
-        getVal: () => (b.type === 3 || b.type === 4) ? (Math.max(2, b.order || 2) * 6) : b.q,
+        getVal: () => (b.type === 3 || b.type === 4) ? (Math.max(1, b.order || 2) * 6) : b.q,
         onSlide: v => {
           if (b.type === 3 || b.type === 4) {
-            b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
+            b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
             numQ.value = b.order * 6;
           } else {
             b.q = v;
@@ -5863,7 +6023,7 @@ function rebuildBandsUI(opts = {}) {
         },
         onApply: v => {
           if (b.type === 3 || b.type === 4) {
-            b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
+            b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
             numQ.value = b.order * 6;
           } else {
             b.q = v;
@@ -6060,7 +6220,7 @@ function rebuildBandsUI(opts = {}) {
       <div class="card-val-badge">
         <span class="badge-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
         <div class="badge-input-row">
-          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '12' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? (Math.max(2, b.order || 2) * 6) : b.q.toFixed(2)}">
+          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '6' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? (Math.max(1, b.order || 2) * 6) : b.q.toFixed(2)}">
           ${isPass ? '<span class="badge-unit">dB</span>' : ''}
         </div>
       </div>
@@ -6168,15 +6328,15 @@ function rebuildBandsUI(opts = {}) {
     });
 
     const qKnob = new Knob(card.querySelector(`#knob-q-${i}`), {
-      min: isPass ? 12 : 0.1,
+      min: isPass ? 6 : 0.1,
       max: isPass ? 24 : 8.0,
       step: isPass ? 6 : null,
-      value: isPass ? (Math.max(2, b.order || 2) * 6) : b.q,
+      value: isPass ? (Math.max(1, b.order || 2) * 6) : b.q,
       defaultVal: isPass ? 12 : 0.707,
       decimals: isPass ? 0 : 2,
       onSlide: v => {
         if (b.type === 3 || b.type === 4) {
-          b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
+          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
           card.querySelector(`#num-q-${i}`).value = b.order * 6;
         } else {
           b.q = v;
@@ -6187,7 +6347,7 @@ function rebuildBandsUI(opts = {}) {
       },
       onApply: v => {
         if (b.type === 3 || b.type === 4) {
-          b.order = Math.max(2, Math.min(4, Math.round(v / 6)));
+          b.order = Math.max(1, Math.min(4, Math.round(v / 6)));
           card.querySelector(`#num-q-${i}`).value = b.order * 6;
         } else {
           b.q = v;
@@ -6201,8 +6361,8 @@ function rebuildBandsUI(opts = {}) {
     card.querySelector(`#num-q-${i}`).addEventListener('change', e => {
       let v = parseFloat(e.target.value);
       if (b.type === 3 || b.type === 4) {
-        if (isNaN(v)) v = Math.max(2, b.order || 2) * 6;
-        v = Math.max(12, Math.min(24, Math.round(v / 6) * 6));
+        if (isNaN(v)) v = Math.max(1, b.order || 2) * 6;
+        v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
         e.target.value = v;
         b.order = Math.round(v / 6);
         qKnob.set(v, false);
@@ -6286,6 +6446,23 @@ function rebuildBandsUI(opts = {}) {
   syncMobileCardInteractiveState();
   updateActionCardButtons();
   root.scrollLeft = prevScrollLeft;
+  if (opts.scrollToEnd && isMobileViewport()) {
+    const startLeft = prevScrollLeft;
+    const startT = performance.now();
+    const dur = 240;
+    const tickScroll = (now) => {
+      const p = Math.min(1, (now - startT) / dur);
+      const ease = 1 - Math.pow(1 - p, 3);
+      const maxLeft = Math.max(0, root.scrollWidth - root.clientWidth);
+      root.scrollLeft = startLeft + (maxLeft - startLeft) * ease;
+      if (p < 1) requestAnimationFrame(tickScroll);
+    };
+    requestAnimationFrame(tickScroll);
+  } else {
+    requestAnimationFrame(() => {
+      root.scrollLeft = prevScrollLeft;
+    });
+  }
   requestDrawResponse();
 }
 
@@ -6368,12 +6545,7 @@ function addBand() {
     color: chosenColor
   };
   bands.push(newBand);
-  rebuildBandsUI({ enteringIndex: newIndex });
-
-  const container = document.getElementById('bands-container');
-  if (container && isMobileViewport()) {
-    container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
-  }
+  rebuildBandsUI({ enteringIndex: newIndex, scrollToEnd: isMobileViewport() });
 
   wsTx({
     t: 'add_band',
@@ -6601,7 +6773,7 @@ function setModuleReorder(on) {
   document.body.classList.toggle('reorder-modules', on);
   const btn = document.getElementById('reorder-modules-btn');
   if (btn) {
-    btn.innerHTML = on ? '<span>Done</span>' : '<span>Reorder modules</span>';
+    btn.innerHTML = on ? '<span>Done</span>' : '<span>Reorder</span>';
     btn.classList.toggle('active-reorder', on);
   }
   const boxes = [...document.querySelectorAll('#dsp-modules-container .module-box[data-module]')];
@@ -6724,10 +6896,10 @@ function initSubsonicKnobs() {
   });
 
   subsonicKnobs.order = new Knob(document.getElementById('knob-sub-order'), {
-    min: 12, max: 24, step: 6, value: Math.max(2, subsonicParams.order || 2) * 6, defaultVal: 12,
+    min: 6, max: 24, step: 6, value: Math.max(1, subsonicParams.order || 2) * 6, defaultVal: 12,
     decimals: 0,
     onChange: v => {
-      const ord = Math.max(2, Math.min(4, Math.round(v / 6)));
+      const ord = Math.max(1, Math.min(4, Math.round(v / 6)));
       subsonicParams.order = ord;
       document.getElementById('num-sub-order').value = ord * 6;
       sendSubsonicThrottled(false);
@@ -6737,8 +6909,8 @@ function initSubsonicKnobs() {
   document.getElementById('num-sub-order').addEventListener('change', e => {
     let v = parseInt(e.target.value);
     if (!isNaN(v)) {
-      v = Math.max(12, Math.min(24, Math.round(v / 6) * 6));
-      const ord = Math.max(2, Math.min(4, v / 6));
+      v = Math.max(6, Math.min(24, Math.round(v / 6) * 6));
+      const ord = Math.max(1, Math.min(4, v / 6));
       subsonicParams.order = ord;
       e.target.value = ord * 6;
       subsonicKnobs.order.set(ord * 6, false);
@@ -7165,6 +7337,7 @@ document.addEventListener('click', (e) => {
   const tabs = [...document.querySelectorAll('.mobile-tab')];
   if (!main || !tabs.length) return;
   const select = (name) => {
+    if (main.dataset.tab === name) return;
     main.dataset.tab = name;
     tabs.forEach(b => {
       const on = b.dataset.tab === name;
@@ -7238,7 +7411,7 @@ function applyImportedConfig(cfg) {
         gain: clampNum(b.gain, -24, 24, 0),
         q:    clampNum(b.q, 0.1, 24, 0.707),
         type: Math.round(clampNum(b.type, 0, 4, 0)),
-        order: Math.round(clampNum(b.order, 2, 4, 2)),
+        order: Math.round(clampNum(b.order, 1, 4, 2)),
         enabled: b.enabled !== false,
         color: BAND_COLORS[idx % BAND_COLORS.length]
       }));
@@ -7258,7 +7431,7 @@ function applyImportedConfig(cfg) {
     const s = cfg.subsonic;
     Object.assign(subsonicParams, {
       freq: clampNum(s.freq, 20, 100, subsonicParams.freq),
-      order: Math.round(clampNum(s.order, 2, 4, subsonicParams.order)),
+      order: Math.round(clampNum(s.order, 1, 4, subsonicParams.order)),
       balance: clampNum(s.balance, -100, 100, 0),
       delayL: clampNum(s.delayL, -20, 20, 0),
       delayR: clampNum(s.delayR, -20, 20, 0),
@@ -7333,6 +7506,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closeWiFiModal();
     closePresetModal();
+    closeOtaModal();
+    closeAboutModal();
   }
 });
 
@@ -7363,21 +7538,182 @@ function submitWiFiConfig() {
     statusMsg.textContent = `Connecting to "${ssid}"...`;
   }
 
-  wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
-
-  if (!isMockMode) {
-    try {
-      const params = new URLSearchParams();
-      params.append('ssid', ssid);
-      params.append('pass', pass);
-      fetch('/api/wifi', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
-      }).catch(() => {});
-    } catch (_) {}
+  if (isMockMode) {
+    wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
+    return;
   }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('ssid', ssid);
+    params.append('pass', pass);
+    fetch('/api/wifi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    }).then(async (res) => {
+      if (res.ok) return;
+      let errMsg = `HTTP ${res.status}`;
+      try {
+        const j = await res.json();
+        if (j && j.error) errMsg = j.error;
+      } catch (_) {}
+      if (res.status === 401) {
+        wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
+        errMsg = 'Authentication required for Wi-Fi changes.';
+      }
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg error';
+        statusMsg.textContent = errMsg;
+      }
+    }).catch(() => {
+      if (statusMsg) {
+        statusMsg.className = 'wifi-status-msg error';
+        statusMsg.textContent = 'Network error sending Wi-Fi settings.';
+      }
+    });
+  } catch (_) {}
 }
+
+function openAboutModal() {
+  const m = document.getElementById('about-modal');
+  if (m) m.classList.add('open');
+}
+function closeAboutModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  const m = document.getElementById('about-modal');
+  if (m) m.classList.remove('open');
+}
+
+let otaSelectedFile = null;
+let otaUploading = false;
+function openOtaModal() {
+  const m = document.getElementById('ota-modal');
+  if (!m) return;
+  m.classList.add('open');
+  setTimeout(() => document.getElementById('ota-drop-zone')?.focus(), 20);
+}
+function closeOtaModal(e) {
+  if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+  if (otaUploading) return;
+  const m = document.getElementById('ota-modal');
+  if (m) m.classList.remove('open');
+}
+function otaFileSelected(file) {
+  if (!file || otaUploading) return;
+  otaSelectedFile = file;
+  const dt = document.getElementById('ota-drop-text');
+  const btn = document.getElementById('ota-up-btn');
+  const st = document.getElementById('ota-status');
+  if (dt) dt.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+  if (btn) btn.disabled = false;
+  if (st) { st.className = 'wifi-status-msg'; st.textContent = ''; }
+}
+(function initOtaDropZone() {
+  const dz = document.getElementById('ota-drop-zone');
+  if (!dz) return;
+  dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', (e) => { e.preventDefault(); dz.classList.remove('dragover'); });
+  dz.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+    if (e.dataTransfer?.files?.[0]) otaFileSelected(e.dataTransfer.files[0]);
+  });
+  if (new URLSearchParams(window.location.search).get('ota') === '1') {
+    openOtaModal();
+    try { history.replaceState(null, '', '/'); } catch (_) {}
+  }
+})();
+async function uploadOtaFirmware() {
+  if (!otaSelectedFile || otaUploading) return;
+  const upBtn = document.getElementById('ota-up-btn');
+  const barWrap = document.getElementById('ota-bar-wrap');
+  const bar = document.getElementById('ota-bar');
+  const status = document.getElementById('ota-status');
+  const setStatus = (txt, cls) => {
+    if (!status) return;
+    status.className = cls ? `wifi-status-msg ${cls}` : 'wifi-status-msg';
+    status.textContent = txt;
+  };
+  if (isMockMode) {
+    setStatus('OTA upload disabled in mock preview.', 'error');
+    return;
+  }
+  otaUploading = true;
+  if (upBtn) upBtn.disabled = true;
+  setStatus('Checking authorization...', '');
+  try {
+    const authRes = await fetch('/api/ota/auth', { method: 'GET', cache: 'no-store' });
+    if (!authRes.ok) {
+      otaUploading = false;
+      if (upBtn) upBtn.disabled = false;
+      setStatus(authRes.status === 401 ? 'Authentication required (401).' : `Auth check failed (HTTP ${authRes.status}).`, 'error');
+      return;
+    }
+  } catch (_) {
+    otaUploading = false;
+    if (upBtn) upBtn.disabled = false;
+    setStatus('Network error checking authorization.', 'error');
+    return;
+  }
+  if (barWrap) { barWrap.style.display = 'block'; barWrap.setAttribute('aria-valuenow', '0'); }
+  if (bar) bar.style.width = '0%';
+  setStatus('Uploading firmware...', '');
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/update', true);
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      if (bar) bar.style.width = pct + '%';
+      if (barWrap) barWrap.setAttribute('aria-valuenow', String(pct));
+      setStatus(`Uploading: ${pct}% (${(e.loaded / 1024).toFixed(0)} / ${(e.total / 1024).toFixed(0)} KB)`, '');
+    }
+  };
+  xhr.onload = () => {
+    otaUploading = false;
+    if (xhr.status === 200) {
+      if (bar) bar.style.width = '100%';
+      if (barWrap) barWrap.setAttribute('aria-valuenow', '100');
+      setStatus('Upload successful! ESP32-S3 is rebooting...', 'success');
+      let countdown = 10;
+      const timer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(timer);
+          window.location.href = '/';
+        } else {
+          setStatus(`Rebooting... reloading in ${countdown}s`, 'success');
+        }
+      }, 1000);
+    } else {
+      if (upBtn) upBtn.disabled = false;
+      setStatus(`Upload failed: ${xhr.responseText || ('HTTP ' + xhr.status)}`, 'error');
+    }
+  };
+  xhr.onerror = () => {
+    otaUploading = false;
+    if (upBtn) upBtn.disabled = false;
+    setStatus('Network error during firmware upload.', 'error');
+  };
+  const formData = new FormData();
+  formData.append('firmware', otaSelectedFile, otaSelectedFile.name);
+  xhr.send(formData);
+}
+
+(function initA11yKeyboardHandlers() {
+  document.querySelectorAll('.input-card[onclick], .sys-card[onclick], .module-header[onclick]').forEach((el) => {
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    if (!el.hasAttribute('role')) el.setAttribute('role', 'button');
+    el.addEventListener('keydown', (e) => {
+      if (e.target !== el) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        el.click();
+      }
+    });
+  });
+})();
 
 wsConnect();
 </script>

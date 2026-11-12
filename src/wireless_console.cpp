@@ -5,9 +5,9 @@
 WirelessConsole Console(&Serial);
 
 WirelessConsole::WirelessConsole(Print* hwSerial)
-    : _hwSerial(hwSerial)
+    : _hwSerial(hwSerial),
+      _mutex(xSemaphoreCreateRecursiveMutex())
 {
-    _mutex = xSemaphoreCreateRecursiveMutex();
     memset(_curLine, 0, sizeof(_curLine));
 }
 
@@ -83,11 +83,28 @@ void WirelessConsole::loop()
             }
             if (_mutex) xSemaphoreGiveRecursive(_mutex);
         }
+        if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
+        while (_telnetQCount > 0) {
+            char lineBuf[kLineBufSize + 2];
+            size_t lineLen = strlen(_telnetQ[_telnetQTail]);
+            if (lineLen > kLineBufSize - 1) lineLen = kLineBufSize - 1;
+            memcpy(lineBuf, _telnetQ[_telnetQTail], lineLen);
+            lineBuf[lineLen] = '\r';
+            lineBuf[lineLen + 1] = '\n';
+            _telnetQTail = (_telnetQTail + 1) % kTelnetQueueSize;
+            _telnetQCount--;
+            if (_telnetClient && _telnetClient.connected()) {
+                if (_mutex) xSemaphoreGiveRecursive(_mutex);
+                _telnetClient.write(reinterpret_cast<const uint8_t*>(lineBuf), lineLen + 2);
+                if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
+            }
+        }
         if (_telnetClient && _telnetClient.connected()) {
             while (_telnetClient.available()) {
                 _telnetClient.read();
             }
         }
+        if (_mutex) xSemaphoreGiveRecursive(_mutex);
     }
 }
 
@@ -123,13 +140,14 @@ size_t WirelessConsole::write(const uint8_t *buffer, size_t size)
             }
 
             if (_telnetClient && _telnetClient.connected()) {
-                size_t lineLen = strlen(_curLine);
-                if (lineLen > kLineBufSize - 1) lineLen = kLineBufSize - 1;
-                char lineBuf[kLineBufSize + 2];
-                memcpy(lineBuf, _curLine, lineLen);
-                lineBuf[lineLen] = '\r';
-                lineBuf[lineLen + 1] = '\n';
-                _telnetClient.write(reinterpret_cast<const uint8_t*>(lineBuf), lineLen + 2);
+                if (_telnetQCount == kTelnetQueueSize) {
+                    _telnetQTail = (_telnetQTail + 1) % kTelnetQueueSize;
+                    _telnetQCount--;
+                }
+                strncpy(_telnetQ[_telnetQHead], _curLine, kLineBufSize - 1);
+                _telnetQ[_telnetQHead][kLineBufSize - 1] = '\0';
+                _telnetQHead = (_telnetQHead + 1) % kTelnetQueueSize;
+                _telnetQCount++;
             }
 
             if (_broadcast) {

@@ -30,10 +30,16 @@ private:
     size_t _writeUnlocked(uint8_t c);
     static constexpr size_t kMaxLogs = 150;
     static constexpr size_t kLineBufSize = 256;
+    static constexpr size_t kTelnetQueueSize = 32;
 
     char   (*_lines)[kLineBufSize]{nullptr};
     size_t _head{0};
     size_t _count{0};
+
+    char   _telnetQ[kTelnetQueueSize][kLineBufSize]{};
+    size_t _telnetQHead{0};
+    size_t _telnetQTail{0};
+    size_t _telnetQCount{0};
 
     char   _curLine[kLineBufSize];
     size_t _curPos{0};

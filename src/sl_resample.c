@@ -1,5 +1,6 @@
 /*
  * Polyphase windowed-sinc (Kaiser) sample-rate converter, see sl_resample.h
+ * SPDX-License-Identifier: GPL-3.0-or-later
  *
  * Uses exact rational stepping (L/M) so there is zero long-term clock drift,
  * paired with a compact polyphase table (up to 64 phases x 24 taps = 6 KB)
@@ -16,6 +17,8 @@
 #include <esp_heap_caps.h>
 #include <esp_timer.h>
 #include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
 
 extern void console_log(const char* buf);
 static void rs_log(const char* fmt, ...) {
@@ -46,7 +49,8 @@ struct resampler {
     uint8_t   is_psram;
     uint32_t  alloc_failures;
 
-    /* Telemetry metrics (concurrency-safe via seq counter) */
+    /* Telemetry metrics (concurrency-safe via spinlock + seq counter) */
+    portMUX_TYPE stats_mux;
     volatile uint32_t seq;
     uint64_t  total_calls;
     uint64_t  in_frames_total;
@@ -158,6 +162,7 @@ resampler_t *resampler_create(unsigned in_rate, unsigned out_rate) {
 
     r->in_rate  = in_rate;
     r->out_rate = out_rate;
+    portMUX_INITIALIZE(&r->stats_mux);
 
     unsigned g = gcd_u(in_rate, out_rate);
     r->L = out_rate / g;
@@ -165,6 +170,7 @@ resampler_t *resampler_create(unsigned in_rate, unsigned out_rate) {
     r->bypass = (in_rate == out_rate);
 
     if (r->bypass) {
+        r->last_calc_time_us = esp_timer_get_time();
         ESP_LOGI(RS_TAG, "Resampler %u -> %u Hz: Passthrough bypass active", in_rate, out_rate);
         return r;
     }
@@ -180,7 +186,6 @@ resampler_t *resampler_create(unsigned in_rate, unsigned out_rate) {
     r->bufR  = (float *)rs_alloc((RS_TAPS - 1 + RS_MAX_IN) * sizeof(float), &used_psram);
 
     if (!r->coef || !r->histL || !r->histR || !r->bufL || !r->bufR) {
-        r->alloc_failures++;
         ESP_LOGE(RS_TAG, "Memory allocation failed for %u -> %u Hz resampler", in_rate, out_rate);
         resampler_destroy(r);
         return NULL;
@@ -240,8 +245,7 @@ size_t resampler_max_out(const resampler_t *r, size_t n_in) {
 size_t resampler_in_for_out(const resampler_t *r, size_t out_frames) {
     if (!r || r->bypass) return out_frames;
     if (out_frames == 0) return 0;
-    size_t in_f = (out_frames * (uint64_t)r->M) / r->L;
-    return in_f > 0 ? in_f : 1;
+    return (size_t)(((uint64_t)out_frames * (uint64_t)r->M) / r->L);
 }
 
 size_t resampler_process(resampler_t *r,
@@ -252,6 +256,13 @@ size_t resampler_process(resampler_t *r,
         size_t n = (n_in < max_out) ? n_in : max_out;
         memcpy(outL, inL, n * sizeof(float));
         memcpy(outR, inR, n * sizeof(float));
+        portENTER_CRITICAL(&r->stats_mux);
+        r->seq++;
+        r->total_calls++;
+        r->in_frames_total += n;
+        r->out_frames_total += n;
+        r->seq++;
+        portEXIT_CRITICAL(&r->stats_mux);
         return n;
     }
 
@@ -298,8 +309,8 @@ size_t resampler_process(resampler_t *r,
     uint32_t dur = (uint32_t)(t1 - t0);
 
     /* Telemetry update */
+    portENTER_CRITICAL(&r->stats_mux);
     r->seq++;
-    __sync_synchronize();
     r->total_calls++;
     r->in_frames_total += n_in;
     r->out_frames_total += produced;
@@ -329,8 +340,8 @@ size_t resampler_process(resampler_t *r,
 
     int64_t expected = (r->in_frames_total * (uint64_t)r->L) / r->M;
     r->frame_mismatch = (int32_t)((int64_t)r->out_frames_total - expected);
-    __sync_synchronize();
     r->seq++;
+    portEXIT_CRITICAL(&r->stats_mux);
 
     return produced;
 }
@@ -340,40 +351,36 @@ void resampler_get_stats(const resampler_t *r, resampler_stats_t *out) {
     memset(out, 0, sizeof(*out));
     if (!r) return;
 
-    uint32_t s1, s2;
-    int retries = 0;
-    do {
-        s1 = r->seq;
-        __sync_synchronize();
-        out->in_rate              = r->in_rate;
-        out->out_rate             = r->out_rate;
-        out->ratio_L              = r->L;
-        out->ratio_M              = r->M;
-        out->phases               = r->P;
-        out->bypass               = (uint8_t)r->bypass;
-        out->is_psram             = r->is_psram;
-        out->alloc_failures       = r->alloc_failures;
-        out->total_calls          = r->total_calls;
-        out->in_frames_total      = r->in_frames_total;
-        out->out_frames_total     = r->out_frames_total;
-        out->last_duration_us     = r->last_duration_us;
-        out->avg_duration_us      = (uint32_t)(r->total_calls ? (r->total_duration_us / r->total_calls) : 0);
-        out->max_duration_us      = r->max_duration_us;
-        out->recent_worst_us      = r->recent_worst_us;
-        out->cpu_util_pct         = r->estimated_cpu_pct;
-        out->frame_mismatch       = r->frame_mismatch;
-        out->dropped_frames       = r->dropped_frames;
-        out->underruns            = r->underruns;
-        out->overruns             = r->overruns;
-        out->buf_occupancy_frames = r->buf_occupancy_frames;
-        out->buf_capacity_frames  = r->buf_capacity_frames;
-        __sync_synchronize();
-        s2 = r->seq;
-    } while ((s1 & 1 || s1 != s2) && ++retries < 5);
+    resampler_t *mr = (resampler_t *)r;
+    portENTER_CRITICAL(&mr->stats_mux);
+    out->in_rate              = r->in_rate;
+    out->out_rate             = r->out_rate;
+    out->ratio_L              = r->L;
+    out->ratio_M              = r->M;
+    out->phases               = r->P;
+    out->bypass               = (uint8_t)r->bypass;
+    out->is_psram             = r->is_psram;
+    out->alloc_failures       = r->alloc_failures;
+    out->total_calls          = r->total_calls;
+    out->in_frames_total      = r->in_frames_total;
+    out->out_frames_total     = r->out_frames_total;
+    out->last_duration_us     = r->last_duration_us;
+    out->avg_duration_us      = (uint32_t)(r->total_calls ? (r->total_duration_us / r->total_calls) : 0);
+    out->max_duration_us      = r->max_duration_us;
+    out->recent_worst_us      = r->recent_worst_us;
+    out->cpu_util_pct         = r->estimated_cpu_pct;
+    out->frame_mismatch       = r->frame_mismatch;
+    out->dropped_frames       = r->dropped_frames;
+    out->underruns            = r->underruns;
+    out->overruns             = r->overruns;
+    out->buf_occupancy_frames = r->buf_occupancy_frames;
+    out->buf_capacity_frames  = r->buf_capacity_frames;
+    portEXIT_CRITICAL(&mr->stats_mux);
 }
 
 void resampler_reset_stats(resampler_t *r) {
     if (!r) return;
+    portENTER_CRITICAL(&r->stats_mux);
     r->seq++;
     r->total_calls = 0;
     r->in_frames_total = 0;
@@ -389,11 +396,13 @@ void resampler_reset_stats(resampler_t *r) {
     r->underruns = 0;
     r->overruns = 0;
     r->seq++;
+    portEXIT_CRITICAL(&r->stats_mux);
 }
 
 void resampler_record_flow(resampler_t *r, uint32_t underruns, uint32_t overruns,
                            uint32_t dropped, uint32_t occ, uint32_t cap) {
     if (!r) return;
+    portENTER_CRITICAL(&r->stats_mux);
     r->seq++;
     r->underruns += underruns;
     r->overruns += overruns;
@@ -401,6 +410,7 @@ void resampler_record_flow(resampler_t *r, uint32_t underruns, uint32_t overruns
     r->buf_occupancy_frames = occ;
     r->buf_capacity_frames = cap;
     r->seq++;
+    portEXIT_CRITICAL(&r->stats_mux);
 }
 
 void resampler_run_validation_iters(int iters) {

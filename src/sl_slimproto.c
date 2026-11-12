@@ -1,6 +1,8 @@
 /*
  * Squeezelite SlimProto state machine ported for ESP32-S3
- * Based on squeezelite (c) Adrian Smith, Ralph Irving
+ * Based on squeezelite (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #include "squeezelite.h"
 #include "esp_wifi.h"
@@ -104,6 +106,15 @@ struct serv_packet {
     char  opcode[4];
     u32_t server_ip;
 };
+
+struct IR_packet {
+    char  opcode[4];
+    u32_t length;
+    u32_t jiffies;
+    u8_t  format;
+    u8_t  bits;
+    u32_t ir_code;
+};
 #pragma pack(pop)
 
 extern struct buffer *streambuf;
@@ -122,9 +133,10 @@ extern struct decodestate decode;
 static sockfd control_sock = -1;
 static in_addr_t slimproto_ip = 0;
 static portMUX_TYPE s_conn_mux = portMUX_INITIALIZER_UNLOCKED;
-static event_event wake_e;
+static event_event wake_e = { .mfds = -1, .fds = { -1, -1 } };
 static TaskHandle_t slimproto_task_handle = NULL;
-static bool running = true;
+static volatile bool running = true;
+static volatile bool slimproto_task_exited = true;
 static u8_t *s_pktBuffer = NULL;
 static char *s_headerCopy = NULL;
 static u8_t *s_respBuf = NULL;
@@ -162,18 +174,23 @@ void wake_controller(void) {
 }
 
 void slimproto_send_packet(const u8_t *packet, size_t len) {
-    if (control_sock < 0) return;
-    const u8_t *ptr = packet;
-    unsigned try_count = 0;
+    portENTER_CRITICAL(&s_conn_mux);
+    sockfd sock = control_sock;
+    portEXIT_CRITICAL(&s_conn_mux);
+    if (sock < 0) return;
 
+    const u8_t *ptr = packet;
     while (len > 0) {
-        int n = send(control_sock, ptr, len, 0);
+        int n = send(sock, ptr, len, 0);
         if (n <= 0) {
-            if (n < 0 && last_error() == ERROR_WOULDBLOCK && try_count++ < 10) {
-                vTaskDelay(pdMS_TO_TICKS(2));
-                continue;
+            if (n < 0 && last_error() == ERROR_WOULDBLOCK) {
+                struct pollfd pfd = { .fd = sock, .events = POLLOUT, .revents = 0 };
+                if (poll(&pfd, 1, 200) > 0 && (pfd.revents & POLLOUT)) {
+                    continue;
+                }
             }
             LOG_WARN("Failed writing packet to LMS control socket: %s", strerror(last_error()));
+            close_control_sock();
             return;
         }
         ptr += n;
@@ -353,7 +370,8 @@ static void process_strm(u8_t *pkt, int len) {
     case 'p': {
         unsigned interval = unpackN(&strm->replay_gain);
         LOCK_O;
-        output.pause_frames = (unsigned)(((u64_t)interval * (u64_t)status.current_sample_rate) / 1000ULL);
+        u32_t rate = output.current_sample_rate ? output.current_sample_rate : SAMPLE_RATE;
+        output.pause_frames = (unsigned)(((u64_t)interval * (u64_t)rate) / 1000ULL);
         if (interval) {
             output.state = OUTPUT_PAUSE_FRAMES;
         } else if (output.state != OUTPUT_OFF) {
@@ -369,8 +387,11 @@ static void process_strm(u8_t *pkt, int len) {
     case 'a': {
         unsigned interval = unpackN(&strm->replay_gain);
         LOCK_O;
-        output.skip_frames = (unsigned)(((u64_t)interval * (u64_t)status.current_sample_rate) / 1000ULL);
-        output.state = OUTPUT_SKIP_FRAMES;
+        u32_t rate = output.current_sample_rate ? output.current_sample_rate : SAMPLE_RATE;
+        output.skip_frames = (unsigned)(((u64_t)interval * (u64_t)rate) / 1000ULL);
+        if (output.state == OUTPUT_RUNNING) {
+            output.state = OUTPUT_SKIP_FRAMES;
+        }
         UNLOCK_O;
         LOG_INFO("Skip ahead interval: %u ms", interval);
         break;
@@ -411,7 +432,13 @@ static void process_strm(u8_t *pkt, int len) {
 
         unsigned stream_thresh = (unsigned)strm->threshold * 1024;
         if (stream_thresh > 32768) stream_thresh = 32768; // Cap input pre-buffer to 32KB so decoder starts immediately
-        stream_sock(ip, port, strm->flags & 0x20, false, header, header_len, stream_thresh, autostart >= 2);
+        if (!stream_sock(ip, port, strm->flags & 0x20, false, header, header_len, stream_thresh, autostart >= 2)) {
+            LOCK_D;
+            decode.state = DECODE_STOPPED;
+            UNLOCK_D;
+            sentSTMu = sentSTMo = sentSTMl = false;
+            break;
+        }
 
         sendSTAT("STMc", 0);
         sentSTMu = sentSTMo = sentSTMl = false;
@@ -421,11 +448,12 @@ static void process_strm(u8_t *pkt, int len) {
         if (output.state == OUTPUT_STOPPED || output.state == OUTPUT_OFF) {
             output.state = OUTPUT_BUFFER;
             output.frames_played = 0;
+            output.track_start = NULL;
             buf_flush(outputbuf);
         }
         output.threshold = strm->output_threshold;
         output.next_replay_gain = unpackN(&strm->replay_gain);
-        output.fade_mode = (fade_mode)(strm->transition_type - '0');
+        output.fade_mode = (strm->transition_type >= '0') ? (fade_mode)(strm->transition_type - '0') : FADE_NONE;
         output.fade_secs = strm->transition_period;
         output.invert = ((strm->flags & 0x03) == 0x03);
         output.channels = (strm->flags & 0x0c) >> 2;
@@ -512,7 +540,9 @@ static void process_serv(u8_t *pkt, int len) {
         portENTER_CRITICAL(&s_conn_mux);
         slimproto_ip = serv->server_ip;
         portEXIT_CRITICAL(&s_conn_mux);
-        LOG_INFO("Switching server to: %s", inet_ntoa(*(struct in_addr *)&slimproto_ip));
+        char ipStr[16] = "0.0.0.0";
+        inet_ntoa_r(*(struct in_addr *)&serv->server_ip, ipStr, sizeof(ipStr));
+        LOG_INFO("Switching server to: %s", ipStr);
     }
 }
 
@@ -584,7 +614,9 @@ static void slimproto_task(void *arg) {
             addr.sin_addr.s_addr = slimproto_ip;
             addr.sin_port = htons(3483);
 
-            LOG_INFO("Connecting to LMS control socket at %s:3483...", inet_ntoa(addr.sin_addr));
+            char ipStr[16] = "0.0.0.0";
+            inet_ntoa_r(addr.sin_addr, ipStr, sizeof(ipStr));
+            LOG_INFO("Connecting to LMS control socket at %s:3483...", ipStr);
             set_nonblock(sock);
 
             if (connect_timeout(sock, (struct sockaddr *)&addr, sizeof(addr), 5) < 0) {
@@ -816,6 +848,7 @@ static void slimproto_task(void *arg) {
         }
     }
 
+    slimproto_task_exited = true;
     vTaskDelete(NULL);
 }
 
@@ -858,8 +891,10 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
         return;
     }
 
+    _wake_close(&wake_e);
     _wake_create(&wake_e);
     running = true;
+    slimproto_task_exited = false;
 
     BaseType_t rc = xTaskCreatePinnedToCore(
         slimproto_task,
@@ -871,6 +906,9 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
         0
     );
     if (rc != pdPASS) {
+        slimproto_task_handle = NULL;
+        running = false;
+        slimproto_task_exited = true;
         LOG_ERROR("Failed to create sl_control task! (rc=%d, free internal=%u)", (int)rc, (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
     }
 }
@@ -881,6 +919,13 @@ void slimproto_stop(void) {
     wake_controller();
 
     close_control_sock();
+
+    if (slimproto_task_handle) {
+        for (int w = 0; w < 100 && !slimproto_task_exited; ++w) {
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+        slimproto_task_handle = NULL;
+    }
 
     _wake_close(&wake_e);
 }
@@ -904,4 +949,29 @@ void slimproto_get_server_ip(char *buf, size_t len) {
     }
     const u8_t *b = (const u8_t *)&ip;
     snprintf(buf, len, "%u.%u.%u.%u", b[0], b[1], b[2], b[3]);
+}
+
+void slimproto_pause_for_ota(void) {
+    LOCK_O;
+    bool outActive = (output.state == OUTPUT_RUNNING || output.state == OUTPUT_PAUSE_FRAMES);
+    UNLOCK_O;
+    LOCK_S;
+    bool streamActive = (stream.state >= STREAMING_WAIT);
+    UNLOCK_S;
+
+    if (!outActive && !streamActive) return;
+
+    if (slimproto_is_connected()) {
+        struct IR_packet pkt;
+        memset(&pkt, 0, sizeof(pkt));
+        memcpy(pkt.opcode, "IR  ", 4);
+        pkt.length  = htonl(sizeof(struct IR_packet) - 8);
+        pkt.jiffies = htonl(gettime_ms());
+        pkt.format  = 0x00;
+        pkt.bits    = 32;
+        pkt.ir_code = htonl(0x768920DFu);
+        slimproto_send_packet((const u8_t *)&pkt, sizeof(pkt));
+        LOG_INFO("Sent SlimProto IR Pause before OTA update");
+    }
+    output_pause();
 }
