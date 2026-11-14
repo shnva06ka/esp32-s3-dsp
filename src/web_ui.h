@@ -1,6 +1,7 @@
 #pragma once
 
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <esp_wifi.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
@@ -9,6 +10,7 @@
 #include <ArduinoJson.h>
 #include <cstring>
 #include <esp_heap_caps.h>
+#include "ap_fallback_policy.h"
 #include "eq_html.h"
 #include "console_html.h"
 #include "wireless_console.h"
@@ -74,11 +76,19 @@ public:
 
     void loop() {
         Console.loop();
+        if (_apActive.load(std::memory_order_acquire)) {
+            _processCaptiveDns();
+        }
         char otaPass[64];
         _params.getAuth(nullptr, 0, otaPass, sizeof(otaPass));
         OTAManager::loopArduinoOTA(otaPass);
-        _ws.cleanupClients();
-        const bool wsHasClients = (_ws.count() > 0);
+
+        bool wsHasClients = false;
+        {
+            WsPriorityGuard guard;
+            _ws.cleanupClients();
+            wsHasClients = (_ws.count() > 0);
+        }
         _wsHasClients.store(wsHasClients, std::memory_order_relaxed);
         _drainWsLogQueue(wsHasClients);
 
@@ -90,14 +100,14 @@ public:
 
         if (_stateBroadcastPending.exchange(false, std::memory_order_acq_rel)) {
             if (wsHasClients) {
-                _ws.textAll(_buildStateJson());
+                _safeWsBroadcast(_buildStateJson(), true);
             }
         }
 
         WiFiStreamMetadata wifiMeta;
         if (_params.getWiFiStreamMetadataIfChanged(wifiMeta, _lastWifiMetaVersion)) {
             if (wsHasClients) {
-                _ws.textAll(_buildWiFiMetaJson(wifiMeta));
+                _safeWsBroadcast(_buildWiFiMetaJson(wifiMeta), true);
             }
         }
 
@@ -125,11 +135,13 @@ public:
             }
         }
 
+        bool sendSys = _sysBroadcastPending.exchange(false, std::memory_order_acq_rel);
         if (now - _lastSysBroadcast >= 1000) {
             _lastSysBroadcast = now;
-            if (wsHasClients) {
-                _ws.textAll(_buildSysJson());
-            }
+            sendSys = true;
+        }
+        if (sendSys && wsHasClients) {
+            _safeWsBroadcast(_buildSysJson(), false);
         }
 
         _pollWiFiReconnect();
@@ -137,8 +149,11 @@ public:
         if (_wifiStaCleanupPending && (int32_t)(now - _wifiStaCleanupTimer) >= 0) {
             _wifiStaCleanupPending = false;
             if (WiFi.status() == WL_CONNECTED && (WiFi.getMode() & WIFI_MODE_AP)) {
+                _dnsUdp.stop();
+                _apActive.store(false, std::memory_order_release);
                 WiFi.softAPdisconnect(true);
                 WiFi.mode(WIFI_STA);
+                WiFi.setTxPower(WIFI_POWER_19_5dBm);
                 Console.println("[NET] Switched from AP_STA to pure STA mode.");
             }
         }
@@ -211,19 +226,53 @@ private:
             doc["msg"] = static_cast<const char*>(lineBuf);
             String out;
             serializeJson(doc, out);
-            _ws.textAll(out);
+            _safeWsBroadcast(out, false);
+        }
+    }
+
+    // Temporarily raises Core 0 WebTask above CONFIG_ASYNC_TCP_PRIORITY so async_tcp cannot
+    // preempt mid-iteration over AsyncWebSocket::_clients or teardown _client mid-send.
+    struct WsPriorityGuard {
+        UBaseType_t prevPrio;
+        WsPriorityGuard() : prevPrio(uxTaskPriorityGet(nullptr)) {
+            if (prevPrio <= CONFIG_ASYNC_TCP_PRIORITY) {
+                vTaskPrioritySet(nullptr, CONFIG_ASYNC_TCP_PRIORITY + 1);
+            }
+        }
+        ~WsPriorityGuard() {
+            if (uxTaskPriorityGet(nullptr) != prevPrio) {
+                vTaskPrioritySet(nullptr, prevPrio);
+            }
+        }
+    };
+
+    void _safeWsBroadcast(const String& msg, bool isCritical) {
+        if (!_wsHasClients.load(std::memory_order_relaxed)) return;
+        WsPriorityGuard guard;
+        for (auto& c : _ws.getClients()) {
+            if (c.shouldBeDeleted() || c.status() != WS_CONNECTED) continue;
+            const bool ok = isCritical
+                ? c.canSend()
+                : apShouldSendWsTelemetry(true, c.canSend(), c.queueLen());
+            if (ok) {
+                c.text(msg);
+            }
         }
     }
 
     ParamStore&       _params;
     AsyncWebServer    _server;
     AsyncWebSocket    _ws;
+    WiFiUDP           _dnsUdp;
     unsigned long     _lastIpPrint{0};
     unsigned long     _lastSysBroadcast{0};
     uint32_t          _lastInputVersion{1};
     uint32_t          _lastWifiMetaVersion{1};
     std::atomic<bool> _stateBroadcastPending{false};
+    std::atomic<bool> _sysBroadcastPending{false};
     std::atomic<bool> _wsHasClients{false};
+    std::atomic<bool> _apActive{false};
+    std::atomic<bool> _wifiConnectingAtomic{false};
     portMUX_TYPE      _wsLogMux = portMUX_INITIALIZER_UNLOCKED;
     char*             _wsLogQueue{nullptr};
     size_t            _wsLogHead{0};
@@ -267,7 +316,83 @@ private:
         return true;
     }
 
+    void _processCaptiveDns() {
+        const IPAddress apIp = WiFi.softAPIP();
+        for (int i = 0; i < 16; ++i) {
+            const int pktLen = _dnsUdp.parsePacket();
+            if (pktLen <= 0) break;
+
+            uint8_t reqBuf[512];
+            const size_t readLen = (static_cast<size_t>(pktLen) <= sizeof(reqBuf))
+                ? static_cast<size_t>(pktLen)
+                : sizeof(reqBuf);
+            const size_t n = _dnsUdp.read(reqBuf, readLen);
+            _dnsUdp.flush();
+
+            if (static_cast<size_t>(pktLen) <= sizeof(reqBuf) && n == static_cast<size_t>(pktLen)) {
+                uint8_t respBuf[512];
+                const size_t respLen = apBuildCaptiveDnsResponse(reqBuf, n, apIp, respBuf, sizeof(respBuf));
+                if (respLen > 0) {
+                    _dnsUdp.beginPacket(_dnsUdp.remoteIP(), _dnsUdp.remotePort());
+                    _dnsUdp.write(respBuf, respLen);
+                    _dnsUdp.endPacket();
+                }
+            }
+        }
+    }
+
+    void _startSoftApFallback() {
+        Console.println("[WEB] Starting fallback AP 'ESP32-S3-DSP'...");
+        apEnterPureSoftApMode("ESP32-S3-DSP");
+        _dnsUdp.stop();
+        if (_dnsUdp.begin(53) != 1) {
+            Console.println("[WEB] WARN: Failed to bind captive DNS UDP port 53");
+        }
+        _apActive.store(true, std::memory_order_release);
+        Console.printf("[WEB] Fallback AP active! Network SSID: 'ESP32-S3-DSP' | AP IP: %s\n",
+                      WiFi.softAPIP().toString().c_str());
+        MDNS.end();
+        if (MDNS.begin("dsp")) {
+            MDNS.addService("http", "tcp", 80);
+        }
+        Console.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
+    }
+
     void _startWiFi() {
+        WiFi.persistent(false);
+
+        static bool s_wifiEventsRegistered = false;
+        if (!s_wifiEventsRegistered) {
+            s_wifiEventsRegistered = true;
+            WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
+                if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+                    if (_apActive.load(std::memory_order_acquire) &&
+                        !_wifiConnectingAtomic.load(std::memory_order_acquire)) {
+                        return;
+                    }
+                    Console.printf("[NET] Wi-Fi DISCONNECTED (reason=%u)\n", info.wifi_sta_disconnected.reason);
+                } else if (event == ARDUINO_EVENT_WIFI_STA_LOST_IP) {
+                    Console.println("[NET] Wi-Fi LOST IP");
+                } else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+                    Console.printf("[NET] Wi-Fi GOT IP: %s\n", WiFi.localIP().toString().c_str());
+                } else if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
+                    const uint8_t* mac = info.wifi_ap_staconnected.mac;
+                    apEnsureSoftApDhcpRunning();
+                    Console.printf("[AP] Client connected: %02X:%02X:%02X:%02X:%02X:%02X (aid=%u)\n",
+                                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                                   info.wifi_ap_staconnected.aid);
+                } else if (event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
+                    const uint8_t* mac = info.wifi_ap_stadisconnected.mac;
+                    Console.printf("[AP] Client disconnected: %02X:%02X:%02X:%02X:%02X:%02X (aid=%u)\n",
+                                   mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
+                                   info.wifi_ap_stadisconnected.aid);
+                } else if (event == ARDUINO_EVENT_WIFI_AP_STAIPASSIGNED) {
+                    IPAddress clientIp(info.wifi_ap_staipassigned.ip.addr);
+                    Console.printf("[AP] DHCP assigned IP: %s\n", clientIp.toString().c_str());
+                }
+            });
+        }
+
         Preferences prefs;
         String savedSSID = "";
         String savedPass = "";
@@ -287,19 +412,6 @@ private:
         bool hasCredentials = (targetSSID.length() > 0 && targetSSID != "YourSSID");
 
         if (hasCredentials) {
-            static bool s_wifiEventsRegistered = false;
-            if (!s_wifiEventsRegistered) {
-                s_wifiEventsRegistered = true;
-                WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
-                    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
-                        Console.printf("[NET] Wi-Fi DISCONNECTED (reason=%u)\n", info.wifi_sta_disconnected.reason);
-                    } else if (event == ARDUINO_EVENT_WIFI_STA_LOST_IP) {
-                        Console.println("[NET] Wi-Fi LOST IP");
-                    } else if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
-                        Console.printf("[NET] Wi-Fi GOT IP: %s\n", WiFi.localIP().toString().c_str());
-                    }
-                });
-            }
             WiFi.mode(WIFI_STA);
             WiFi.setAutoReconnect(true);
             WiFi.setSleep(false);
@@ -311,6 +423,7 @@ private:
                 delay(500);
             }
             if (WiFi.status() == WL_CONNECTED) {
+                _apActive.store(false, std::memory_order_release);
                 WiFi.setSleep(false);
                 esp_wifi_set_ps(WIFI_PS_NONE);
                 WiFi.setTxPower(WIFI_POWER_19_5dBm);
@@ -324,15 +437,7 @@ private:
             Console.println("\n[WEB] Wi-Fi connection timed out");
         }
 
-        Console.println("[WEB] Starting fallback AP 'ESP32-S3-DSP'...");
-        WiFi.mode(WIFI_AP);
-        WiFi.softAP("ESP32-S3-DSP");
-        Console.printf("[WEB] Fallback AP active! Network SSID: 'ESP32-S3-DSP' | AP IP: %s\n",
-                      WiFi.softAPIP().toString().c_str());
-        if (MDNS.begin("dsp")) {
-            MDNS.addService("http", "tcp", 80);
-        }
-        Console.printf("[NET] Web UI accessible at: http://%s (or http://dsp.local)\n", WiFi.softAPIP().toString().c_str());
+        _startSoftApFallback();
     }
 
     void _pollWiFiReconnect() {
@@ -354,12 +459,15 @@ private:
             if (!start) return;
 
             Console.printf("\n[WEB] Attempting Wi-Fi connection to SSID '%s'...\n", _activeSSID);
+            WiFi.persistent(false);
             WiFi.mode(WIFI_AP_STA);
+            WiFi.setAutoReconnect(true);
             WiFi.setSleep(false);
             esp_wifi_set_ps(WIFI_PS_NONE);
             WiFi.setTxPower(WIFI_POWER_19_5dBm);
             WiFi.begin(_activeSSID, _activePass);
             _wifiConnecting = true;
+            _wifiConnectingAtomic.store(true, std::memory_order_release);
             _wifiConnectDeadline = now + 10000UL;
             _wifiLastDotMs = now;
             return;
@@ -367,6 +475,7 @@ private:
 
         if (WiFi.status() == WL_CONNECTED) {
             _wifiConnecting = false;
+            _wifiConnectingAtomic.store(false, std::memory_order_release);
             WiFi.setSleep(false);
             esp_wifi_set_ps(WIFI_PS_NONE);
             WiFi.setTxPower(WIFI_POWER_19_5dBm);
@@ -394,7 +503,7 @@ private:
             doc["msg"] = String("Connected successfully to ") + _activeSSID;
             String out;
             serializeJson(doc, out);
-            _ws.textAll(out);
+            _safeWsBroadcast(out, true);
 
             _wifiStaCleanupPending = true;
             _wifiStaCleanupTimer = millis() + 2000UL;
@@ -408,14 +517,18 @@ private:
 
         if ((int32_t)(now - _wifiConnectDeadline) >= 0) {
             _wifiConnecting = false;
-            Console.println("\n[WEB] Wi-Fi connection failed! Remaining in current mode.");
+            _wifiConnectingAtomic.store(false, std::memory_order_release);
+            Console.println("\n[WEB] Wi-Fi connection failed! Restoring pure AP mode.");
+            if (_apActive.load(std::memory_order_acquire)) {
+                apEnterPureSoftApMode("ESP32-S3-DSP");
+            }
             StaticJsonDocument<512> doc;
             doc["t"] = "wifi_status";
             doc["status"] = "failed";
             doc["msg"] = String("Could not connect to '") + _activeSSID + "'. Please check password and try again.";
             String out;
             serializeJson(doc, out);
-            _ws.textAll(out);
+            _safeWsBroadcast(out, true);
         }
     }
 
@@ -484,7 +597,7 @@ private:
             doc["ssid"] = staConn ? WiFi.SSID() : (hasAp ? "ESP32-S3-DSP" : "");
             doc["ip"] = staConn ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
             doc["mode"] = staConn ? (hasAp ? "ap+sta" : "sta") : (hasAp ? "ap" : "other");
-            doc["rssi"] = WiFi.RSSI();
+            doc["rssi"] = staConn ? WiFi.RSSI() : 0;
             String out;
             serializeJson(doc, out);
             req->send(200, "application/json", out);
@@ -561,7 +674,9 @@ private:
         });
 
         _server.onNotFound([](AsyncWebServerRequest* req) {
-            req->send(404, "text/plain", "Not found");
+            AsyncWebServerResponse* res = req->beginResponse(404, "text/plain", "Not found");
+            res->addHeader("Connection", "close");
+            req->send(res);
         });
     }
 
@@ -569,10 +684,9 @@ private:
                     AwsEventType type, void* arg, uint8_t* data, size_t len) {
         switch (type) {
             case WS_EVT_CONNECT:
-                client->setCloseClientOnQueueFull(false);
                 _wsHasClients.store(true, std::memory_order_relaxed);
-                client->text(_buildStateJson());
-                client->text(_buildSysJson());
+                _stateBroadcastPending.store(true, std::memory_order_release);
+                _sysBroadcastPending.store(true, std::memory_order_release);
                 Console.printf("[WS] Client #%u connected from %s\n",
                               client->id(), client->remoteIP().toString().c_str());
                 break;
@@ -669,12 +783,12 @@ private:
                     _wifiReconnectRequested = true;
                     _wifiReconnectTimer = millis() + 300;
                     portEXIT_CRITICAL(&_wifiMux);
-                    client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Initiating Wi-Fi connection...\"}");
+                    if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Initiating Wi-Fi connection...\"}");
                 } else {
-                    client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Invalid SSID or password length (SSID 1-32, Pass 8-63)\"}");
+                    if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Invalid SSID or password length (SSID 1-32, Pass 8-63)\"}");
                 }
             } else {
-                client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Use authenticated HTTP /api/wifi when connected to LAN\"}");
+                if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Use authenticated HTTP /api/wifi when connected to LAN\"}");
             }
         }
         else if (strcmp(t, "boot_defaults") == 0) {
@@ -721,7 +835,7 @@ private:
             }
         }
         else if (strcmp(t, "getState") == 0) {
-            client->text(_buildStateJson());
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
     }
 

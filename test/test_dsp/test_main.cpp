@@ -13,9 +13,18 @@
 #include "dsp_pipeline.h"
 #include "param_store.h"
 #include "sl_resample.h"
+#include "ap_fallback_policy.h"
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <esp_netif.h>
+
+extern esp_netif_t* get_esp_interface_netif(esp_interface_t interface);
 
 extern "C" {
+int config_get_wifi_cache_tx_buffer_num(void);
+int config_get_wifi_dynamic_tx_buffer_num(void);
 #include "../../src/sl_resample.c"
+#include "../../src/lwip_tcp_tuning.c"
 }
 
 // ==========================================
@@ -375,6 +384,140 @@ void test_wav_aiff_parser_boundaries(void) {
     TEST_ASSERT_FALSE(validSsnd);
 }
 
+// ==========================================
+// Test 9: Fallback AP Isolation & Captive Portal Policy
+// ==========================================
+void test_ap_fallback_isolation_and_captive_portal(void) {
+    // 1. Captive portal probe paths (Android/Pixel, Apple, Windows, Firefox)
+    TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/generate_204"));
+    TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/gen_204"));
+    TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/hotspot-detect.html"));
+    TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/connecttest.txt"));
+    TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/ncsi.txt"));
+    TEST_ASSERT_FALSE(apIsCaptivePortalProbePath("/"));
+    TEST_ASSERT_FALSE(apIsCaptivePortalProbePath("/api/wifi"));
+    TEST_ASSERT_TRUE(apIsLocalDspHostname("dsp"));
+    TEST_ASSERT_TRUE(apIsLocalDspHostname("DSP.LOCAL"));
+    TEST_ASSERT_TRUE(apIsLocalDspHostname("esp32-s3-dsp.local"));
+    TEST_ASSERT_FALSE(apIsLocalDspHostname("connectivitycheck.gstatic.com"));
+    TEST_ASSERT_FALSE(apIsLocalDspHostname("example.com"));
+    TEST_ASSERT_FALSE(apIsLocalDspHostname(""));
+
+    // 2. WebSocket backpressure policy for periodic sys/log broadcasts
+    TEST_ASSERT_TRUE(apShouldSendWsTelemetry(true, true, 0));
+    TEST_ASSERT_FALSE(apShouldSendWsTelemetry(true, true, 8));
+    TEST_ASSERT_FALSE(apShouldSendWsTelemetry(false, true, 0));
+
+    // 3. Non-captive local DNS responder (dsp.local A/EDNS0/AAAA vs external NXDOMAIN, malformed)
+    const IPAddress apIp(192, 168, 4, 1);
+    uint8_t dnsOut[512]{};
+
+    const uint8_t queryDspA[] = {
+        0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x03, 'd', 's', 'p', 0x05, 'l', 'o', 'c', 'a', 'l', 0x00,
+        0x00, 0x01, 0x00, 0x01
+    };
+    size_t outLen = apBuildCaptiveDnsResponse(queryDspA, sizeof(queryDspA), apIp, dnsOut, sizeof(dnsOut));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(queryDspA) + 16U, outLen);
+    TEST_ASSERT_EQUAL_UINT8(0x12, dnsOut[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x34, dnsOut[1]);
+    TEST_ASSERT_TRUE((dnsOut[2] & 0x80) != 0);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F); // NoError
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[7]);        // ANCount == 1
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0
+    TEST_ASSERT_EQUAL_UINT8(192, dnsOut[outLen - 4]);
+    TEST_ASSERT_EQUAL_UINT8(168, dnsOut[outLen - 3]);
+    TEST_ASSERT_EQUAL_UINT8(4,   dnsOut[outLen - 2]);
+    TEST_ASSERT_EQUAL_UINT8(1,   dnsOut[outLen - 1]);
+
+    const uint8_t queryDspEdnsA[] = {
+        0x56, 0x78, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x03, 'd', 's', 'p', 0x05, 'l', 'o', 'c', 'a', 'l', 0x00,
+        0x00, 0x01, 0x00, 0x01,
+        0x00, 0x00, 0x29, 0x04, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    outLen = apBuildCaptiveDnsResponse(queryDspEdnsA, sizeof(queryDspEdnsA), apIp, dnsOut, sizeof(dnsOut));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(queryDspA) + 16U, outLen);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F); // NoError
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[7]);        // ANCount == 1
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0
+    TEST_ASSERT_EQUAL_UINT8(192, dnsOut[outLen - 4]);
+    TEST_ASSERT_EQUAL_UINT8(168, dnsOut[outLen - 3]);
+    TEST_ASSERT_EQUAL_UINT8(4,   dnsOut[outLen - 2]);
+    TEST_ASSERT_EQUAL_UINT8(1,   dnsOut[outLen - 1]);
+
+    const uint8_t queryDspAAAA[] = {
+        0x9A, 0xBC, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x03, 'd', 's', 'p', 0x05, 'l', 'o', 'c', 'a', 'l', 0x00,
+        0x00, 0x1C, 0x00, 0x01,
+        0x00, 0x00, 0x29, 0x04, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    outLen = apBuildCaptiveDnsResponse(queryDspAAAA, sizeof(queryDspAAAA), apIp, dnsOut, sizeof(dnsOut));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(queryDspA), outLen);
+    TEST_ASSERT_TRUE((dnsOut[2] & 0x80) != 0);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F); // NoError
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[7]);        // ANCount == 0 (NODATA)
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0
+
+    const uint8_t queryExternalA[] = {
+        0xDE, 0xAD, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+        0x07, 'e', 'x', 'a', 'm', 'p', 'l', 'e', 0x03, 'c', 'o', 'm', 0x00,
+        0x00, 0x01, 0x00, 0x01,
+        0x00, 0x00, 0x29, 0x04, 0xD0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    outLen = apBuildCaptiveDnsResponse(queryExternalA, sizeof(queryExternalA), apIp, dnsOut, sizeof(dnsOut));
+    TEST_ASSERT_EQUAL_UINT32(29U, outLen);
+    TEST_ASSERT_TRUE((dnsOut[2] & 0x80) != 0);
+    TEST_ASSERT_EQUAL_UINT8(3, dnsOut[3] & 0x0F); // NXDOMAIN
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[7]);        // ANCount == 0
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0 (EDNS0 stripped)
+
+    const uint8_t queryShort[] = { 0x00, 0x01, 0x01, 0x00 };
+    TEST_ASSERT_EQUAL_UINT32(0U, apBuildCaptiveDnsResponse(queryShort, sizeof(queryShort), apIp, dnsOut, sizeof(dnsOut)));
+    const uint8_t queryTruncLabel[] = {
+        0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x20, 'a', 'b', 'c'
+    };
+    TEST_ASSERT_EQUAL_UINT32(0U, apBuildCaptiveDnsResponse(queryTruncLabel, sizeof(queryTruncLabel), apIp, dnsOut, sizeof(dnsOut)));
+
+    // 4. Reproduce zombie-STA auto-reconnect flip after doomed STA connect attempt
+    WiFi.persistent(false);
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin("__non_existent_dsp_test_ssid__", "12345678");
+    delay(500);
+
+    apEnterPureSoftApMode("ESP32-S3-DSP");
+
+    // Wait >1 full 2.4s 13-channel scan cycle so any pending STA_DISCONNECTED triggers
+    delay(3200);
+
+    TEST_ASSERT_EQUAL(WIFI_AP, WiFi.getMode());
+    TEST_ASSERT_FALSE(WiFi.getAutoReconnect());
+
+    wifi_config_t conf{};
+    esp_wifi_get_config(WIFI_IF_STA, &conf);
+    TEST_ASSERT_EQUAL_UINT8(0, conf.sta.ssid[0]);
+
+    TEST_ASSERT_FALSE(apIsStaAssociated());
+    TEST_ASSERT_EQUAL_STRING("192.168.4.1", WiFi.softAPIP().toString().c_str());
+    TEST_ASSERT_GREATER_OR_EQUAL_INT(32, config_get_wifi_cache_tx_buffer_num());
+    TEST_ASSERT_GREATER_OR_EQUAL_INT(32, config_get_wifi_dynamic_tx_buffer_num());
+
+    esp_netif_t* apNetif = get_esp_interface_netif(ESP_IF_WIFI_AP);
+    TEST_ASSERT_NOT_NULL(apNetif);
+    esp_netif_dhcp_status_t dhcpStatus = ESP_NETIF_DHCP_INIT;
+    TEST_ASSERT_EQUAL(ESP_OK, esp_netif_dhcps_get_status(apNetif, &dhcpStatus));
+    TEST_ASSERT_EQUAL(ESP_NETIF_DHCP_STARTED, dhcpStatus);
+
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+}
+
 void setup() {
     Serial.begin(115200);
     unsigned long waitStart = millis();
@@ -393,6 +536,7 @@ void setup() {
     RUN_TEST(test_param_store_sanitization);
     RUN_TEST(test_resampler_arbitrary_rate);
     RUN_TEST(test_wav_aiff_parser_boundaries);
+    RUN_TEST(test_ap_fallback_isolation_and_captive_portal);
     UNITY_END();
 }
 

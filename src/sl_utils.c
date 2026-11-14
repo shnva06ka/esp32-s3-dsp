@@ -5,6 +5,7 @@
  * Modified for ESP32-S3-DSP (2026) under GNU GPL v3.0 (see LICENSE).
  */
 #include "squeezelite.h"
+#include "esp_wifi.h"
 
 log_level loglevel = lINFO;
 
@@ -214,6 +215,10 @@ in_addr_t discover_server(char *default_server, int max) {
 
     int attempts = 0;
     while (max == 0 || attempts < max) {
+        wifi_ap_record_t ap_info;
+        if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
+            break;
+        }
         attempts++;
         LOG_INFO("Broadcasting LMS discovery packet (attempt %d)...", attempts);
         if (sendto(disc_sock, buf, len, 0, (struct sockaddr *)&d, sizeof(d)) < 0) {

@@ -31,6 +31,8 @@
 #define TUNED_WIFI_STATIC_RX    16
 #define TUNED_WIFI_DYNAMIC_RX   64
 #define TUNED_WIFI_RX_BA_WIN    16
+#define TUNED_WIFI_CACHE_TX     32
+#define TUNED_WIFI_DYNAMIC_TX   32
 
 extern esp_err_t __real_esp_wifi_init(const wifi_init_config_t *config);
 extern err_t __real_sys_mbox_new(sys_mbox_t *mbox, int size);
@@ -52,6 +54,12 @@ esp_err_t __wrap_esp_wifi_init(const wifi_init_config_t *config)
     }
     if (cfg.rx_ba_win < TUNED_WIFI_RX_BA_WIN) {
         cfg.rx_ba_win = TUNED_WIFI_RX_BA_WIN;
+    }
+    if (cfg.tx_buf_type == 1 && cfg.dynamic_tx_buf_num < TUNED_WIFI_DYNAMIC_TX) {
+        cfg.dynamic_tx_buf_num = TUNED_WIFI_DYNAMIC_TX;
+    }
+    if (cfg.cache_tx_buf_num > 0 && cfg.cache_tx_buf_num < TUNED_WIFI_CACHE_TX) {
+        cfg.cache_tx_buf_num = TUNED_WIFI_CACHE_TX;
     }
     return __real_esp_wifi_init(&cfg);
 }

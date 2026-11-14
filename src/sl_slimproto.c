@@ -581,6 +581,12 @@ static void slimproto_task(void *arg) {
         // 1. Connection phase
         int connect_fails = 0;
         while (running && control_sock < 0) {
+            wifi_ap_record_t ap_info;
+            if (esp_wifi_sta_get_ap_info(&ap_info) != ESP_OK) {
+                vTaskDelay(pdMS_TO_TICKS(2000));
+                continue;
+            }
+
             if (slimproto_ip == 0) {
                 in_addr_t discovered = discover_server(NULL, 5);
                 portENTER_CRITICAL(&s_conn_mux);
@@ -856,7 +862,10 @@ void slimproto_start(log_level level, const char *server, const u8_t mac[6], con
     (void)level;
     (void)maxSampleRate;
 
-    esp_wifi_set_ps(WIFI_PS_NONE);
+    wifi_mode_t mode = WIFI_MODE_NULL;
+    if (esp_wifi_get_mode(&mode) == ESP_OK && (mode & WIFI_MODE_STA)) {
+        esp_wifi_set_ps(WIFI_PS_NONE);
+    }
 
     if (mac) {
         memcpy(s_mac, mac, 6);

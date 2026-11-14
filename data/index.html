@@ -2723,7 +2723,6 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             </div>
             <div class="input-card-title">Line In</div>
           </div>
-          <span class="input-card-badge" id="badge-src-1">ACTIVE</span>
         </button>
 
         <button class="input-card" id="btn-src-2" onclick="setInputSource(2)" type="button">
@@ -2735,7 +2734,6 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             </div>
             <div class="input-card-title">Bluetooth</div>
           </div>
-          <span class="input-card-badge" id="badge-src-2">STANDBY</span>
         </button>
 
         <button class="input-card" id="btn-src-3" onclick="setInputSource(3)" type="button">
@@ -2750,8 +2748,30 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             </div>
             <div class="input-card-title">Squeezebox</div>
           </div>
-          <span class="input-card-badge" id="badge-src-3">STANDBY</span>
         </button>
+      </div>
+
+      <div id="wifi-stream-sub" style="display: none;">
+        <div class="submodule-separator"></div>
+        <div class="wifi-sub-header">
+          <div class="submodule-title" style="margin-bottom: 0;">Squeezebox Stream</div>
+          <div class="active-source-pill" id="wifi-status-pill">
+            <span class="badge-dot" id="wifi-status-dot"></span>
+            <span id="wifi-status-text">DISCONNECTED</span>
+          </div>
+        </div>
+        <div class="wifi-stream-card">
+          <div class="wifi-stream-meta-grid">
+            <div class="wifi-info-item">
+              <span class="wifi-info-lbl">Stream Format</span>
+              <span class="wifi-info-val" id="wifi-format-val">--</span>
+            </div>
+            <div class="wifi-info-item">
+              <span class="wifi-info-lbl">Playback Status</span>
+              <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="submodule-separator"></div>
@@ -2831,7 +2851,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 
         <div class="sys-stat-card">
           <div class="sys-stat-header">
-            <span class="sys-stat-name">Internal RAM</span>
+            <span class="sys-stat-name">SRAM</span>
             <span class="sys-stat-val" id="sys-val-ram">-- / -- KB</span>
           </div>
           <div class="sys-stat-bar-track">
@@ -2851,34 +2871,11 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 
         <div class="sys-stat-card">
           <div class="sys-stat-header">
-            <span class="sys-stat-name">Flash Memory</span>
+            <span class="sys-stat-name">Flash</span>
             <span class="sys-stat-val" id="sys-val-flash">-- / -- MB</span>
           </div>
           <div class="sys-stat-bar-track">
             <div class="sys-stat-bar-fill" id="sys-bar-flash" style="width: 0%;"></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="wifi-stream-sub" style="display: none;">
-        <div class="submodule-separator"></div>
-        <div class="wifi-sub-header">
-          <div class="submodule-title" style="margin-bottom: 0;">Squeezebox Stream</div>
-          <div class="active-source-pill" id="wifi-status-pill">
-            <span class="badge-dot" id="wifi-status-dot"></span>
-            <span id="wifi-status-text">DISCONNECTED</span>
-          </div>
-        </div>
-        <div class="wifi-stream-card">
-          <div class="wifi-stream-meta-grid">
-            <div class="wifi-info-item">
-              <span class="wifi-info-lbl">Stream Format</span>
-              <span class="wifi-info-val" id="wifi-format-val">--</span>
-            </div>
-            <div class="wifi-info-item">
-              <span class="wifi-info-lbl">Playback Status</span>
-              <span class="wifi-info-val" id="wifi-state-val">Listening on Port 3483</span>
-            </div>
           </div>
         </div>
       </div>
@@ -4651,13 +4648,6 @@ function updateInputSourceUI() {
   if (btnAux)  btnAux.classList.toggle('active', isAux);
   if (btnBt)   btnBt.classList.toggle('active', isBt);
   if (btnWifi) btnWifi.classList.toggle('active', isWifi);
-
-  const b1 = document.getElementById('badge-src-1');
-  const b2 = document.getElementById('badge-src-2');
-  const b3 = document.getElementById('badge-src-3');
-  if (b1) b1.textContent = isAux ? 'ACTIVE' : 'STANDBY';
-  if (b2) b2.textContent = isBt ? 'ACTIVE' : 'STANDBY';
-  if (b3) b3.textContent = isWifi ? 'ACTIVE' : 'STANDBY';
 
   updateWiFiModuleVisibility();
 }
