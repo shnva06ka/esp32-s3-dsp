@@ -9,9 +9,9 @@ When conveying source or compiled firmware binaries (e.g. GitHub Releases), all 
 ## 1. Squeezelite / squeezelite-esp32
 - **License:** GNU General Public License v3.0 (GPL-3.0)
 - **Copyright:**
-  - Copyright (c) 2012–2015 Adrian Smith
-  - Copyright (c) 2015–2021 Ralph Irving
-  - Copyright (c) Philippe G. (sle118) — `squeezelite-esp32`
+  - Copyright (c) 2012-2015 Adrian Smith
+  - Copyright (c) 2015-2021 Ralph Irving
+  - Copyright (c) Philippe G. (sle118) - `squeezelite-esp32`
 - **Files:** `src/squeezelite.h`, `src/sl_buffer.c`, `src/sl_decode.c`, `src/sl_flac.c`, `src/sl_output.c`, `src/sl_output_pack.c`, `src/sl_pcm.c`, `src/sl_slimproto.c`, `src/sl_stream.c`, `src/sl_utils.c`
 
 ## 2. dr_flac
@@ -26,7 +26,7 @@ When conveying source or compiled firmware binaries (e.g. GitHub Releases), all 
 
 ## 4. ArduinoJson
 - **License:** MIT License
-- **Copyright:** Copyright (c) 2014–2024 Benoit Blanchon
+- **Copyright:** Copyright (c) 2014-2024 Benoit Blanchon
 - **Version:** `6.21.6`
 
 ## 5. ESP32-A2DP (Bluetooth Bridge)

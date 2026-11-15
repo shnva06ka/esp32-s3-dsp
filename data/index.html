@@ -18,7 +18,7 @@
   color-scheme: light;
   --on-accent: #FFFFFF;
   --accent-soft: #E8F0FE;
-  --accent-hover: #4C6F98;
+  --accent-hover: #3D5A7D;
   --surface-hover: #DAE0EA;
   --surface-bypass: #E2E8F0;
   --bypass-veil: rgba(237, 241, 247, 0.45);
@@ -32,16 +32,16 @@
   --cv-dim: #CBD5E1; --cv-curve: #000000; --cv-node-stroke: #2E3440; --cv-tip: rgba(255, 255, 255, 0.94);
   --cv-tip-grid: #D8DEE9; --cv-tip-text: #4C566A; --cv-tip-text-strong: #2E3440; --cv-off: #A0AEC0;  --nord0: #2E3440; --nord1: #3B4252;
   --nord2: #434C5E;
-  --nord3: #4C566A; --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4; --nord7: #8FBCBB; --nord8: #88C0D0; --nord9: #81A1C1; --nord10: #5E81AC; --nord11: #BF616A; --nord12: #D08770; --nord13: #EBCB8B; --nord14: #438728; --nord15: #B48EAD; --bg: #EDF1F7;
+  --nord3: #4C566A; --nord4: #D8DEE9; --nord5: #E5E9F0; --nord6: #ECEFF4; --nord7: #8FBCBB; --nord8: #88C0D0; --nord9: #81A1C1; --nord10: #4C6F98; --nord11: #BF616A; --nord12: #D08770; --nord13: #EBCB8B; --nord14: #438728; --nord15: #B48EAD; --bg: #EDF1F7;
   --card-bg: #FFFFFF;
   --card-header: #E5E9F0;
   --border: #CBD5E1;
   --border-strong: #4C566A;
   --text: #2E3440;
   --muted: #4C566A;
-  --accent: #5E81AC;
+  --accent: #4C6F98;
   --active: #3D7820;
-  --danger: #BF616A;
+  --danger: #A9444E;
 
   --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
 }
@@ -50,6 +50,7 @@
   color-scheme: dark;
   --nord0: #ECEFF4; --nord1: #E5E9F0; --nord2: #D8DEE9; --nord3: #9AA5BA;
   --nord4: #2F3541; --nord5: #272C36; --nord6: #1E222A;
+  --nord10: #5E81AC;
   --nord14: #A3BE8C;
   --bg: #1A1E25;
   --card-bg: #232831;
@@ -60,6 +61,7 @@
   --muted: #9AA5BA;
   --accent: #88C0D0;
   --active: #A3BE8C;
+  --danger: #BF616A;
   --on-accent: #1A1E25;
   --accent-soft: #2B3A4E;
   --accent-hover: #8FBCBB;
@@ -98,10 +100,21 @@
 
 html, body, button, input, select, textarea {
   font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+input, textarea {
+  caret-color: var(--accent);
 }
 
 html {
   scrollbar-gutter: stable;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
   overflow-y: scroll;
   overflow-x: hidden;
   overflow-x: clip;
@@ -174,7 +187,6 @@ select::-ms-expand {
   font-weight: 800;
   color: var(--nord11);
   letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 .conn-desc {
   font-size: 11px;
@@ -248,15 +260,20 @@ select::-ms-expand {
 }
 .input-card-badge {
   text-transform: uppercase;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   padding: 3px 7px;
-  border-radius: 2px;
+  border-radius: 3px;
   border: 1px solid var(--border);
   background: var(--nord5);
   color: var(--muted);
   letter-spacing: 0.04em;
   flex-shrink: 0;
+  display: none;
+}
+.input-card-badge.visible {
+  display: inline-flex;
+  align-items: center;
 }
 .input-card.active .input-card-badge {
   text-transform: uppercase;
@@ -264,40 +281,50 @@ select::-ms-expand {
   color: var(--on-accent);
   border-color: var(--nord10);
 }
+.input-card-badge.pending {
+  background: var(--nord13);
+  color: #2E3440;
+  border-color: var(--nord12);
+}
 
 .sys-stats-container {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 10px;
 }
 .sys-stat-card {
   background: var(--nord6);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 .sys-stat-header {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
+  gap: 4px;
   font-family: var(--mono);
 }
 .sys-stat-name {
   text-transform: uppercase;
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sys-stat-val {
   font-size: 11px;
   font-weight: 800;
   color: var(--nord0);
+  white-space: nowrap;
 }
 .sys-stat-bar-track {
   width: 100%;
@@ -319,7 +346,7 @@ select::-ms-expand {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--nord0);
   background: var(--nord5);
@@ -368,7 +395,7 @@ select::-ms-expand {
   gap: 3px;
 }
 .wifi-info-lbl {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.05em;
@@ -417,11 +444,14 @@ main {
   color: var(--nord3);
 }
 .module-box.bypassed .module-body {
-  filter: grayscale(1);
-  opacity: 0.45;
   pointer-events: none;
   user-select: none;
   position: relative;
+}
+.module-box.bypassed .module-body > :not(.module-help-row) {
+  filter: grayscale(1);
+  opacity: 0.45;
+  transition: opacity 0.25s ease, filter 0.25s ease;
 }
 .module-box.bypassed .module-body::after {
   content: '';
@@ -435,21 +465,40 @@ main {
   pointer-events: auto;
   cursor: not-allowed;
 }
+.module-box.bypassed .module-help-row {
+  position: relative;
+  z-index: 101;
+  pointer-events: auto;
+}
 
 .submodule-title {
   text-transform: uppercase;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--muted);
   letter-spacing: 0.05em;
   margin: 2px 0 8px 2px;
   font-family: var(--mono);
-  text-transform: uppercase;
+}
+.submodule-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 2px 0 8px 2px;
+}
+.submodule-header-row .submodule-title {
+  margin: 0;
+}
+.submodule-title-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .submodule-separator {
   height: 1px;
   background: var(--border);
-  margin: 14px 0 12px;
+  margin: 12px 0 10px;
   width: 100%;
 }
 
@@ -521,12 +570,16 @@ main {
   cursor: -webkit-grabbing;
   background: var(--dragger-active);
 }
-.drag-grip-dots {
+.drag-grip-dots,
+.drag-grip-arrows {
   color: var(--nord0);
   opacity: 0.45;
   transition: opacity 0.15s ease;
   flex-shrink: 0;
   pointer-events: none;
+}
+.drag-grip-arrows {
+  display: none;
 }
 .dragger-num {
   font-size: 11px;
@@ -553,6 +606,48 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.module-header-right {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.module-help-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 6px;
+}
+.module-help-row.mobile-only-help {
+  display: none;
+}
+.module-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  min-width: 20px;
+  height: 20px;
+  border: none;
+  outline: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+.module-info-btn:hover {
+  background: transparent;
+  border: none;
+  color: var(--accent);
 }
 .collapse-icon {
   display: inline-flex;
@@ -588,7 +683,6 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   font-weight: 800;
   color: var(--nord0);
   letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 
 .switch {
@@ -630,6 +724,12 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 .switch input:checked + .slider {
   background-color: #3D7820;
   border-color: var(--nord0);
+}
+:root[data-theme="dark"] .switch input:checked + .slider {
+  border-color: rgba(0, 0, 0, 0.35);
+}
+:root[data-theme="dark"] .slider:before {
+  border-color: rgba(0, 0, 0, 0.35);
 }
 .switch input:checked + .slider:before {
   transform: translateX(16px);
@@ -716,7 +816,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 }
 .preset-label {
   text-transform: uppercase;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--nord0);
   letter-spacing: 0.05em;
@@ -741,6 +841,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   text-align: center;
 }
 .preset-dropdown-btn:hover {
@@ -748,12 +849,27 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   border-color: var(--nord0);
 }
 .preset-modal-panel {
-  max-width: 360px;
+  max-width: 380px;
 }
 .preset-modal-body {
   padding: 10px 12px;
   max-height: 55vh;
   overflow-y: auto;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+}
+.preset-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+.preset-modal-body::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: 4px;
+}
+.preset-modal-body::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 4px;
+}
+.preset-modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--nord0);
 }
 .preset-modal-list {
   display: flex;
@@ -785,6 +901,57 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   background: var(--border);
   margin: 6px 0;
 }
+.preset-storage-note {
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.35;
+}
+.preset-save-bar {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--nord5);
+}
+.preset-save-bar.open {
+  display: flex;
+}
+.preset-save-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.preset-save-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--nord0);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+}
+.preset-modal-msg {
+  display: none;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--nord0);
+  background: var(--nord5);
+  border-top: 1px solid var(--border);
+}
+.preset-modal-msg.visible {
+  display: block;
+}
+.preset-modal-msg.error {
+  color: var(--danger);
+}
 .preset-modal-footer {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -798,14 +965,19 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   height: 34px;
 }
 .preset-del-x {
-  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--muted);
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 3px;
+  font-size: 11px;
+  font-weight: 800;
 }
-.preset-del-x:hover {
-  color: var(--danger);
-  background: rgba(191, 97, 106, 0.14);
+.preset-del-x:hover,
+.preset-del-x.armed {
+  color: #FFFFFF;
+  background: var(--nord11);
 }
 .btn-preset-action {
   text-transform: uppercase;
@@ -827,6 +999,14 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 .btn-preset-action:hover {
   background: var(--surface-hover);
   border-color: var(--nord0);
+}
+.btn-preset-action.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+.btn-preset-action.primary:hover {
+  background: var(--accent-hover);
 }
 
 .eq-bands-box {
@@ -862,7 +1042,6 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  text-transform: uppercase;
 }
 .btn-primary:hover {
   background: var(--accent-hover);
@@ -885,9 +1064,9 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   max-width: 54px;
   flex: 0 0 54px;
   margin-top: 0;
-  height: 290px;
-  min-height: 290px;
-  max-height: 290px;
+  height: 314px;
+  min-height: 314px;
+  max-height: 314px;
   box-sizing: border-box;
   background: var(--nord5);
   border: 2px solid var(--border);
@@ -923,7 +1102,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   writing-mode: vertical-lr;
   direction: rtl;
   width: 24px;
-  height: 200px;
+  height: 224px;
   cursor: pointer;
   accent-color: var(--nord0);
   background: transparent;
@@ -977,19 +1156,21 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   min-width: 175px;
   max-width: 175px;
   flex: 0 0 175px;
-  height: 290px;
-  min-height: 290px;
-  max-height: 290px;
+  height: 314px;
+  min-height: 314px;
+  max-height: 314px;
+  margin-top: 0;
+  margin-bottom: 0;
   box-sizing: border-box;
   background: var(--nord5);
   border: 3px solid var(--border-strong);
   border-radius: 8px;
-  padding: 14px 8px 10px;
+  padding: 8px 8px 8px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 6px;
-  transition: border-color 0.15s, opacity 0.15s, background 0.15s, width 0.18s ease, min-width 0.18s ease, max-width 0.18s ease, flex-basis 0.18s ease;
+  transition: border-color 0.15s, opacity 0.15s, background-color 0.15s, width 0.22s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.22s cubic-bezier(0.22, 1, 0.36, 1), max-width 0.22s cubic-bezier(0.22, 1, 0.36, 1), flex-basis 0.22s cubic-bezier(0.22, 1, 0.36, 1), height 0.22s cubic-bezier(0.22, 1, 0.36, 1), min-height 0.22s cubic-bezier(0.22, 1, 0.36, 1), max-height 0.22s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.22s cubic-bezier(0.22, 1, 0.36, 1), margin-bottom 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   user-select: none;
   position: relative;
   z-index: 1;
@@ -1018,13 +1199,17 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 }
 .band-reorder-overlay,
 .band-select-overlay {
-  display: none;
+  display: flex;
   position: absolute;
   inset: 0;
   z-index: 25;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  opacity: 0;
+  transform: scale(0.82);
+  visibility: hidden;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0.18s;
 }
 .band-reorder-pill {
   width: 44px;
@@ -1084,7 +1269,13 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 }
 #bands-container.select-mode .band-card.selected {
   border-color: var(--nord11) !important;
-  box-shadow: 0 0 0 2px var(--nord11);
+  outline: 2px solid var(--nord11);
+  outline-offset: 1px;
+}
+.band-card:not(.eq-row-desktop) .band-type-row,
+.band-card:not(.eq-row-desktop) .band-card-main-grid,
+.band-card:not(.eq-row-desktop) .band-card-bottom-row {
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 body.reorder-bands .band-card:not(.eq-row-desktop),
 #bands-container.select-mode .band-card:not(.eq-row-desktop) {
@@ -1092,6 +1283,11 @@ body.reorder-bands .band-card:not(.eq-row-desktop),
   min-width: 118px;
   max-width: 118px;
   flex: 0 0 118px;
+  height: 278px;
+  min-height: 278px;
+  max-height: 278px;
+  margin-top: 18px;
+  margin-bottom: 18px;
   overflow: hidden;
 }
 body.reorder-bands .band-card:not(.eq-row-desktop) {
@@ -1107,23 +1303,25 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-bottom-row,
 #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-type-row,
 #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-main-grid,
 #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-bottom-row {
-  opacity: 0.16;
+  opacity: 0.14;
+  transform: scale(0.86);
   pointer-events: none !important;
 }
-body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
-  display: flex;
-}
+body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay,
 #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-select-overlay {
-  display: flex;
+  opacity: 1;
+  transform: scale(1);
+  visibility: visible;
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), visibility 0s linear 0s;
 }
 
 @keyframes band-enter-row {
-  0% { opacity: 0; transform: translateY(-6px) scale(0.985); max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-width: 0; padding-top: 0; padding-bottom: 0; }
-  100% { opacity: 1; transform: translateY(0) scale(1); max-height: 44px; min-height: 44px; height: 44px; margin-top: 0; border-width: 2px; padding-top: 0; padding-bottom: 0; }
+  0% { max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-top-width: 0; border-bottom-width: 0; border-left-width: 2px; border-right-width: 2px; padding-top: 0; padding-bottom: 0; }
+  100% { max-height: 44px; min-height: 44px; height: 44px; margin-top: 0; border-top-width: 2px; border-bottom-width: 2px; border-left-width: 2px; border-right-width: 2px; padding-top: 0; padding-bottom: 0; }
 }
 @keyframes band-exit-row {
-  0% { opacity: 1; transform: scale(1); max-height: 44px; }
-  100% { opacity: 0; transform: scale(0.97); max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-width: 0; padding-top: 0; padding-bottom: 0; }
+  0% { max-height: 44px; min-height: 44px; height: 44px; margin-top: 0; border-top-width: 2px; border-bottom-width: 2px; border-left-width: 2px; border-right-width: 2px; }
+  100% { max-height: 0; min-height: 0; height: 0; margin-top: -6px; border-top-width: 0; border-bottom-width: 0; border-left-width: 2px; border-right-width: 2px; padding-top: 0; padding-bottom: 0; }
 }
 @keyframes band-enter-card {
   0% { opacity: 0; transform: scale(0.9); width: 0; min-width: 0; max-width: 0; flex-basis: 0; margin-left: -12px; padding-left: 0; padding-right: 0; border-width: 0; }
@@ -1157,9 +1355,9 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
   min-width: 90px;
   max-width: 90px;
   flex: 0 0 90px;
-  height: 290px;
-  min-height: 290px;
-  max-height: 290px;
+  height: 314px;
+  min-height: 314px;
+  max-height: 314px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1214,30 +1412,50 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
 .band-type-row {
   width: 100%;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+}
+.band-card-num-badge {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  min-width: 0;
+  height: auto;
+  border: none !important;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--nord0);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  flex-shrink: 0;
 }
 .band-type-menu-wrap {
   position: relative;
   width: 100%;
+  min-width: 0;
   display: flex;
   justify-content: center;
 }
 .band-type-menu-btn {
+  position: relative;
   width: 100%;
-  max-width: 135px;
-  font-size: 10.5px;
+  max-width: none;
+  font-size: 11px;
   font-weight: 700;
   color: var(--on-accent);
   background: var(--nord0);
   border: none;
   border-radius: 12px;
-  padding: 4px 10px;
+  padding: 4px 24px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0;
+  text-align: center;
   outline: none;
   transition: background 0.08s ease;
   font-family: var(--mono);
@@ -1246,7 +1464,19 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
   background: var(--nord1);
 }
 .type-btn-caret {
-  display: none;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.78;
+  pointer-events: none;
+  transition: transform 0.14s ease;
+}
+.band-type-menu-wrap.open .type-btn-caret {
+  transform: translateY(-50%) rotate(180deg);
 }
 
 .band-type-dropdown {
@@ -1363,15 +1593,26 @@ body.is-scrubbing-val * {
   align-items: center;
   justify-content: center;
   text-align: center;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 .eq-preamp-auto-btn:hover {
   background: var(--surface-hover);
   border-color: var(--nord0);
 }
+.eq-preamp-auto-btn.clipping-warn,
+.btn-card-action.clipping-warn {
+  border-color: var(--nord11) !important;
+  color: var(--nord11) !important;
+  background: rgba(191, 97, 106, 0.14) !important;
+}
+.eq-preamp-auto-btn.clipping-warn:hover,
+.btn-card-action.clipping-warn:hover {
+  background: var(--nord11) !important;
+  color: #FFFFFF !important;
+}
 .eq-row-lbl {
   text-transform: uppercase;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   color: var(--muted);
   letter-spacing: 0.04em;
@@ -1394,6 +1635,9 @@ body.is-scrubbing-val * {
   border-radius: 4px;
   cursor: ns-resize;
   transition: border-color 0.15s, background-color 0.15s;
+}
+.eq-scrub-box:hover:not(:focus-within) {
+  background: var(--surface-hover);
 }
 .eq-scrub-box:hover,
 .eq-scrub-box.scrubbing,
@@ -1420,7 +1664,7 @@ body.is-scrubbing-val * {
   cursor: text;
 }
 .eq-scrub-unit {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--muted);
   margin-left: 0;
@@ -1481,6 +1725,10 @@ body.is-scrubbing-val * {
   border-radius: 3px 0 0 3px;
   cursor: grab;
   flex-shrink: 0;
+  transition: background-color 0.15s ease;
+}
+.band-card.eq-row-desktop .band-dragger-titlebar.eq-row-dragger:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 .band-card.eq-row-desktop .eq-row-num {
   display: inline-flex;
@@ -1497,12 +1745,13 @@ body.is-scrubbing-val * {
   flex-shrink: 0;
 }
 .band-card.eq-row-desktop .band-type-menu-btn {
+  position: relative;
   max-width: none;
   width: 100%;
   height: 30px;
   justify-content: center;
   text-align: center;
-  padding: 0 10px;
+  padding: 0 24px;
   border-radius: 4px;
   background: var(--card-bg);
   color: var(--nord0);
@@ -1516,7 +1765,7 @@ body.is-scrubbing-val * {
   border-color: var(--nord0);
 }
 .band-card.eq-row-desktop .type-btn-caret {
-  display: none !important;
+  display: inline-flex;
 }
 .band-card.eq-row-desktop .band-type-dropdown {
   width: 150px;
@@ -1703,7 +1952,7 @@ body.is-scrubbing-val * {
 
 .band-menu-opt {
   padding: 6px 10px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: #ECEFF4;
   cursor: pointer;
@@ -1725,7 +1974,7 @@ body.is-scrubbing-val * {
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  padding-top: 4px;
+  padding-top: 2px;
 }
 .band-card-bottom-col {
   display: flex;
@@ -1743,9 +1992,10 @@ body.is-scrubbing-val * {
   min-width: 0;
 }
 .band-bypass-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: none !important;
+  border-radius: 0;
   background: transparent !important;
   color: var(--muted);
   cursor: pointer;
@@ -1755,15 +2005,19 @@ body.is-scrubbing-val * {
   padding: 0;
   outline: none;
   flex-shrink: 0;
+}
+.band-bypass-btn:hover {
+  color: var(--nord0);
 }
 .band-bypass-btn svg {
   width: 18px;
   height: 18px;
 }
 .band-delete-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: none !important;
+  border-radius: 0;
   background: transparent !important;
   color: var(--muted);
   cursor: pointer;
@@ -1774,9 +2028,100 @@ body.is-scrubbing-val * {
   outline: none;
   flex-shrink: 0;
 }
+.band-delete-btn:hover:not(:disabled) {
+  color: var(--danger);
+}
+.band-delete-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
 .band-delete-btn svg {
   width: 17px;
   height: 17px;
+}
+.eq-undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 850;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: max-content;
+  min-width: min(260px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  padding: 9px 14px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--nord0);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.92);
+  transform-origin: center bottom;
+  transition: opacity 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+              visibility 0s linear 0.2s;
+}
+:root[data-theme="dark"] .eq-undo-toast {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+.eq-undo-toast.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) scale(1);
+  transition: opacity 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+              visibility 0s linear 0s;
+}
+.eq-undo-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.eq-undo-btn {
+  text-transform: uppercase;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--nord0);
+  border: none;
+  outline: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.eq-undo-btn:hover {
+  background: transparent;
+  color: var(--accent);
+}
+.eq-undo-dismiss {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--nord0);
+  padding: 4px;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.eq-undo-dismiss:hover {
+  background: transparent;
+  color: var(--danger);
 }
 
 .band-card-main-grid {
@@ -1882,22 +2227,26 @@ body.is-scrubbing-val * {
 }
 :root[data-theme="dark"] .preamp-slider::-webkit-slider-thumb,
 :root[data-theme="dark"] .band-vslider::-webkit-slider-thumb {
-  border-color: #9AA5BA !important;
+  background: #3B4252 !important;
+  border-color: #FFFFFF !important;
 }
 :root[data-theme="dark"] .preamp-slider::-webkit-slider-thumb:hover,
 :root[data-theme="dark"] .band-vslider::-webkit-slider-thumb:hover {
-  border-color: #C2CAD8 !important;
+  background: #4C566A !important;
+  border-color: #FFFFFF !important;
 }
 :root[data-theme="dark"] .preamp-slider::-moz-range-thumb,
 :root[data-theme="dark"] .band-vslider::-moz-range-thumb {
-  border-color: #9AA5BA !important;
+  background: #3B4252 !important;
+  border-color: #FFFFFF !important;
 }
 :root[data-theme="dark"] .preamp-slider::-moz-range-thumb:hover,
 :root[data-theme="dark"] .band-vslider::-moz-range-thumb:hover {
-  border-color: #C2CAD8 !important;
+  background: #4C566A !important;
+  border-color: #FFFFFF !important;
 }
 :root[data-theme="dark"] .knob-notch {
-  stroke: #9AA5BA;
+  stroke: #FFFFFF;
 }
 :root[data-theme="dark"] .preamp-slider::-webkit-slider-runnable-track,
 :root[data-theme="dark"] .band-vslider::-webkit-slider-runnable-track {
@@ -1910,6 +2259,7 @@ body.is-scrubbing-val * {
   border-color: #434C5E;
 }.knob {
   cursor: pointer;
+  touch-action: none;
   filter: none;
 }
 .knob:hover {
@@ -1936,7 +2286,7 @@ body.is-scrubbing-val * {
   background: #2E3440;
   color: #ECEFF4;
   border-radius: 6px;
-  padding: 3px 4px;
+  padding: 4px 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1953,18 +2303,17 @@ body.is-scrubbing-val * {
 }
 .card-val-badge .badge-lbl {
   text-transform: uppercase;
-  font-size: 8.5px;
+  font-size: 9.5px;
   font-weight: 800;
   color: #D8DEE9;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   line-height: 1.1;
-  text-transform: uppercase;
 }
 .badge-input-row {
+  position: relative;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
-  gap: 2px;
   width: 100%;
 }
 .card-val-badge input.badge-val-input {
@@ -1984,9 +2333,12 @@ body.is-scrubbing-val * {
   cursor: pointer;
 }
 .badge-unit {
-  font-size: 8.5px;
+  position: absolute;
+  right: 2px;
+  font-size: 9px;
   font-weight: 700;
   color: #88C0D0;
+  pointer-events: none;
 }
 
 .module-grid-controls {
@@ -2003,6 +2355,37 @@ body.is-scrubbing-val * {
   overflow-anchor: none;
   padding: 6px 4px 10px;
   scroll-behavior: smooth;
+  scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+.module-grid-controls.sub-bypassed {
+  opacity: 0.42;
+  filter: grayscale(0.9);
+  pointer-events: none;
+}
+.control-pod-pair {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: rgba(0, 0, 0, 0.02);
+  flex-shrink: 0;
+}
+.module-grid-controls::-webkit-scrollbar {
+  height: 10px;
+}
+.module-grid-controls::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-radius: 5px;
+}
+.module-grid-controls::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 5px;
+}
+.module-grid-controls::-webkit-scrollbar-thumb:hover {
+  background: var(--nord0);
 }
 .control-pod {
   width: 136px;
@@ -2029,58 +2412,172 @@ body.is-scrubbing-val * {
 }
 
 .boot-cfg-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.cfg-card {
+  background: var(--nord5);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 6px 4px;
+  gap: 10px;
+}
+.cfg-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 22px;
+}
+.cfg-card-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .boot-cfg-mode-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
 }
 .boot-radio-label {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
+  justify-content: center;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--card-bg);
   color: var(--nord0);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
   cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.boot-radio-label:hover {
+  background: var(--nord5);
+  border-color: var(--nord9);
 }
 .boot-radio-label input[type="radio"] {
-  cursor: pointer;
-  accent-color: var(--accent);
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.boot-radio-label:has(input[type="radio"]:checked) {
+  background: var(--accent-soft);
+  border: 1.5px solid var(--nord10);
+  color: var(--nord0);
+}
+.boot-radio-label:has(input[type="radio"]:checked):hover {
+  background: var(--accent-soft);
+  border-color: var(--nord9);
 }
 .boot-toggles-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  align-items: center;
-  padding: 8px 12px;
-  background: var(--nord5);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  transition: opacity 0.2s ease;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+.boot-toggles-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 .boot-toggle-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
   font-size: 11px;
   font-weight: 700;
   color: var(--nord0);
   cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.boot-toggle-item:hover {
+  background: var(--nord5);
+  border-color: var(--nord9);
+}
+.boot-toggle-item:has(input[type="checkbox"]:checked) {
+  background: var(--accent-soft);
+  border-color: var(--nord10);
 }
 .boot-toggle-item input[type="checkbox"] {
   cursor: pointer;
-  accent-color: var(--accent);
+  accent-color: var(--nord10);
 }
-.boot-actions-row {
-  display: flex;
+.cfg-btn-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
   align-items: center;
-  gap: 14px;
+}
+.cfg-btn {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  justify-content: center;
+  background: var(--card-bg);
+  color: var(--nord0);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.cfg-btn:hover {
+  background: var(--nord5);
+  border-color: var(--nord9);
+}
+.cfg-btn:active,
+.boot-radio-label:active,
+.cfg-btn-subtle:active {
+  transform: scale(0.97);
+}
+.cfg-btn-subtle {
+  width: 100%;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  color: var(--nord0);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.cfg-btn-subtle:hover {
+  background: var(--nord5);
+  border-color: var(--nord9);
 }
 .boot-saved-indicator {
   font-size: 11px;
@@ -2171,18 +2668,33 @@ body.is-scrubbing-val * {
 }
 .wifi-cfg-badge {
   text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
+  font-weight: 800;
+  padding: 3px 8px;
   border-radius: 3px;
-  background: var(--active);
-  color: var(--on-accent);
-  letter-spacing: 0.05em;
+  background: var(--nord6);
+  border: 1px solid var(--border);
+  color: var(--nord0);
+  letter-spacing: 0.04em;
+  max-width: 145px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.wifi-cfg-badge.ap-mode {
+.wifi-cfg-badge .badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--active);
+}
+.wifi-cfg-badge.ap-mode .badge-dot {
   background: #D08770;
 }
-.wifi-cfg-badge.disconnected {
+.wifi-cfg-badge.disconnected .badge-dot {
   background: var(--muted);
 }
 .wifi-cfg-status-row {
@@ -2196,8 +2708,7 @@ body.is-scrubbing-val * {
   font-size: 11px;
   font-weight: 700;
   color: var(--nord3);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 .wifi-cfg-toggle-btn {
   font-size: 11px;
@@ -2206,6 +2717,12 @@ body.is-scrubbing-val * {
 }
 .wifi-cfg-body {
   padding: 26px 20px 24px;
+}
+.wifi-cfg-card {
+  display: contents;
+}
+#wifi-modal .wifi-cfg-card-head {
+  display: none;
 }
 .wifi-cfg-inputs {
   display: grid;
@@ -2224,7 +2741,6 @@ body.is-scrubbing-val * {
   font-weight: 800;
   color: var(--muted);
   letter-spacing: 0.05em;
-  text-transform: uppercase;
 }
 .wifi-pass-wrap {
   position: relative;
@@ -2244,6 +2760,13 @@ body.is-scrubbing-val * {
   outline: none;
   transition: border-color 0.15s;
 }
+.wifi-pass-wrap .wifi-text-input {
+  padding-right: 36px;
+}
+.wifi-text-input::placeholder {
+  color: var(--muted);
+  opacity: 0.72;
+}
 .wifi-text-input:focus-visible {
   border-color: var(--accent);
   outline: 2px solid var(--nord8);
@@ -2251,16 +2774,32 @@ body.is-scrubbing-val * {
 }
 .wifi-pass-toggle {
   position: absolute;
-  right: 8px;
+  right: 6px;
   background: none;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
-  opacity: 0.6;
-  padding: 4px;
+  color: var(--muted);
+  opacity: 0.78;
+  padding: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
 }
 .wifi-pass-toggle:hover {
   opacity: 1;
+  color: var(--nord0);
+  background: var(--surface-hover);
+}
+.wifi-pass-toggle .eye-shut {
+  display: none;
+}
+.wifi-pass-toggle.showing .eye-open {
+  display: none;
+}
+.wifi-pass-toggle.showing .eye-shut {
+  display: block;
 }
 .wifi-actions-row {
   grid-column: 1 / -1;
@@ -2272,25 +2811,30 @@ body.is-scrubbing-val * {
   margin-top: 6px;
 }
 .btn-wifi-connect {
-  padding: 9px 22px;
-  background: var(--nord10);
-  color: var(--on-accent);
-  font-size: 12px;
+  height: 34px;
+  padding: 0 18px;
+  background: var(--card-bg);
+  color: var(--nord0);
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 700;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s;
 }
 .btn-wifi-connect:hover {
-  background: var(--nord9);
+  background: var(--nord5);
+  border-color: var(--nord9);
 }
 .btn-wifi-connect:active {
   transform: scale(0.98);
 }
 .btn-wifi-connect:disabled {
-  background: var(--border-strong);
+  background: var(--card-bg);
   color: var(--muted);
+  border-color: var(--border);
+  opacity: 0.45;
   cursor: not-allowed;
   transform: none;
 }
@@ -2333,13 +2877,13 @@ body.is-scrubbing-val * {
 .wifi-status-msg.success {
   color: var(--ok-text);
 }
-.wifi-link { color: inherit; text-decoration: underline; }
+.wifi-link { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 680px) { .wifi-text-input { font-size: 16px; } }
 .wifi-status-msg.error {
   color: var(--err-text);
 }
 
-body, .module-box, .module-header, .band-card, .btn-preset, .wifi-cfg-panel, .input-card {
+body, .module-box, .module-header, .band-card.eq-row-desktop, .btn-preset, .wifi-cfg-panel, .input-card {
   transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
 }
 
@@ -2350,14 +2894,50 @@ body, .module-box, .module-header, .band-card, .btn-preset, .wifi-cfg-panel, .in
 button:not(:disabled), .input-card, .btn-preset, .mobile-tab { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled):active { transform: scale(0.97); }
 button:focus-visible, .switch input:focus-visible + .slider, .module-dragger:focus-visible,
-select:focus-visible, input:focus-visible {
+select:focus-visible, input:focus-visible, .knob:focus-visible {
   outline: 2px solid var(--nord8);
   outline-offset: 2px;
 }
+.knob:focus-visible {
+  border-radius: 50%;
+}
 .slider, .slider:before { transition: background-color 0.133s ease, transform 0.133s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.133s ease; }
-.input-card, .btn-preset, .btn-primary, .btn-card-action { transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.1s ease; }
+.input-card, .btn-preset, .btn-primary, .btn-card-action,
+.preset-dropdown-btn, .btn-preset-action, .eq-preamp-auto-btn,
+.eq-scrub-box, .eq-add-row-btn, .band-type-menu-btn, .band-bypass-btn, .band-delete-btn,
+.eq-undo-btn, .eq-undo-dismiss, .preset-del-x, .module-header,
+.band-card.eq-row-desktop .band-type-menu-btn,
+.band-card.eq-row-desktop .band-bypass-btn,
+.band-card.eq-row-desktop .band-delete-btn,
+.band-card.eq-row-desktop .eq-row-select-cb,
+.band-card.eq-row-desktop .band-dragger-titlebar.eq-row-dragger {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.input-card:hover, .btn-preset:hover, .btn-primary:hover, .btn-card-action:hover,
+.btn-card-action.btn-danger:hover, .preset-dropdown-btn:hover, .btn-preset-action:hover,
+.btn-preset-action.primary:hover, .eq-preamp-auto-btn:hover, .eq-scrub-box:hover,
+.eq-add-row-btn:hover:not(:disabled),
+.eq-delete-row-btn:hover:not(:disabled), .band-type-menu-btn:hover,
+.band-card.eq-row-desktop:hover,
+.band-card.eq-row-desktop .band-type-menu-btn:hover,
+.band-card.eq-row-desktop .band-bypass-btn:hover,
+.band-card.eq-row-desktop .band-delete-btn:hover:not(:disabled),
+.band-card.eq-row-desktop .eq-row-select-cb:hover,
+.band-card.eq-row-desktop .band-dragger-titlebar.eq-row-dragger:hover,
+.band-dragger-titlebar:hover .drag-grip,
+.band-bypass-btn:hover, .band-delete-btn:hover,
+.cfg-btn:hover, .cfg-btn-subtle:hover, .boot-radio-label:hover,
+.boot-radio-label:has(input[type="radio"]:checked):hover, .boot-toggle-item:hover,
+.module-info-btn:hover, .module-header:hover, .module-dragger:hover, .collapse-icon:hover,
+.wifi-modal-close:hover, .wifi-pass-toggle:hover, .btn-wifi-connect:hover,
+.eq-undo-btn:hover, .eq-undo-dismiss:hover, .preset-del-x:hover, .preset-modal-list .gm-opt:hover,
+#graph-band-menu .gm-opt:hover, .band-menu-opt:hover,
+.control-pod:hover, .ota-drop-zone:hover,
+:root:not([data-theme="dark"]) .band-card:not(.eq-row-desktop) .band-type-menu-btn:hover {
+  transition-duration: 0s !important;
+}
 .module-box { transition: border-color 0.25s ease, background-color 0.25s ease; }
-.module-box.bypassed .module-body { transition: opacity 0.25s ease, filter 0.25s ease; }
+.module-box.bypassed .module-body { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -2378,8 +2958,52 @@ select:focus-visible, input:focus-visible {
 .sys-actions-grid { margin-top: 0; }
 @media (min-width: 681px) {
   .sys-actions-grid {
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
   }
+  .sys-actions-grid .input-card {
+    padding: 7px 12px;
+    background: var(--nord5);
+    border-radius: 4px;
+  }
+  .sys-actions-grid .input-card.active {
+    background: var(--accent-soft);
+    border-color: var(--nord10);
+  }
+  .sys-actions-grid .input-card-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .sys-actions-grid .input-card-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+  .sys-actions-grid .input-card-title {
+    font-size: 12px;
+  }
+}
+.help-modal-body {
+  padding: 18px 20px 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--nord0);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.help-modal-body p {
+  margin: 0;
+  color: var(--nord1);
+}
+.help-modal-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.help-modal-list li strong {
+  color: var(--nord0);
 }
 body.processing-off #dsp-modules-container {
   filter: grayscale(1);
@@ -2520,8 +3144,35 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   #wifi-modal .wifi-cfg-header {
     display: none;
   }
+  #wifi-modal {
+    margin-bottom: -4px;
+  }
   #wifi-modal .wifi-cfg-body {
     padding: 0;
+  }
+  #wifi-modal .wifi-cfg-card {
+    background: var(--nord5);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #wifi-modal .wifi-cfg-card-head {
+    display: flex;
+  }
+  #wifi-modal .wifi-cfg-status-row {
+    margin-bottom: 0;
+  }
+  #wifi-modal .wifi-cfg-note {
+    margin: 0;
+  }
+  #wifi-modal .wifi-cfg-inputs {
+    gap: 10px;
+  }
+  #wifi-modal .wifi-actions-row {
+    margin-top: 2px;
   }
   #mod-input,
   #mod-boot-cfg {
@@ -2562,49 +3213,83 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   .btn-action-reorder {
     display: flex;
   }
+  .module-help-row.mobile-only-help { display: flex; }
+  .module-help-row.desktop-only-help { display: none; }
   #bands-container {
+    padding: 12px 0 46px 0;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y;
   }
-  .module-dragger { pointer-events: none; }
-  body:not(.reorder-modules) .module-dragger .drag-grip-dots { display: none; }
-  body.reorder-modules .module-dragger {
-    pointer-events: auto;
-    background: var(--accent-soft);
-    outline: 2px solid var(--nord8);
-    outline-offset: -2px;
+  #channel-correction-grid {
+    padding: 6px 4px 46px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
   }
-  body.reorder-bands .band-card:not(.eq-row-desktop),
-  #bands-container.select-mode .band-card:not(.eq-row-desktop) {
-    width: 118px;
-    min-width: 118px;
-    max-width: 118px;
-    flex: 0 0 118px;
+  .eq-undo-toast {
+    bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+  .module-box[data-module] .module-header {
+    transition: min-height 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  }
+  .module-box[data-module] .module-header:hover {
+    transition-duration: 0.22s, 0s, 0s, 0s !important;
+  }
+  .module-dragger {
+    pointer-events: none;
+    gap: 0;
+    transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), min-width 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.15s ease;
+  }
+  .module-dragger .drag-grip-dots { display: none; }
+  .module-dragger .drag-grip-arrows {
+    display: block;
+    width: 0;
+    opacity: 0;
+    margin-right: 0;
     overflow: hidden;
+    transition: width 0.22s cubic-bezier(0.22, 1, 0.36, 1), margin-right 0.22s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.18s ease;
   }
-  body.reorder-bands .band-card:not(.eq-row-desktop) {
+  .module-box[data-module] .module-header-right,
+  .module-box[data-module] .collapse-icon {
+    transition: opacity 0.16s ease, visibility 0s linear 0s;
+  }
+  body.reorder-modules .module-box[data-module] .module-header {
+    min-height: 58px;
     cursor: grab;
     touch-action: none;
   }
-  #bands-container.select-mode .band-card:not(.eq-row-desktop) {
-    cursor: pointer;
+  body.reorder-modules .module-box[data-module] .module-header:active {
+    cursor: grabbing;
   }
-  body.reorder-bands .band-card:not(.eq-row-desktop) .band-type-row,
-  body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-main-grid,
-  body.reorder-bands .band-card:not(.eq-row-desktop) .band-card-bottom-row,
-  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-type-row,
-  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-main-grid,
-  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-card-bottom-row {
-    opacity: 0.16;
+  body.reorder-modules .module-box[data-module] .module-dragger {
+    pointer-events: auto;
+    width: 52px;
+    min-width: 52px;
+    background: var(--accent-soft);
+  }
+  body.reorder-modules .module-box[data-module] .module-dragger .drag-grip-arrows {
+    width: 15px;
+    opacity: 0.85;
+    margin-right: 4px;
+  }
+  body.reorder-modules .module-box[data-module] .switch,
+  body.reorder-modules .module-box[data-module] .switch * {
     pointer-events: none !important;
+    cursor: grab !important;
   }
-  body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay {
-    display: flex;
+  body.reorder-modules .module-box[data-module] .module-header-right,
+  body.reorder-modules .module-box[data-module] .collapse-icon {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none !important;
+    transition: opacity 0.16s ease, visibility 0s linear 0.16s;
   }
-  #bands-container.select-mode .band-card:not(.eq-row-desktop) .band-select-overlay {
-    display: flex;
+  body.reorder-modules .module-box.sorting {
+    z-index: 850;
   }
-  main[data-tab] { overflow-x: hidden; }
+  main[data-tab] {
+    overflow-x: hidden;
+    overflow-x: clip;
+  }
   main[data-tab="system"] [data-tabpanel="system"] { animation: tab-slide-from-left 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
   main[data-tab="dsp"] [data-tabpanel="dsp"] { animation: tab-slide-from-right 0.22s cubic-bezier(0.22, 1, 0.36, 1); }
   .input-selector-grid {
@@ -2622,30 +3307,38 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     justify-content: space-between;
     width: 100%;
   }
+  :root:not([data-theme="dark"]) .preamp-slider::-webkit-slider-runnable-track,
+  :root:not([data-theme="dark"]) .band-vslider::-webkit-slider-runnable-track {
+    border-color: rgba(46, 52, 64, 0.25);
+  }
+  :root:not([data-theme="dark"]) .preamp-slider::-moz-range-track,
+  :root:not([data-theme="dark"]) .band-vslider::-moz-range-track {
+    border-color: rgba(46, 52, 64, 0.25);
+  }
   :root:not([data-theme="dark"]) .preamp-slider::-webkit-slider-thumb,
   :root:not([data-theme="dark"]) .band-vslider::-webkit-slider-thumb {
     background: #FFFFFF !important;
-    border-color: #2E3440 !important;
+    border-color: #4C566A !important;
   }
   :root:not([data-theme="dark"]) .preamp-slider::-webkit-slider-thumb:hover,
   :root:not([data-theme="dark"]) .band-vslider::-webkit-slider-thumb:hover {
     background: #ECEFF4 !important;
-    border-color: #2E3440 !important;
+    border-color: #4C566A !important;
   }
   :root:not([data-theme="dark"]) .preamp-slider::-moz-range-thumb,
   :root:not([data-theme="dark"]) .band-vslider::-moz-range-thumb {
     background: #FFFFFF !important;
-    border-color: #2E3440 !important;
+    border-color: #4C566A !important;
   }
   :root:not([data-theme="dark"]) .preamp-slider::-moz-range-thumb:hover,
   :root:not([data-theme="dark"]) .band-vslider::-moz-range-thumb:hover {
     background: #ECEFF4 !important;
-    border-color: #2E3440 !important;
+    border-color: #4C566A !important;
   }
   :root:not([data-theme="dark"]) .band-card:not(.eq-row-desktop) .band-type-menu-btn {
     background: #FFFFFF;
     color: #2E3440;
-    border: 1px solid #4C566A;
+    border: 1px solid rgba(46, 52, 64, 0.25);
   }
   :root:not([data-theme="dark"]) .band-card:not(.eq-row-desktop) .band-type-menu-btn:hover {
     background: #ECEFF4;
@@ -2671,6 +3364,9 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     color: #2E3440;
     border: 1px solid #4C566A;
   }
+  :root:not([data-theme="dark"]) #mod-eq .card-val-badge {
+    border: 1px solid rgba(46, 52, 64, 0.25);
+  }
   :root:not([data-theme="dark"]) .card-val-badge .badge-lbl {
     color: #4C566A;
   }
@@ -2685,7 +3381,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     stroke: #4C566A;
   }
   :root:not([data-theme="dark"]) .knob .knob-notch {
-    stroke: #2E3440;
+    stroke: #4C566A;
   }
 }</style>
 </head>
@@ -2705,41 +3401,47 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     <button type="button" class="mobile-tab" role="tab" id="tab-dsp" aria-selected="false" aria-controls="tabpanel-dsp" data-tab="dsp">DSP</button>
   </nav>
   <section class="module-box" id="mod-input" data-tabpanel="system">
-    <div class="module-header" onclick="toggleModuleCollapse('input')">
+    <div class="module-header" aria-expanded="true" onclick="toggleModuleCollapse('input')">
       <div class="module-title-area">
         <span class="module-title">ESP32-S3-DSP</span>
       </div>
-      <span class="collapse-icon">▼</span>
+      <div class="module-header-right">
+        <span class="collapse-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
     </div>
     <div class="module-body">
-      <div class="submodule-title">Inputs</div>
+      <div class="submodule-header-row">
+        <div class="submodule-title">Inputs</div>
+      </div>
       <div class="input-selector-grid">
-        <button class="input-card active" id="btn-src-1" onclick="setInputSource(1)" type="button">
+        <button class="input-card active" id="btn-src-1" onclick="setInputSource(1)" type="button" aria-pressed="true">
           <div class="input-card-main">
             <div class="input-card-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 12 C 5.5 4, 8.5 4, 12 12 C 15.5 20, 18.5 20, 21 12"/>
               </svg>
             </div>
             <div class="input-card-title">Line In</div>
           </div>
+          <span class="input-card-badge visible" id="badge-src-1">Active</span>
         </button>
 
-        <button class="input-card" id="btn-src-2" onclick="setInputSource(2)" type="button">
+        <button class="input-card" id="btn-src-2" onclick="setInputSource(2)" type="button" aria-pressed="false">
           <div class="input-card-main">
             <div class="input-card-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/>
               </svg>
             </div>
             <div class="input-card-title">Bluetooth</div>
           </div>
+          <span class="input-card-badge" id="badge-src-2"></span>
         </button>
 
-        <button class="input-card" id="btn-src-3" onclick="setInputSource(3)" type="button">
+        <button class="input-card" id="btn-src-3" onclick="setInputSource(3)" type="button" aria-pressed="false">
           <div class="input-card-main">
             <div class="input-card-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
                 <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
                 <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
@@ -2748,6 +3450,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             </div>
             <div class="input-card-title">Squeezebox</div>
           </div>
+          <span class="input-card-badge" id="badge-src-3"></span>
         </button>
       </div>
 
@@ -2879,11 +3582,14 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           </div>
         </div>
       </div>
+      <div class="module-help-row">
+        <button type="button" class="module-info-btn" onclick="openModuleHelp('input', event)" title="Module Help" aria-label="Inputs and System Help">?</button>
+      </div>
     </div>
   </section>
 
   <div class="wifi-modal-backdrop" id="wifi-modal" data-tabpanel="system" onclick="closeWiFiModal(event)">
-    <div class="wifi-cfg-panel" onclick="event.stopPropagation()">
+    <div class="wifi-cfg-panel" role="dialog" aria-modal="true" aria-labelledby="wifi-modal-title" onclick="event.stopPropagation()">
       <div class="wifi-cfg-header">
         <div class="wifi-cfg-title-row">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -2892,29 +3598,44 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
             <line x1="12" y1="20" x2="12.01" y2="20"/>
           </svg>
-          <span class="wifi-cfg-title">Network</span>
+          <span class="wifi-cfg-title" id="wifi-modal-title">Network</span>
         </div>
-        <button type="button" class="wifi-modal-close" onclick="closeWiFiModal()" aria-label="Close">✕</button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="wifi-cfg-badge disconnected" id="wifi-cfg-modal-status"><span class="badge-dot"></span><span class="wifi-badge-text">Offline</span></span>
+          <button type="button" class="wifi-modal-close" onclick="closeWiFiModal()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+        </div>
       </div>
       <div class="wifi-cfg-body" id="wifi-cfg-body">
         <div class="submodule-separator mobile-only-el"></div>
-        <div class="submodule-title mobile-only-el">Network</div>
-        <p class="wifi-cfg-note">Web UI and Squeezebox streaming will use this network.</p>
-        <div class="wifi-cfg-inputs">
-          <div class="wifi-input-group">
-            <label for="wifi-input-ssid">Network</label>
-            <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="SSID" autocomplete="off" autocorrect="off" autocapitalize="none">
-          </div>
-          <div class="wifi-input-group">
-            <label for="wifi-input-pass">Password</label>
-            <div class="wifi-pass-wrap">
-              <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Password" autocomplete="off">
-              <button type="button" class="wifi-pass-toggle" onclick="togglePassVisibility()" title="Show or hide password" aria-label="Show or hide password">👁</button>
+        <div class="wifi-cfg-card">
+          <div class="cfg-card-head wifi-cfg-card-head">
+            <span class="cfg-card-title">Wi-Fi Network</span>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="wifi-cfg-badge disconnected" id="wifi-cfg-cur-status"><span class="badge-dot"></span><span class="wifi-badge-text">Offline</span></span>
             </div>
           </div>
-          <div class="wifi-actions-row">
-            <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
-            <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Connect</button>
+          <div class="wifi-cfg-inputs">
+            <div class="wifi-input-group">
+              <label for="wifi-input-ssid">Network</label>
+              <input type="text" id="wifi-input-ssid" class="wifi-text-input" placeholder="SSID" autocomplete="off" autocorrect="off" autocapitalize="none" onkeydown="if(event.key==='Enter'){event.preventDefault();submitWiFiConfig();}">
+            </div>
+            <div class="wifi-input-group">
+              <label for="wifi-input-pass">Password</label>
+              <div class="wifi-pass-wrap">
+                <input type="password" id="wifi-input-pass" class="wifi-text-input" placeholder="Password" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();submitWiFiConfig();}">
+                <button type="button" class="wifi-pass-toggle" id="wifi-pass-toggle-btn" onclick="togglePassVisibility()" title="Show or hide password" aria-label="Show or hide password" aria-pressed="false">
+                  <svg class="eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  <svg class="eye-shut" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="wifi-actions-row">
+              <span class="wifi-status-msg" id="wifi-cfg-msg"></span>
+              <button type="button" class="btn-wifi-connect" onclick="submitWiFiConfig()">Connect</button>
+            </div>
+          </div>
+          <div class="module-help-row">
+            <button type="button" class="module-info-btn" onclick="openModuleHelp('wifi', event)" title="Wi-Fi Help" aria-label="Wi-Fi Help">?</button>
           </div>
         </div>
       </div>
@@ -2922,16 +3643,25 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   </div>
 
   <div class="wifi-modal-backdrop" id="preset-modal" data-tabpanel="dsp" onclick="closePresetModal(event)">
-    <div class="wifi-cfg-panel preset-modal-panel" onclick="event.stopPropagation()">
+    <div class="wifi-cfg-panel preset-modal-panel" role="dialog" aria-modal="true" aria-labelledby="preset-modal-title" onclick="event.stopPropagation()">
       <div class="wifi-cfg-header">
         <div class="wifi-cfg-title-row">
-          <span class="wifi-cfg-title">EQ Presets</span>
+          <span class="wifi-cfg-title" id="preset-modal-title">EQ Presets</span>
         </div>
-        <button type="button" class="wifi-modal-close" onclick="closePresetModal()" aria-label="Close">✕</button>
+        <button type="button" class="wifi-modal-close" onclick="closePresetModal()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div class="preset-modal-body">
+        <div class="preset-storage-note">Custom presets are saved in this browser. Use Export to back up to a file.</div>
         <div class="preset-modal-list" id="preset-modal-list"></div>
       </div>
+      <div class="preset-save-bar" id="preset-save-bar">
+        <div class="preset-save-row">
+          <input type="text" id="preset-save-input" class="preset-save-input" placeholder="Preset name" maxlength="40" aria-label="Preset name" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmSavePreset();}else if(event.key==='Escape'){event.preventDefault();cancelSavePreset();}">
+          <button type="button" class="btn-preset-action primary" onclick="confirmSavePreset()">Save</button>
+          <button type="button" class="btn-preset-action" onclick="cancelSavePreset()">Cancel</button>
+        </div>
+      </div>
+      <div class="preset-modal-msg" id="preset-modal-msg" role="status" aria-live="polite"></div>
       <div class="preset-modal-footer">
         <button type="button" class="btn-preset-action" onclick="saveCurrentPreset()" title="Save current settings as preset">Save</button>
         <button type="button" class="btn-preset-action" onclick="document.getElementById('preset-file-input').click()" title="Import preset file">Import</button>
@@ -2947,7 +3677,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   <div id="dsp-modules-container" data-tabpanel="dsp">
 
   <section class="module-box bypassed" id="mod-eq" data-module="eq">
-    <div class="module-header" onclick="toggleModuleCollapse('eq')">
+    <div class="module-header" aria-expanded="true" onclick="toggleModuleCollapse('eq')">
       <div class="module-header-left">
         <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
           <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
@@ -2957,6 +3687,11 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <circle cx="6" cy="7" r="1.3"/>
             <circle cx="2" cy="12" r="1.3"/>
             <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <svg class="drag-grip-arrows" width="15" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="8 7 12 3 16 7"/>
+            <line x1="12" y1="3" x2="12" y2="21"/>
+            <polyline points="8 17 12 21 16 17"/>
           </svg>
           <span class="dragger-num">1</span>
         </div>
@@ -2968,7 +3703,9 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <span class="module-title">Parametric Equalizer</span>
         </div>
       </div>
-      <span class="collapse-icon">▼</span>
+      <div class="module-header-right">
+        <span class="collapse-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
     </div>
     <div class="module-body">
       <div id="canvas-wrap">
@@ -2981,6 +3718,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="preset-dropdown-wrap" id="preset-dropdown-wrap">
             <button type="button" class="preset-dropdown-btn" id="preset-dropdown-btn" onclick="openPresetModal(event)">
               <span id="preset-dropdown-label">Flat 5 Bands</span>
+              <span class="type-btn-caret" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
             </button>
           </div>
           <input type="file" id="preset-file-input" accept=".json" style="display:none" onchange="importPresetFile(event)">
@@ -2991,8 +3729,8 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
         <div class="eq-preamp-desk-title" id="eq-preamp-title">Preamp</div>
         <div class="eq-row-field eq-preamp-gain-field">
           <span class="eq-row-lbl">Gain</span>
-          <div class="eq-scrub-box" id="scrub-box-preamp-desk" title="Click to type, drag up/down to adjust">
-            <input type="text" inputmode="decimal" id="preamp-num-desk" class="eq-scrub-input" value="0.0">
+          <div class="eq-scrub-box" id="scrub-box-preamp-desk" title="Click to type, drag up/down to adjust, double-click to reset">
+            <input type="text" inputmode="decimal" id="preamp-num-desk" class="eq-scrub-input" aria-label="Preamp Gain (dB)" value="0.0">
             <span class="eq-scrub-unit">dB</span>
           </div>
         </div>
@@ -3007,22 +3745,26 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
         <div id="bands-container">
           <div class="preamp-col" id="eq-preamp-col">
             <div class="preamp-slider-wrap">
-              <input type="range" id="preamp-slider" class="preamp-slider" min="-18" max="18" step="0.1" value="0.0" orient="vertical">
+              <input type="range" id="preamp-slider" class="preamp-slider" aria-label="Preamp Gain Slider" min="-24" max="24" step="0.1" value="0.0" orient="vertical">
             </div>
             <div class="card-val-badge">
               <span class="badge-lbl">PREAMP</span>
               <div class="badge-input-row">
-                <input type="number" id="preamp-num" class="badge-val-input" min="-18" max="18" step="0.1" value="0.0">
+                <input type="number" id="preamp-num" class="badge-val-input" aria-label="Preamp Gain (dB)" min="-24" max="24" step="0.1" value="0.0">
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <div class="module-help-row">
+        <button type="button" class="module-info-btn" onclick="openModuleHelp('eq', event)" title="Equalizer Help" aria-label="Parametric Equalizer Help">?</button>
+      </div>
     </div>
   </section>
 
   <section class="module-box bypassed" id="mod-compander" data-module="comp">
-    <div class="module-header" onclick="toggleModuleCollapse('comp')">
+    <div class="module-header" aria-expanded="true" onclick="toggleModuleCollapse('comp')">
       <div class="module-header-left">
         <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
           <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
@@ -3032,6 +3774,11 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <circle cx="6" cy="7" r="1.3"/>
             <circle cx="2" cy="12" r="1.3"/>
             <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <svg class="drag-grip-arrows" width="15" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="8 7 12 3 16 7"/>
+            <line x1="12" y1="3" x2="12" y2="21"/>
+            <polyline points="8 17 12 21 16 17"/>
           </svg>
           <span class="dragger-num">2</span>
         </div>
@@ -3043,7 +3790,9 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <span class="module-title">Compressor</span>
         </div>
       </div>
-      <span class="collapse-icon">▼</span>
+      <div class="module-header-right">
+        <span class="collapse-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
@@ -3052,7 +3801,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">THRESHOLD</span>
             <div class="badge-input-row">
-              <input type="number" id="num-comp-thresh" class="badge-val-input" min="-60" max="0" step="0.5" value="-18">
+              <input type="number" id="num-comp-thresh" class="badge-val-input" aria-label="Compressor Threshold (dBFS)" min="-60" max="0" step="0.5" value="-18">
               <span class="badge-unit">dBFS</span>
             </div>
           </div>
@@ -3062,7 +3811,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">RATIO</span>
             <div class="badge-input-row">
-              <input type="number" id="num-comp-ratio" class="badge-val-input" min="1" max="20" step="0.1" value="4">
+              <input type="number" id="num-comp-ratio" class="badge-val-input" aria-label="Compressor Ratio" min="1" max="20" step="0.1" value="4">
               <span class="badge-unit">:1</span>
             </div>
           </div>
@@ -3072,7 +3821,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">ATTACK</span>
             <div class="badge-input-row">
-              <input type="number" id="num-comp-att" class="badge-val-input" min="0.1" max="200" step="0.5" value="5">
+              <input type="number" id="num-comp-att" class="badge-val-input" aria-label="Compressor Attack (ms)" min="0.1" max="200" step="0.5" value="5">
               <span class="badge-unit">ms</span>
             </div>
           </div>
@@ -3082,7 +3831,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">RELEASE</span>
             <div class="badge-input-row">
-              <input type="number" id="num-comp-rel" class="badge-val-input" min="10" max="2000" step="5" value="150">
+              <input type="number" id="num-comp-rel" class="badge-val-input" aria-label="Compressor Release (ms)" min="10" max="2000" step="5" value="150">
               <span class="badge-unit">ms</span>
             </div>
           </div>
@@ -3092,17 +3841,20 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">MAKEUP</span>
             <div class="badge-input-row">
-              <input type="number" id="num-comp-gain" class="badge-val-input" min="-12" max="24" step="0.5" value="0">
+              <input type="number" id="num-comp-gain" class="badge-val-input" aria-label="Compressor Makeup Gain (dB)" min="-12" max="24" step="0.5" value="0">
               <span class="badge-unit">dB</span>
             </div>
           </div>
         </div>
       </div>
+      <div class="module-help-row">
+        <button type="button" class="module-info-btn" onclick="openModuleHelp('comp', event)" title="Compressor Help" aria-label="Compressor Help">?</button>
+      </div>
     </div>
   </section>
 
   <section class="module-box bypassed" id="mod-limiter" data-module="lim">
-    <div class="module-header" onclick="toggleModuleCollapse('lim')">
+    <div class="module-header" aria-expanded="true" onclick="toggleModuleCollapse('lim')">
       <div class="module-header-left">
         <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
           <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
@@ -3112,6 +3864,11 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <circle cx="6" cy="7" r="1.3"/>
             <circle cx="2" cy="12" r="1.3"/>
             <circle cx="6" cy="12" r="1.3"/>
+          </svg>
+          <svg class="drag-grip-arrows" width="15" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="8 7 12 3 16 7"/>
+            <line x1="12" y1="3" x2="12" y2="21"/>
+            <polyline points="8 17 12 21 16 17"/>
           </svg>
           <span class="dragger-num">3</span>
         </div>
@@ -3123,7 +3880,9 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <span class="module-title">Limiter</span>
         </div>
       </div>
-      <span class="collapse-icon">▼</span>
+      <div class="module-header-right">
+        <span class="collapse-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
     </div>
     <div class="module-body">
       <div class="module-grid-controls">
@@ -3132,7 +3891,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">CEILING</span>
             <div class="badge-input-row">
-              <input type="number" id="num-lim-ceil" class="badge-val-input" min="-6" max="0" step="0.1" value="-0.5">
+              <input type="number" id="num-lim-ceil" class="badge-val-input" aria-label="Limiter Ceiling (dBFS)" min="-6" max="0" step="0.1" value="-0.5">
               <span class="badge-unit">dBFS</span>
             </div>
           </div>
@@ -3142,17 +3901,20 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">KNEE</span>
             <div class="badge-input-row">
-              <input type="number" id="num-lim-knee" class="badge-val-input" min="0" max="6" step="0.1" value="3">
+              <input type="number" id="num-lim-knee" class="badge-val-input" aria-label="Limiter Knee (dB)" min="0" max="6" step="0.1" value="3">
               <span class="badge-unit">dB</span>
             </div>
           </div>
         </div>
       </div>
+      <div class="module-help-row">
+        <button type="button" class="module-info-btn" onclick="openModuleHelp('lim', event)" title="Limiter Help" aria-label="Limiter Help">?</button>
+      </div>
     </div>
   </section>
 
   <section class="module-box bypassed" id="mod-subsonic" data-module="subsonic">
-    <div class="module-header" onclick="toggleModuleCollapse('subsonic')">
+    <div class="module-header" aria-expanded="true" onclick="toggleModuleCollapse('subsonic')">
       <div class="module-header-left">
         <div class="module-dragger" title="Drag to reorder DSP signal chain" onclick="event.stopPropagation()">
           <svg class="drag-grip-dots" width="8" height="14" viewBox="0 0 8 14" fill="currentColor">
@@ -3163,6 +3925,11 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <circle cx="2" cy="12" r="1.3"/>
             <circle cx="6" cy="12" r="1.3"/>
           </svg>
+          <svg class="drag-grip-arrows" width="15" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="8 7 12 3 16 7"/>
+            <line x1="12" y1="3" x2="12" y2="21"/>
+            <polyline points="8 17 12 21 16 17"/>
+          </svg>
           <span class="dragger-num">4</span>
         </div>
         <div class="module-title-area">
@@ -3170,20 +3937,30 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <input type="checkbox" id="switch-subsonic" onchange="toggleSubsonicModule(this.checked)">
             <span class="slider"></span>
           </label>
-          <span class="module-title">Speakers correction</span>
+          <span class="module-title">Speakers Correction</span>
         </div>
       </div>
-      <span class="collapse-icon">▼</span>
+      <div class="module-header-right">
+        <span class="collapse-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
     </div>
     <div class="module-body">
-      <div class="submodule-title">Subsonic Filter</div>
-      <div class="module-grid-controls">
+      <div class="submodule-header-row">
+        <div class="submodule-title-left">
+          <label class="switch" onclick="event.stopPropagation();" title="Toggle Subsonic Filter On/Off">
+            <input type="checkbox" id="switch-sub-filter" checked onchange="toggleSubsonicFilter(this.checked)">
+            <span class="slider"></span>
+          </label>
+          <div class="submodule-title">Subsonic Filter</div>
+        </div>
+      </div>
+      <div class="module-grid-controls" id="subsonic-filter-grid">
         <div class="control-pod">
           <svg id="knob-sub-freq" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
             <span class="badge-lbl">FREQ</span>
             <div class="badge-input-row">
-              <input type="number" id="num-sub-freq" class="badge-val-input" min="20" max="100" step="1" value="80">
+              <input type="number" id="num-sub-freq" class="badge-val-input" aria-label="Subsonic Cutoff Frequency (Hz)" min="20" max="100" step="1" value="80">
               <span class="badge-unit">Hz</span>
             </div>
           </div>
@@ -3193,7 +3970,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <div class="card-val-badge">
             <span class="badge-lbl">SLOPE</span>
             <div class="badge-input-row">
-              <input type="number" id="num-sub-order" class="badge-val-input" min="12" max="24" step="6" value="12">
+              <input type="number" id="num-sub-order" class="badge-val-input" aria-label="Subsonic Roll-Off Slope (dB/oct)" min="6" max="24" step="6" value="12">
               <span class="badge-unit">dB</span>
             </div>
           </div>
@@ -3203,129 +3980,167 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
       <div class="submodule-separator"></div>
 
       <div class="submodule-title">Channel Correction</div>
-      <div class="module-grid-controls">
+      <div class="module-grid-controls" id="channel-correction-grid">
         <div class="control-pod">
           <svg id="knob-spk-bal" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
           <div class="card-val-badge">
             <span class="badge-lbl">BALANCE</span>
             <div class="badge-input-row">
-              <input type="number" id="num-spk-bal" class="badge-val-input" min="-100" max="100" step="1" value="0">
+              <input type="number" id="num-spk-bal" class="badge-val-input" aria-label="Channel Balance (%)" min="-100" max="100" step="1" value="0">
               <span class="badge-unit">%</span>
             </div>
           </div>
         </div>
 
-        <div class="control-pod">
-          <svg id="knob-spk-delay-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
-          <div class="card-val-badge">
-            <span class="badge-lbl">TIME L</span>
-            <div class="badge-input-row">
-              <input type="number" id="num-spk-delay-l" class="badge-val-input" min="-20" max="20" step="0.1" value="0.0">
-              <span class="badge-unit">ms</span>
+        <div class="control-pod-pair">
+          <div class="control-pod">
+            <svg id="knob-spk-delay-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+            <div class="card-val-badge">
+              <span class="badge-lbl">TIME L</span>
+              <div class="badge-input-row">
+                <input type="number" id="num-spk-delay-l" class="badge-val-input" aria-label="Left Speaker Time Alignment (ms)" min="-20" max="20" step="0.1" value="0.0">
+                <span class="badge-unit">ms</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-pod">
+            <svg id="knob-spk-delay-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+            <div class="card-val-badge">
+              <span class="badge-lbl">TIME R</span>
+              <div class="badge-input-row">
+                <input type="number" id="num-spk-delay-r" class="badge-val-input" aria-label="Right Speaker Time Alignment (ms)" min="-20" max="20" step="0.1" value="0.0">
+                <span class="badge-unit">ms</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="control-pod">
-          <svg id="knob-spk-delay-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
-          <div class="card-val-badge">
-            <span class="badge-lbl">TIME R</span>
-            <div class="badge-input-row">
-              <input type="number" id="num-spk-delay-r" class="badge-val-input" min="-20" max="20" step="0.1" value="0.0">
-              <span class="badge-unit">ms</span>
+        <div class="control-pod-pair">
+          <div class="control-pod">
+            <svg id="knob-spk-phase-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+            <div class="card-val-badge">
+              <span class="badge-lbl">PHASE L</span>
+              <div class="badge-input-row">
+                <input type="number" id="num-spk-phase-l" class="badge-val-input" aria-label="Left Speaker Phase (degrees)" min="-180" max="180" step="45" value="0">
+                <span class="badge-unit">°</span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="control-pod">
-          <svg id="knob-spk-phase-l" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
-          <div class="card-val-badge">
-            <span class="badge-lbl">PHASE L</span>
-            <div class="badge-input-row">
-              <input type="number" id="num-spk-phase-l" class="badge-val-input" min="-180" max="180" step="45" value="0">
-              <span class="badge-unit">°</span>
+          <div class="control-pod">
+            <svg id="knob-spk-phase-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
+            <div class="card-val-badge">
+              <span class="badge-lbl">PHASE R</span>
+              <div class="badge-input-row">
+                <input type="number" id="num-spk-phase-r" class="badge-val-input" aria-label="Right Speaker Phase (degrees)" min="-180" max="180" step="45" value="0">
+                <span class="badge-unit">°</span>
+              </div>
             </div>
           </div>
         </div>
-
-        <div class="control-pod">
-          <svg id="knob-spk-phase-r" class="knob" width="64" height="64" viewBox="0 0 64 64"></svg>
-          <div class="card-val-badge">
-            <span class="badge-lbl">PHASE R</span>
-            <div class="badge-input-row">
-              <input type="number" id="num-spk-phase-r" class="badge-val-input" min="-180" max="180" step="45" value="0">
-              <span class="badge-unit">°</span>
-            </div>
-          </div>
-        </div>
+      </div>
+      <div class="module-help-row">
+        <button type="button" class="module-info-btn" onclick="openModuleHelp('subsonic', event)" title="Speakers Correction Help" aria-label="Speakers Correction Help">?</button>
       </div>
     </div>
   </section>
   </div>
 
   <section class="module-box" id="mod-boot-cfg" data-tabpanel="system">
-    <div class="module-header" onclick="toggleModuleCollapse('boot-cfg')">
+    <div class="module-header" aria-expanded="true" onclick="toggleModuleCollapse('boot-cfg')">
       <div class="module-title-area">
         <span class="module-title">Config</span>
       </div>
-      <span class="collapse-icon">▼</span>
+      <div class="module-header-right">
+        <span class="collapse-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
     </div>
     <div class="module-body" id="body-boot-cfg">
       <div class="boot-cfg-container">
-        <div class="submodule-separator mobile-only-el"></div>
-        <div class="submodule-title">Startup</div>
-        <div class="boot-cfg-mode-row">
-          <label class="boot-radio-label">
-            <input type="radio" name="boot_mode" value="last_state" id="boot-mode-last" checked onchange="updateBootConfigUI(); sendBootDefaults();">
-            <span>Last used</span>
-          </label>
-          <label class="boot-radio-label">
-            <input type="radio" name="boot_mode" value="custom" id="boot-mode-custom" onchange="updateBootConfigUI(); sendBootDefaults();">
-            <span>Custom</span>
-          </label>
+        <div class="cfg-card">
+          <div class="cfg-card-head">
+            <span class="cfg-card-title">Power-On State</span>
+            <span class="boot-saved-indicator" id="boot-saved-indicator">Saved</span>
+          </div>
+          <div class="boot-cfg-mode-row">
+            <label class="boot-radio-label">
+              <input type="radio" name="boot_mode" value="last_state" id="boot-mode-last" checked onchange="updateBootConfigUI(); sendBootDefaults();">
+              <span>Restore Last</span>
+            </label>
+            <label class="boot-radio-label">
+              <input type="radio" name="boot_mode" value="custom" id="boot-mode-custom" onchange="updateBootConfigUI(); sendBootDefaults();">
+              <span>Custom</span>
+            </label>
+          </div>
+          <div class="boot-toggles-row" id="boot-toggles-wrap">
+            <div class="boot-toggles-grid">
+              <label class="boot-toggle-item">
+                <input type="checkbox" id="boot-def-eq" onchange="onBootToggleChanged()">
+                <span>Equalizer</span>
+              </label>
+              <label class="boot-toggle-item">
+                <input type="checkbox" id="boot-def-sub" onchange="onBootToggleChanged()">
+                <span>Speakers</span>
+              </label>
+              <label class="boot-toggle-item">
+                <input type="checkbox" id="boot-def-comp" onchange="onBootToggleChanged()">
+                <span>Compressor</span>
+              </label>
+              <label class="boot-toggle-item">
+                <input type="checkbox" id="boot-def-lim" onchange="onBootToggleChanged()">
+                <span>Limiter</span>
+              </label>
+            </div>
+            <button type="button" class="cfg-btn-subtle" onclick="saveCurrentAsBootDefaults()">Use current active</button>
+          </div>
+          <div class="module-help-row mobile-only-help">
+            <button type="button" class="module-info-btn" onclick="openModuleHelp('boot-cfg', event)" title="Configuration Help" aria-label="Configuration Help">?</button>
+          </div>
         </div>
-        <div class="boot-toggles-row" id="boot-toggles-wrap" title="Effects switched on at boot" style="opacity: 0.4; pointer-events: none;">
-          <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-eq" onchange="onBootToggleChanged()">
-            <span>Equalizer</span>
-          </label>
-          <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-sub" onchange="onBootToggleChanged()">
-            <span>Speaker Correction</span>
-          </label>
-          <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-comp" onchange="onBootToggleChanged()">
-            <span>Compressor</span>
-          </label>
-          <label class="boot-toggle-item">
-            <input type="checkbox" id="boot-def-lim" onchange="onBootToggleChanged()">
-            <span>Limiter</span>
-          </label>
+
+        <div class="cfg-card">
+          <div class="cfg-card-head">
+            <span class="cfg-card-title">Presets &amp; Backup</span>
+            <span class="backup-msg" id="backup-msg" role="status" aria-live="polite"></span>
+          </div>
+          <div class="cfg-btn-row">
+            <button type="button" class="cfg-btn" onclick="exportConfig()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Export JSON
+            </button>
+            <button type="button" class="cfg-btn" onclick="document.getElementById('backup-file').click()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Import JSON
+            </button>
+            <input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importConfig(event)">
+          </div>
         </div>
-        <div class="boot-actions-row">
-          <button class="btn-primary" onclick="saveCurrentAsBootDefaults()">Save as startup</button>
-          <span class="boot-saved-indicator" id="boot-saved-indicator">Saved</span>
+
+        <div class="cfg-card">
+          <div class="cfg-card-head">
+            <span class="cfg-card-title">System</span>
+          </div>
+          <div class="cfg-btn-row">
+            <a class="cfg-btn" href="/console">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              Live Console
+            </a>
+            <button type="button" class="cfg-btn" onclick="openAboutModal()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              About
+            </button>
+          </div>
         </div>
-        <div class="submodule-separator"></div>
-        <div class="submodule-title">Backup</div>
-        <div class="backup-row">
-          <button type="button" class="btn-primary" onclick="exportConfig()">Export</button>
-          <button type="button" class="btn-primary" onclick="document.getElementById('backup-file').click()">Import</button>
-          <input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importConfig(event)">
-          <span class="backup-msg" id="backup-msg" role="status" aria-live="polite"></span>
-        </div>
-        <div class="submodule-separator"></div>
-        <div class="submodule-title">System &amp; Legal</div>
-        <div class="backup-row" style="flex-wrap: wrap;">
-          <a class="btn-primary" href="/console" style="text-decoration:none;display:inline-flex;align-items:center;">Live Console</a>
-          <button type="button" class="btn-primary" onclick="openAboutModal()">Licenses &amp; About</button>
-        </div>
+      </div>
+      <div class="module-help-row desktop-only-help">
+        <button type="button" class="module-info-btn" onclick="openModuleHelp('boot-cfg', event)" title="Configuration Help" aria-label="Configuration Help">?</button>
       </div>
     </div>
   </section>
 
   <div class="wifi-modal-backdrop" id="ota-modal" onclick="closeOtaModal(event)">
-    <div class="wifi-cfg-panel" onclick="event.stopPropagation()">
+    <div class="wifi-cfg-panel" role="dialog" aria-modal="true" aria-labelledby="ota-modal-title" onclick="event.stopPropagation()">
       <div class="wifi-cfg-header">
         <div class="wifi-cfg-title-row">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -3333,12 +4148,12 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
-          <span class="wifi-cfg-title">Firmware Update (OTA)</span>
+          <span class="wifi-cfg-title" id="ota-modal-title">Firmware Update (OTA)</span>
         </div>
-        <button type="button" class="wifi-modal-close" onclick="closeOtaModal()" aria-label="Close">✕</button>
+        <button type="button" class="wifi-modal-close" onclick="closeOtaModal()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div class="wifi-cfg-body" style="gap: 12px;">
-        <p class="wifi-cfg-note">Select or drag and drop <code>firmware.bin</code> compiled by PlatformIO.</p>
+        <p class="wifi-cfg-note">Select or drag and drop <code>firmware.bin</code> compiled by PlatformIO. Dual-OTA partitions protect your device: if an upload is interrupted or invalid, the active firmware remains untouched.</p>
         <div class="ota-drop-zone" id="ota-drop-zone" role="button" tabindex="0" aria-label="Choose firmware.bin file" onclick="document.getElementById('ota-file-input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('ota-file-input').click();}">
           <div id="ota-drop-text">Click to choose firmware.bin or drop file here</div>
           <input type="file" id="ota-file-input" accept=".bin" hidden onchange="otaFileSelected(this.files && this.files[0])">
@@ -3355,29 +4170,49 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   </div>
 
   <div class="wifi-modal-backdrop" id="about-modal" onclick="closeAboutModal(event)">
-    <div class="wifi-cfg-panel" onclick="event.stopPropagation()">
+    <div class="wifi-cfg-panel" role="dialog" aria-modal="true" aria-labelledby="about-modal-title" onclick="event.stopPropagation()">
       <div class="wifi-cfg-header">
         <div class="wifi-cfg-title-row">
-          <span class="wifi-cfg-title">ESP32-S3-DSP — Licenses &amp; About</span>
+          <span class="wifi-cfg-title" id="about-modal-title">ESP32-S3-DSP - Licenses &amp; About</span>
         </div>
-        <button type="button" class="wifi-modal-close" onclick="closeAboutModal()" aria-label="Close">✕</button>
+        <button type="button" class="wifi-modal-close" onclick="closeAboutModal()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
       <div class="wifi-cfg-body" style="gap: 10px; font-size: 11px; line-height: 1.5;">
         <p><strong>License:</strong> GNU General Public License v3.0 (GPLv3). NO WARRANTY; see the repository LICENSE file for full terms and Corresponding Source.</p>
         <p><strong>Third-Party Components:</strong></p>
         <ul style="padding-left: 16px; display: flex; flex-direction: column; gap: 4px;">
-          <li><strong>Squeezelite / squeezelite-esp32</strong> — GPLv3 (© Adrian Smith, Ralph Irving, Philippe G.)</li>
-          <li><strong>dr_flac</strong> — Public Domain / MIT-0 (© David Reid)</li>
-          <li><strong>ESPAsyncWebServer &amp; AsyncTCP</strong> — LGPLv3 (© Mathieu Carbou, Hristo Gochkov)</li>
-          <li><strong>ArduinoJson</strong> — MIT (© Benoit Blanchon)</li>
-          <li><strong>ESP32-A2DP</strong> — Apache-2.0 (© Phil Schatzmann)</li>
+          <li><strong>Squeezelite / squeezelite-esp32</strong> - GPLv3 (© Adrian Smith, Ralph Irving, Philippe G.)</li>
+          <li><strong>dr_flac</strong> - Public Domain / MIT-0 (© David Reid)</li>
+          <li><strong>ESPAsyncWebServer &amp; AsyncTCP</strong> - LGPLv3 (© Mathieu Carbou, Hristo Gochkov)</li>
+          <li><strong>ArduinoJson</strong> - MIT (© Benoit Blanchon)</li>
+          <li><strong>ESP32-A2DP</strong> - Apache-2.0 (© Phil Schatzmann)</li>
         </ul>
         <p style="color: var(--muted);">Squeezebox / Squeezelite are trademarks of their respective owners, used for compatibility identification only.</p>
       </div>
     </div>
   </div>
 
+  <div class="wifi-modal-backdrop" id="help-modal" onclick="closeHelpModal(event)">
+    <div class="wifi-cfg-panel help-modal-panel" role="dialog" aria-modal="true" aria-labelledby="help-modal-title" onclick="event.stopPropagation()">
+      <div class="wifi-cfg-header">
+        <div class="wifi-cfg-title-row">
+          <span class="wifi-cfg-title" id="help-modal-title">Module Guide</span>
+        </div>
+        <button type="button" class="wifi-modal-close" onclick="closeHelpModal()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="help-modal-body" id="help-modal-body"></div>
+    </div>
+  </div>
+
   </main>
+
+  <div class="eq-undo-toast" id="eq-undo-toast" role="status" aria-live="polite" aria-hidden="true">
+    <span id="eq-undo-text">Band removed</span>
+    <div class="eq-undo-actions">
+      <button type="button" class="eq-undo-btn" id="eq-undo-btn" onclick="undoBandDelete()">Undo</button>
+      <button type="button" class="eq-undo-dismiss" onclick="dismissEqToast()" aria-label="Dismiss"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
 
 <script>
 
@@ -3405,7 +4240,7 @@ function bandCardBorder(hsl, hex) {
     bands.forEach((_, idx) => syncBandCardUI(idx));
   }
 }
-const FS = 44100;
+const FS = 96000;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
   '#BF616A',
@@ -3504,8 +4339,19 @@ const BUILTIN_PRESET_LABELS = {
   high_boost: 'High Boost'
 };
 
+function showPresetModalMsg(text, isError) {
+  const el = document.getElementById('preset-modal-msg');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('error', !!isError);
+  el.classList.add('visible');
+  clearTimeout(showPresetModalMsg._t);
+  showPresetModalMsg._t = setTimeout(() => el.classList.remove('visible'), 3200);
+}
+
 function openPresetModal(event) {
   if (event) event.stopPropagation();
+  cancelSavePreset();
   renderCustomPresets();
   const modal = document.getElementById('preset-modal');
   if (modal) modal.classList.add('open');
@@ -3513,6 +4359,7 @@ function openPresetModal(event) {
 
 function closePresetModal(e) {
   if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+  cancelSavePreset();
   const modal = document.getElementById('preset-modal');
   if (modal) modal.classList.remove('open');
 }
@@ -3520,6 +4367,7 @@ function closePresetModal(e) {
 function applyPreset(name) {
   if (name === 'flat') name = 'flat_5';
   if (!PRESETS[name]) return;
+  dismissEqToast();
   currentPreset = name;
   closePresetModal();
 
@@ -3558,11 +4406,29 @@ function buildEqPresetPayload(name) {
 }
 
 function saveCurrentPreset() {
+  const bar = document.getElementById('preset-save-bar');
+  const inp = document.getElementById('preset-save-input');
+  if (!bar || !inp) return;
   const defaultName = `Preset ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-  const name = prompt("Enter preset name:", defaultName);
-  if (!name || !name.trim()) return;
+  inp.value = (!BUILTIN_PRESET_LABELS[currentPreset] && currentPreset) ? currentPreset : defaultName;
+  bar.classList.add('open');
+  setTimeout(() => { inp.focus(); inp.select(); }, 15);
+}
 
-  const trimmed = name.trim();
+function cancelSavePreset() {
+  const bar = document.getElementById('preset-save-bar');
+  if (bar) bar.classList.remove('open');
+}
+
+function confirmSavePreset() {
+  const inp = document.getElementById('preset-save-input');
+  if (!inp) return;
+  const trimmed = (inp.value || '').trim();
+  if (!trimmed) {
+    showPresetModalMsg('Please enter a preset name.', true);
+    inp.focus();
+    return;
+  }
   const presetData = buildEqPresetPayload(trimmed);
 
   let customPresets = [];
@@ -3578,7 +4444,9 @@ function saveCurrentPreset() {
   }
   localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
   currentPreset = trimmed;
+  cancelSavePreset();
   renderCustomPresets();
+  showPresetModalMsg(`Saved "${trimmed}"`, false);
 }
 
 function exportPresetFile() {
@@ -3605,12 +4473,15 @@ function importPresetFile(event) {
       const raw = JSON.parse(e.target.result);
       const data = (raw && raw.eq && Array.isArray(raw.eq.bands)) ? raw.eq : raw;
       if (!data || !Array.isArray(data.bands) || data.bands.length === 0) {
-        alert("Invalid preset file: missing bands data.");
+        showPresetModalMsg("Invalid preset file: missing bands data.", true);
+        event.target.value = '';
         return;
       }
 
+      dismissEqToast();
+
       if (typeof data.preamp === 'number') {
-        eqPreamp = Math.max(-18, Math.min(18, data.preamp));
+        eqPreamp = Math.max(-24, Math.min(24, data.preamp));
         updatePreampUI();
         wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
       }
@@ -3655,8 +4526,10 @@ function importPresetFile(event) {
       bands.forEach((_, i) => sendBand(i));
 
       event.target.value = '';
+      showPresetModalMsg(`Imported "${presetName}"`, false);
     } catch (err) {
-      alert("Error reading preset file: " + err.message);
+      showPresetModalMsg("Invalid JSON preset: " + err.message, true);
+      event.target.value = '';
     }
   };
   reader.readAsText(file);
@@ -3694,14 +4567,7 @@ function renderCustomPresets() {
     menu.appendChild(sep);
   }
 
-  const deleteCustomAt = (idx, name) => {
-    if (confirm(`Delete preset "${name}"?`)) {
-      customPresets.splice(idx, 1);
-      localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
-      if (currentPreset === name) currentPreset = 'flat_5';
-      renderCustomPresets();
-    }
-  };
+  const deleteIconHtml = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
 
   customPresets.forEach((p, idx) => {
     const opt = document.createElement('div');
@@ -3715,16 +4581,33 @@ function renderCustomPresets() {
 
     const delBtn = document.createElement('span');
     delBtn.className = 'preset-del-x';
-    delBtn.textContent = '✕';
+    delBtn.innerHTML = deleteIconHtml;
     delBtn.title = `Delete "${p.name}"`;
+    let armTimer = null;
     delBtn.onclick = (e) => {
       e.stopPropagation();
-      deleteCustomAt(idx, p.name);
+      if (!delBtn.classList.contains('armed')) {
+        delBtn.classList.add('armed');
+        delBtn.textContent = 'Delete?';
+        clearTimeout(armTimer);
+        armTimer = setTimeout(() => {
+          delBtn.classList.remove('armed');
+          delBtn.innerHTML = deleteIconHtml;
+        }, 2800);
+        return;
+      }
+      clearTimeout(armTimer);
+      customPresets.splice(idx, 1);
+      localStorage.setItem('esp32_dsp_custom_presets', JSON.stringify(customPresets));
+      if (currentPreset === p.name) currentPreset = 'flat_5';
+      renderCustomPresets();
+      showPresetModalMsg(`Deleted "${p.name}"`, false);
     };
     opt.appendChild(delBtn);
 
     opt.onclick = (e) => {
       e.stopPropagation();
+      dismissEqToast();
       currentPreset = p.name;
       closePresetModal();
       if (typeof p.preamp === 'number') {
@@ -3738,7 +4621,7 @@ function renderCustomPresets() {
           let ord = b.order || 2;
           if (t === 5) { t = 3; ord = 4; }
           else if (t === 6) { t = 4; ord = 4; }
-          if (ord < 2 || ord > 4) ord = 2;
+          if (ord < 1 || ord > 4) ord = 2;
           return {
             band: i,
             freq: b.freq,
@@ -3754,12 +4637,6 @@ function renderCustomPresets() {
       rebuildBandsUI();
       drawResponse();
       bands.forEach((_, i) => sendBand(i));
-    };
-
-    opt.oncontextmenu = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      deleteCustomAt(idx, p.name);
     };
 
     menu.appendChild(opt);
@@ -3874,6 +4751,29 @@ function attachScrubInput(boxEl, inputEl, opts) {
       inputEl.blur();
     }
   });
+
+  boxEl.addEventListener('dblclick', e => {
+    const cfg = getCfg();
+    const rawDef = cfg.defaultVal !== undefined ? cfg.defaultVal : opts.defaultVal;
+    const defVal = typeof rawDef === 'function' ? rawDef() : rawDef;
+    if (defVal === undefined || defVal === null) return;
+    e.preventDefault();
+    window.getSelection()?.removeAllRanges();
+    let v = defVal;
+    if (cfg.step > 0) {
+      v = Math.round(v / cfg.step) * cfg.step;
+    }
+    v = Math.max(cfg.min, Math.min(cfg.max, v));
+    if (opts.onApply) opts.onApply(v);
+    inputEl.blur();
+  });
+}
+
+function getBandDefaultFreq(b, i) {
+  const p = PRESETS[currentPreset];
+  if (p && p[i]) return p[i].freq;
+  if (b && b.defaultFreq !== undefined) return b.defaultFreq;
+  return 1000;
 }
 
 function initPreamp() {
@@ -3885,7 +4785,7 @@ function initPreamp() {
 
   slider.addEventListener('input', e => {
     isPreampDragging = true;
-    eqPreamp = Math.max(-18, Math.min(18, parseFloat(e.target.value) || 0));
+    eqPreamp = Math.max(-24, Math.min(24, parseFloat(e.target.value) || 0));
     input.value = eqPreamp.toFixed(1);
     if (deskInput) deskInput.value = eqPreamp.toFixed(1);
     requestDrawResponse();
@@ -3900,7 +4800,7 @@ function initPreamp() {
   input.addEventListener('change', e => {
     let v = parseFloat(e.target.value);
     if (isNaN(v)) v = eqPreamp;
-    v = Math.max(-18, Math.min(18, v));
+    v = Math.max(-24, Math.min(24, v));
     eqPreamp = v;
     slider.value = v;
     input.value = v.toFixed(1);
@@ -3911,7 +4811,7 @@ function initPreamp() {
 
   if (deskBox && deskInput) {
     attachScrubInput(deskBox, deskInput, {
-      min: -18, max: 18, step: 0.1, logScale: false, pixels: 150,
+      min: -24, max: 24, step: 0.1, defaultVal: 0, logScale: false, pixels: 150,
       format: v => v.toFixed(1),
       getVal: () => eqPreamp,
       onSlide: v => {
@@ -3929,6 +4829,19 @@ function initPreamp() {
       }
     });
   }
+
+  const resetPreamp = (e) => {
+    e.preventDefault();
+    window.getSelection()?.removeAllRanges();
+    isPreampDragging = false;
+    eqPreamp = 0;
+    updatePreampUI();
+    wsTx({ t: 'eq_preamp', preamp: 0 });
+    requestDrawResponse();
+    input.blur();
+  };
+  slider.addEventListener('dblclick', resetPreamp);
+  input.closest('.card-val-badge')?.addEventListener('dblclick', resetPreamp);
 }
 
 function updatePreampUI() {
@@ -3941,7 +4854,7 @@ function updatePreampUI() {
 }
 
 let subsonicParams = {
-  enabled: false, freq: 80.0, order: 2,
+  enabled: false, subEnabled: true, freq: 80.0, order: 2,
   balance: 0, delayL: 0.0, delayR: 0.0, phaseL: 0, phaseR: 0
 };
 
@@ -3963,7 +4876,7 @@ let ws = null, wsRetry = null;
 let wsBackoffMs = 1000;
 const isMockMode = (location.protocol === 'file:') || (new URLSearchParams(location.search).get('mock') === '1');
 let mockSysTimer = null;
-let mockSsid = 'Mock-DSP (Offline)';
+let mockSsid = 'Mock-DSP';
 
 function startMockMode() {
   clearTimeout(wsRetry);
@@ -4158,19 +5071,23 @@ function updateSysStatsUI(s) {
   }
   if (s.wifi_ssid !== undefined) {
     if (s.wifi_con) {
-      setWiFiBadges('wifi-cfg-badge', `Connected: ${s.wifi_ssid}`);
+      setWiFiBadges('wifi-cfg-badge', s.wifi_ssid || 'Online');
+    } else if (s.wifi_ssid && s.wifi_ssid !== 'Disconnected' && s.wifi_ssid !== 'Offline') {
+      const shortAp = s.wifi_ssid.includes('AP') ? 'Hotspot' : s.wifi_ssid;
+      setWiFiBadges('wifi-cfg-badge ap-mode', shortAp);
     } else {
-      setWiFiBadges('wifi-cfg-badge ap-mode', s.wifi_ssid);
+      setWiFiBadges('wifi-cfg-badge disconnected', 'Offline');
     }
   }
 }
 
 function setWiFiBadges(cls, text) {
-  const el = document.getElementById('wifi-cfg-cur-status');
-  if (el) {
+  document.querySelectorAll('.wifi-cfg-badge').forEach(el => {
     el.className = cls;
-    el.textContent = text;
-  }
+    const lbl = el.querySelector('.wifi-badge-text');
+    if (lbl) lbl.textContent = text;
+    else el.textContent = text;
+  });
 }
 
 function handleMsg(d) {
@@ -4180,22 +5097,20 @@ function handleMsg(d) {
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg success';
         statusMsg.replaceChildren();
-        const strong = document.createElement('strong');
-        strong.textContent = d.ssid || '';
         const link = document.createElement('a');
         const targetUrl = d.ip ? `http://${d.ip}` : (location.origin || 'http://dsp.local');
         link.href = targetUrl;
         link.target = '_blank';
         link.rel = 'noopener';
         link.className = 'wifi-link';
-        link.textContent = targetUrl;
-        statusMsg.append('Connected to ', strong, ` · ${d.ip || ''} · `, link);
+        link.textContent = d.ip || targetUrl;
+        statusMsg.append('Connected · ', link);
       }
-      setWiFiBadges('wifi-cfg-badge', `Connected: ${d.ssid || d.ip || 'OK'}`);
+      setWiFiBadges('wifi-cfg-badge', d.ssid || d.ip || 'Online');
     } else if (d.status === 'failed') {
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg error';
-        statusMsg.textContent = d.msg || 'Connection failed. Please check password.';
+        statusMsg.textContent = d.msg || 'Failed. Check password.';
       }
     } else if (d.status === 'connecting') {
       if (statusMsg) {
@@ -4272,7 +5187,15 @@ function handleMsg(d) {
   }
 
   if (d.subsonic) {
+    const prevOrder = subsonicParams.order || 2;
     Object.assign(subsonicParams, d.subsonic);
+    if (d.subsonic.order === 0) {
+      subsonicParams.subEnabled = false;
+      subsonicParams.order = prevOrder >= 1 && prevOrder <= 4 ? prevOrder : 2;
+    } else if (d.subsonic.order >= 1 && d.subsonic.order <= 4) {
+      subsonicParams.subEnabled = true;
+      subsonicParams.order = d.subsonic.order;
+    }
     updateBypassUI('subsonic', subsonicParams.enabled);
     syncSubsonicUI();
   }
@@ -4332,8 +5255,7 @@ function updateBootConfigUI() {
   const isCustom = document.getElementById('boot-mode-custom')?.checked;
   const wrap = document.getElementById('boot-toggles-wrap');
   if (wrap) {
-    wrap.style.opacity = isCustom ? '1' : '0.4';
-    wrap.style.pointerEvents = isCustom ? 'auto' : 'none';
+    wrap.style.display = isCustom ? 'flex' : 'none';
   }
 }
 
@@ -4408,7 +5330,7 @@ function updateDraggerNumbers() {
 }
 
 function makeLiveSortable(opts) {
-  const { container, itemSelector, handle, item, axis, onStart, onCommit, edge } = opts;
+  const { container, itemSelector, handle, item, axis, onBeforeStart, onStart, onCommit, onEnd, edge } = opts;
   const horiz = axis === 'x';
   const posProp = horiz ? 'offsetLeft' : 'offsetTop';
   const sizeProp = horiz ? 'offsetWidth' : 'offsetHeight';
@@ -4421,11 +5343,20 @@ function makeLiveSortable(opts) {
     e.preventDefault();
     e.stopPropagation();
 
+    const relInItem = e.clientY - item.getBoundingClientRect().top;
+    if (onBeforeStart) onBeforeStart();
+    if (!horiz) {
+      const clampedRel = Math.max(0, Math.min(item[sizeProp], relInItem));
+      const dy = item.getBoundingClientRect().top - (e.clientY - clampedRel);
+      if (Math.abs(dy) > 1) window.scrollBy(0, dy);
+    }
+
     if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     const rectC = () => container.getBoundingClientRect();
     const ptr = (ev) => horiz ? (ev.clientX - rectC().left + container.scrollLeft)
                               : (ev.clientY - rectC().top);
-    const grab = ptr(e) - item[posProp];
+    const grab = horiz ? (ptr(e) - item[posProp])
+                       : Math.max(0, Math.min(item[sizeProp], relInItem));
     const startOrder = [...container.querySelectorAll(itemSelector)];
     item.style.transition = 'none';
     item.classList.add('sorting');
@@ -4534,7 +5465,24 @@ function makeLiveSortable(opts) {
       checkSwapsAndPlace(ev);
     };
 
+    let collapseSyncRaf = 0;
+    const collapseSyncStart = performance.now();
+    const syncDuringCollapse = () => {
+      collapseSyncRaf = 0;
+      const d = ptr(lastEv) - grab - item[posProp];
+      if (item.style.transform || Math.abs(d) > 0.5) {
+        item.style.transform = tx(d);
+      }
+      if (container.querySelector('.is-collapsing') && performance.now() - collapseSyncStart < 250) {
+        collapseSyncRaf = requestAnimationFrame(syncDuringCollapse);
+      }
+    };
+
     const onUp = () => {
+      if (collapseSyncRaf) {
+        cancelAnimationFrame(collapseSyncRaf);
+        collapseSyncRaf = 0;
+      }
       if (autoScrollTimer) {
         clearTimeout(autoScrollTimer);
         autoScrollTimer = null;
@@ -4546,22 +5494,45 @@ function makeLiveSortable(opts) {
       window.removeEventListener('pointercancel', onUp);
       try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
 
-      item.style.transition = reduced ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      let moveDist = 0;
+      if (item.style.transform) {
+        const m = new DOMMatrix(getComputedStyle(item).transform);
+        moveDist = Math.hypot(m.m41, m.m42);
+      }
+      if (!reduced && moveDist >= 0.5) void item.offsetWidth;
+      item.style.transition = (reduced || moveDist < 0.5) ? 'none' : 'transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)';
       item.style.transform = '';
       let done = false;
+      let finishTimer = null;
+      const onTrEnd = (ev) => {
+        if (ev.target === item && ev.propertyName === 'transform') finish();
+      };
       const finish = () => {
         if (done) return;
         done = true;
+        item.removeEventListener('transitionend', onTrEnd);
+        if (finishTimer) clearTimeout(finishTimer);
         item.style.transition = '';
         item.classList.remove('sorting');
         siblings().forEach(el => { el.style.transition = ''; el.style.transform = ''; });
         const now = [...container.querySelectorAll(itemSelector)];
         if (now.some((el, i) => el !== startOrder[i]) && onCommit) onCommit(now);
+        if (onEnd) onEnd();
       };
-      item.addEventListener('transitionend', finish, { once: true });
-      setTimeout(finish, 260);
+      if (reduced || moveDist < 0.5) {
+        finish();
+        return;
+      }
+      item.addEventListener('transitionend', onTrEnd);
+      finishTimer = setTimeout(finish, 260);
     };
 
+    if (!horiz && Math.abs(ptr(e) - grab - item[posProp]) > 1) {
+      place();
+    }
+    if (!horiz && container.querySelector('.is-collapsing')) {
+      collapseSyncRaf = requestAnimationFrame(syncDuringCollapse);
+    }
     window.addEventListener('pointermove', onMove, { passive: false });
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
@@ -4575,12 +5546,17 @@ function initModuleReordering() {
   container.querySelectorAll('.module-dragger').forEach(dragger => {
     const box = dragger.closest('.module-box');
     if (!box) return;
+    const header = box.querySelector(':scope > .module-header') || dragger;
     makeLiveSortable({
       container,
       itemSelector: '.module-box[data-module]',
-      handle: dragger,
+      handle: header,
       item: box,
       axis: 'y',
+      ignore: (e) => {
+        if (isMobileViewport() && document.body.classList.contains('reorder-modules')) return false;
+        return !e.target.closest('.module-dragger');
+      },
       onStart: () => { isDraggingModule = true; draggedModuleBox = box; },
       onCommit: () => {
         updateDraggerNumbers();
@@ -4590,10 +5566,12 @@ function initModuleReordering() {
           lastSentModuleOrder = orderStr;
           wsTx({ t: 'module_order', order: order });
         }
+      },
+      onEnd: () => {
+        isDraggingModule = false;
+        draggedModuleBox = null;
       }
     });
-    dragger.addEventListener('pointerup', () => { isDraggingModule = false; draggedModuleBox = null; });
-    dragger.addEventListener('pointercancel', () => { isDraggingModule = false; draggedModuleBox = null; });
   });
 }
 
@@ -4631,23 +5609,34 @@ let activeInputSource   = 1;
 
 function setInputSource(src) {
   selectedInputSource = src;
-  activeInputSource = src;
+  if (isMockMode) activeInputSource = src;
   updateInputSourceUI();
   wsTx({ t: 'input_source', source: src });
 }
 
 function updateInputSourceUI() {
-  const isAux  = (selectedInputSource === 1);
-  const isBt   = (selectedInputSource === 2);
-  const isWifi = (selectedInputSource === 3);
-
-  const btnAux  = document.getElementById('btn-src-1');
-  const btnBt   = document.getElementById('btn-src-2');
-  const btnWifi = document.getElementById('btn-src-3');
-
-  if (btnAux)  btnAux.classList.toggle('active', isAux);
-  if (btnBt)   btnBt.classList.toggle('active', isBt);
-  if (btnWifi) btnWifi.classList.toggle('active', isWifi);
+  [1, 2, 3].forEach(idx => {
+    const isSel = (selectedInputSource === idx);
+    const isAct = (activeInputSource === idx);
+    const btn   = document.getElementById(`btn-src-${idx}`);
+    const badge = document.getElementById(`badge-src-${idx}`);
+    if (btn) {
+      btn.classList.toggle('active', isSel);
+      btn.setAttribute('aria-pressed', isSel ? 'true' : 'false');
+    }
+    if (badge) {
+      if (isSel && !isAct) {
+        badge.textContent = 'Switching...';
+        badge.className = 'input-card-badge visible pending';
+      } else if (isAct) {
+        badge.textContent = 'Active';
+        badge.className = 'input-card-badge visible';
+      } else {
+        badge.textContent = '';
+        badge.className = 'input-card-badge';
+      }
+    }
+  });
 
   updateWiFiModuleVisibility();
 }
@@ -4757,6 +5746,10 @@ class Knob {
     this._drag = false;
     this._y0   = 0;
     this._v0   = 0;
+    this._lastTapTime = 0;
+    this._touchMoved = false;
+    this._touchStartX = 0;
+    this._touchStartY = 0;
 
     this._onMove = (e) => {
       if (!this._drag) return;
@@ -4773,18 +5766,39 @@ class Knob {
     };
 
     this._onTouchMove = (e) => {
-      if (!this._drag) return;
+      if (!this._drag || !e.touches.length) return;
       e.preventDefault();
-      this._mm(e.touches[0].clientY, false);
+      const t = e.touches[0];
+      if (!this._touchMoved) {
+        if (Math.hypot(t.clientX - this._touchStartX, t.clientY - this._touchStartY) >= 6) {
+          this._touchMoved = true;
+        }
+      }
+      if (this._touchMoved) {
+        this._mm(t.clientY, false);
+      }
     };
 
-    this._onTouchEnd = () => {
+    this._onTouchEnd = (e) => {
       if (!this._drag) return;
       this._drag = false;
       window.removeEventListener('touchmove', this._onTouchMove);
       window.removeEventListener('touchend', this._onTouchEnd);
-      if (this.onApply) this.onApply(this.value);
-      else if (this.onEnd) this.onEnd(this.value);
+      window.removeEventListener('touchcancel', this._onTouchEnd);
+      const isCancel = e && e.type === 'touchcancel';
+      const now = performance.now();
+      if (!isCancel && !this._touchMoved && (now - this._lastTapTime) < 320) {
+        this._lastTapTime = 0;
+        this.set(this.defaultVal, true);
+      } else if (!isCancel && !this._touchMoved) {
+        this._lastTapTime = now;
+      } else {
+        this._lastTapTime = 0;
+      }
+      if (!isCancel) {
+        if (this.onApply) this.onApply(this.value);
+        else if (this.onEnd) this.onEnd(this.value);
+      }
     };
 
     const isKnobLocked = () => !!svg.closest('body.reorder-bands .band-card:not(.eq-row-desktop), #bands-container.select-mode .band-card:not(.eq-row-desktop)');
@@ -4813,14 +5827,78 @@ class Knob {
     }, { passive: false });
 
     svg.addEventListener('touchstart', e => {
-      if (isKnobLocked()) return;
+      if (isKnobLocked() || !e.touches.length) return;
       e.preventDefault();
-      this._md(e.touches[0].clientY);
+      const t = e.touches[0];
+      this._touchStartX = t.clientX;
+      this._touchStartY = t.clientY;
+      this._touchMoved = false;
+      this._md(t.clientY);
       window.addEventListener('touchmove', this._onTouchMove, { passive: false });
       window.addEventListener('touchend', this._onTouchEnd);
+      window.addEventListener('touchcancel', this._onTouchEnd);
     }, { passive: false });
 
-    this.draw();
+    svg.setAttribute('tabindex', '0');
+    svg.setAttribute('role', 'slider');
+    svg.setAttribute('aria-valuemin', String(this.min));
+    svg.setAttribute('aria-valuemax', String(this.max));
+    svg.setAttribute('aria-valuenow', String(this.value));
+    const podLbl = svg.parentElement?.querySelector('.badge-lbl');
+    if (podLbl && podLbl.textContent) {
+      svg.setAttribute('aria-label', podLbl.textContent.trim());
+    }
+
+    svg.addEventListener('dblclick', e => {
+      if (isKnobLocked()) return;
+      e.preventDefault();
+      this.set(this.defaultVal, true);
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    });
+
+    const podBadge = svg.parentElement?.querySelector('.card-val-badge');
+    if (podBadge) {
+      podBadge.addEventListener('dblclick', e => {
+        if (isKnobLocked()) return;
+        e.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        this.set(this.defaultVal, true);
+        if (this.onApply) this.onApply(this.value);
+        else if (this.onEnd) this.onEnd(this.value);
+        podBadge.querySelector('input.badge-val-input')?.blur();
+      });
+    }
+
+    svg.addEventListener('keydown', e => {
+      if (isKnobLocked()) return;
+      if (e.key === 'Home') {
+        e.preventDefault();
+        this.set(this.defaultVal, true);
+        if (this.onApply) this.onApply(this.value);
+        else if (this.onEnd) this.onEnd(this.value);
+        return;
+      }
+      const dir = (e.key === 'ArrowUp' || e.key === 'ArrowRight') ? 1 : ((e.key === 'ArrowDown' || e.key === 'ArrowLeft') ? -1 : 0);
+      if (!dir) return;
+      e.preventDefault();
+      if (this.step && this.step > 0) {
+        this.set(this.value + dir * this.step, true);
+      } else if (this.logScale) {
+        const factor = Math.pow(e.shiftKey ? 1.008 : 1.025, dir);
+        this.set(this.value * factor, true);
+      } else {
+        const step = (this.max - this.min) / (e.shiftKey ? 400 : 100);
+        this.set(this.value + dir * step, true);
+      }
+      if (this.onApply) this.onApply(this.value);
+      else if (this.onEnd) this.onEnd(this.value);
+    });
+
+    this._animAngle   = null;
+    this._targetAngle = null;
+    this._rafId       = null;
+    this.draw(false);
   }
 
   configure(opts) {
@@ -4828,8 +5906,14 @@ class Knob {
     if (this.defaultVal === undefined) {
       this.defaultVal = this.centerZero ? 0 : this.min;
     }
+    this.el.setAttribute('aria-valuemin', String(this.min));
+    this.el.setAttribute('aria-valuemax', String(this.max));
     this.set(this.value, false);
     return this;
+  }
+
+  _isCoarseStepped() {
+    return !!(this.step && this.step > 0 && ((this.max - this.min) / this.step) <= 16);
   }
 
   _md(y) {
@@ -4847,7 +5931,7 @@ class Knob {
       const curT  = Math.log(this._v0 / this.min) / range;
       const newT  = Math.max(0, Math.min(1, curT + dy / sens));
       this.set(this.min * Math.exp(newT * range), true);
-    } else if (this.step && this.step > 0) {
+    } else if (this._isCoarseStepped()) {
       const sens = 120;
       const range = this.max - this.min;
       const rawV = this._v0 + dy * range / sens;
@@ -4865,9 +5949,11 @@ class Knob {
     if (this.step && this.step > 0) {
       clamped = Math.round((clamped - this.min) / this.step) * this.step + this.min;
     }
-    this.value = +clamped.toFixed(this.decimals + 1);
-    this.draw();
-    if (isSlide) {
+    const nextVal = +clamped.toFixed(this.decimals + 1);
+    const changed = Math.abs(nextVal - this.value) > 1e-6;
+    this.value = nextVal;
+    this.draw(true);
+    if (isSlide && (changed || !(this.step && this.step > 0))) {
       if (this.onSlide) this.onSlide(this.value);
       else if (this.onChange) this.onChange(this.value);
     }
@@ -4881,21 +5967,11 @@ class Knob {
       clamped = Math.round((clamped - this.min) / this.step) * this.step + this.min;
     }
     this.value = +clamped.toFixed(this.decimals + 1);
-    this.draw();
+    this.draw(true);
     return this;
   }
 
-  draw() {
-    let t = 0;
-    if (this.logScale) {
-      t = Math.log(this.value / this.min) / Math.log(this.max / this.min);
-    } else {
-      t = (this.value - this.min) / (this.max - this.min);
-    }
-    t = Math.max(0, Math.min(1, t));
-
-    const vA = this.SA + t * this.SWP;
-
+  _renderAngle(vA) {
     const notchR1 = Math.max(2, this.rDisc - 13);
     const notchR2 = Math.max(4, this.rDisc - 2);
     const x1 = this.cx + notchR1 * Math.cos(vA);
@@ -4908,6 +5984,73 @@ class Knob {
       this._notchEl.setAttribute('x2', x2.toFixed(2));
       this._notchEl.setAttribute('y2', y2.toFixed(2));
     }
+  }
+
+  draw(animate = true) {
+    let t = 0;
+    if (this.logScale) {
+      t = Math.log(this.value / this.min) / Math.log(this.max / this.min);
+    } else {
+      t = (this.value - this.min) / (this.max - this.min);
+    }
+    t = Math.max(0, Math.min(1, t));
+
+    const vA = this.SA + t * this.SWP;
+    if (this.el) {
+      this.el.setAttribute('aria-valuenow', String(this.value));
+    }
+
+    const isCoarseStepped = this._isCoarseStepped();
+    const shouldAnimate = animate && !REDUCED_MOTION.matches && this._animAngle !== null && (isCoarseStepped || !this._drag);
+
+    if (!shouldAnimate) {
+      if (this._rafId) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+      }
+      this._animAngle = vA;
+      this._targetAngle = vA;
+      this._renderAngle(vA);
+      return;
+    }
+
+    if (this._targetAngle !== null && Math.abs(vA - this._targetAngle) < 0.0005) {
+      if (!this._rafId) {
+        this._animAngle = vA;
+        this._renderAngle(vA);
+      }
+      return;
+    }
+
+    this._targetAngle = vA;
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+
+    const startA = this._animAngle;
+    const diffA = vA - startA;
+    if (Math.abs(diffA) < 0.002) {
+      this._animAngle = vA;
+      this._renderAngle(vA);
+      return;
+    }
+
+    const startT = performance.now();
+    const dur = 95;
+    const stepAnim = (now) => {
+      const p = Math.max(0, Math.min(1, (now - startT) / dur));
+      const ease = 1 - Math.pow(1 - p, 3);
+      this._animAngle = startA + diffA * ease;
+      this._renderAngle(this._animAngle);
+      if (p < 1) {
+        this._rafId = requestAnimationFrame(stepAnim);
+      } else {
+        this._animAngle = vA;
+        this._rafId = null;
+      }
+    };
+    this._rafId = requestAnimationFrame(stepAnim);
   }
 }
 
@@ -5079,6 +6222,17 @@ function bandMagAt(b, f) {
   return Math.max(-60, Math.min(30, m));
 }
 
+function evalSubsonicMagAt(f) {
+  if (!dspProcessingEnabled || !subsonicParams.enabled || subsonicParams.subEnabled === false) return 0;
+  const order = subsonicParams.order || 2;
+  if (order < 1 || order > 4) return 0;
+  const freq = subsonicParams.freq || 80;
+  if (order === 1) return Math.max(-60, Math.min(30, eval1stOrderHP(freq, f)));
+  if (order === 3) return Math.max(-60, Math.min(30, eval1stOrderHP(freq, f) + singleBiquadMag(4, freq, 0, 1.0, f)));
+  if (order === 4) return Math.max(-60, Math.min(30, singleBiquadMag(4, freq, 0, 1.30656296, f) + singleBiquadMag(4, freq, 0, 0.5411961, f)));
+  return Math.max(-60, Math.min(30, singleBiquadMag(4, freq, 0, Math.SQRT1_2, f)));
+}
+
 function totalMagAt(f) {
   return eqPreamp + bands.reduce((s, b) => s + bandMagAt(b, f), 0);
 }
@@ -5106,7 +6260,7 @@ function autoPreamp() {
   let target = -peak;
   target = Math.round(target * 10) / 10;
   if (Math.abs(target) < 0.05) target = 0.0;
-  target = Math.max(-18, Math.min(18, target));
+  target = Math.max(-24, Math.min(24, target));
 
   eqPreamp = target;
   updatePreampUI();
@@ -5199,9 +6353,49 @@ function drawResponse() {
   });
 
   const pts = [];
+  let hasClipping = false;
   for (let k = 0; k <= NPTS; k++) {
     const f = F0 * Math.pow(F1 / F0, k / NPTS);
-    pts.push({ x: f2x(f, W), y: db2y(totalMagAt(f), H) });
+    const db = totalMagAt(f);
+    if (eqEnabled && db > 0.15) hasClipping = true;
+    pts.push({ x: f2x(f, W), y: db2y(db, H), db });
+  }
+
+  const autoBtnDesk = document.getElementById('btn-preamp-auto');
+  const autoBtnMob  = document.getElementById('btn-action-auto');
+  if (autoBtnDesk) autoBtnDesk.classList.toggle('clipping-warn', hasClipping);
+  if (autoBtnMob)  autoBtnMob.classList.toggle('clipping-warn', hasClipping);
+
+  if (hasClipping && eqEnabled) {
+    c.save();
+    c.beginPath();
+    c.rect(0, 0, W, zY);
+    c.clip();
+    c.beginPath();
+    c.moveTo(pts[0].x, zY);
+    pts.forEach(p => c.lineTo(p.x, p.y));
+    c.lineTo(pts[pts.length - 1].x, zY);
+    c.closePath();
+    c.fillStyle = isDarkTheme() ? 'rgba(191, 97, 106, 0.30)' : 'rgba(169, 68, 78, 0.24)';
+    c.fill();
+    c.restore();
+  }
+
+  if (dspProcessingEnabled && subsonicParams.enabled && subsonicParams.subEnabled !== false && (subsonicParams.order || 2) >= 1) {
+    c.save();
+    c.beginPath();
+    for (let k = 0; k <= NPTS; k++) {
+      const f = F0 * Math.pow(F1 / F0, k / NPTS);
+      const subDb = evalSubsonicMagAt(f) + (eqEnabled ? totalMagAt(f) : 0);
+      const sx = f2x(f, W), sy = db2y(subDb, H);
+      if (k === 0) c.moveTo(sx, sy);
+      else c.lineTo(sx, sy);
+    }
+    c.setLineDash([4 * DPR, 3 * DPR]);
+    c.strokeStyle = isDarkTheme() ? 'rgba(136, 192, 208, 0.85)' : 'rgba(76, 111, 152, 0.78)';
+    c.lineWidth = 1.8 * DPR;
+    c.stroke();
+    c.restore();
   }
 
   c.beginPath();
@@ -5215,8 +6409,9 @@ function drawResponse() {
     const x = f2x(b.freq, W);
     const y = db2y(totalMagAt(b.freq), H);
     const bandColor = getBandColor(b, i);
+    const nodeR = (window.innerWidth <= 680 ? 7.5 : 8.5) * DPR;
     c.beginPath();
-    c.arc(x, y, (window.innerWidth <= 680 ? 3 : 4.5) * DPR, 0, Math.PI * 2);
+    c.arc(x, y, nodeR, 0, Math.PI * 2);
     if (eqEnabled) {
       c.fillStyle   = b.enabled ? bandColor : cv('--cv-off');
       c.strokeStyle = cv('--cv-node-stroke');
@@ -5227,6 +6422,14 @@ function drawResponse() {
     c.lineWidth   = 1.5 * DPR;
     c.fill();
     c.stroke();
+
+    c.save();
+    c.font = `700 ${(window.innerWidth <= 680 ? 8.5 : 9.5) * DPR}px ui-monospace, SFMono-Regular, monospace`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillStyle = (eqEnabled && b.enabled) ? '#2E3440' : cv('--cv-tip-text-strong');
+    c.fillText(String(i + 1), x, y + 0.5 * DPR);
+    c.restore();
   });
 
   [-18, -12, -6, 0, 6, 12, 18].forEach(db => {
@@ -5385,10 +6588,21 @@ function applyGraphPos(d, x, y, rect) {
 }
 
 fCanvas.addEventListener('pointerdown', (e) => {
-  if (window.innerWidth <= 680) return;
-  if (e.button !== 0 && e.button !== 1) return;
   const rect = fCanvas.getBoundingClientRect();
   const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  if (window.innerWidth <= 680) {
+    const hitIdx = graphHitBand(px, py);
+    if (hitIdx >= 0) {
+      const card = document.getElementById(`band-card-${hitIdx}`);
+      const root = document.getElementById('bands-container');
+      if (card && root) {
+        const targetLeft = Math.max(0, card.offsetLeft - (root.clientWidth - card.offsetWidth) / 2);
+        root.scrollTo({ left: targetLeft, behavior: REDUCED_MOTION.matches ? 'auto' : 'smooth' });
+      }
+    }
+    return;
+  }
+  if (e.button !== 0 && e.button !== 1) return;
   const i = graphHitBand(px, py);
   if (i < 0) return;
   e.preventDefault();
@@ -5514,9 +6728,13 @@ function toggleBandMenu(i, event) {
   const wasOpen = wrap.classList.contains('open');
   document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
     w.classList.remove('open');
+    const b = w.querySelector('.band-type-menu-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
   });
   if (!wasOpen) {
     wrap.classList.add('open');
+    const btn = wrap.querySelector('.band-type-menu-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'true');
   }
 }
 
@@ -5524,6 +6742,8 @@ document.addEventListener('click', (e) => {
   if (!e.target.closest('.band-type-menu-wrap')) {
     document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
       w.classList.remove('open');
+      const b = w.querySelector('.band-type-menu-btn');
+      if (b) b.setAttribute('aria-expanded', 'false');
     });
   }
 });
@@ -5538,6 +6758,8 @@ function selectBandFilter(i, type) {
 
   document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
     w.classList.remove('open');
+    const btn = w.querySelector('.band-type-menu-btn');
+    if (btn) btn.setAttribute('aria-expanded', 'false');
   });
 
   updateBandCardParamStates(i);
@@ -5587,7 +6809,7 @@ function updateBandCardParamStates(i) {
     if (gSlider) gSlider.value = 0;
 
     if (qBadgeLbl) qBadgeLbl.textContent = 'SLOPE';
-    if (qUnitSpan) qUnitSpan.textContent = 'dB/oct';
+    if (qUnitSpan) qUnitSpan.textContent = isDeskRow ? 'dB/oct' : 'dB';
     if (qNumInput) {
       qNumInput.min = '6';
       qNumInput.max = '24';
@@ -5596,7 +6818,7 @@ function updateBandCardParamStates(i) {
     }
     if (bandKnobs[i] && bandKnobs[i].qKnob) {
       bandKnobs[i].qKnob.configure({
-        min: 6, max: 24, step: 6, decimals: 0,
+        min: 6, max: 24, step: 6, defaultVal: 12, decimals: 0,
         value: Math.max(1, b.order || 2) * 6
       });
     }
@@ -5616,7 +6838,7 @@ function updateBandCardParamStates(i) {
     }
     if (bandKnobs[i] && bandKnobs[i].qKnob) {
       bandKnobs[i].qKnob.configure({
-        min: 0.1, max: 8.0, step: null, decimals: 2,
+        min: 0.1, max: 8.0, step: null, defaultVal: 0.707, decimals: 2,
         value: b.q
       });
     }
@@ -5652,13 +6874,34 @@ function updateDesktopDeleteBtnUI() {
   const delDeskBtn = document.getElementById('btn-delete-bands-desk');
   if (!delDeskBtn) return;
   const count = selectedBandIndices.size;
+  const lbl = delDeskBtn.querySelector('span');
   if (count > 0) {
+    if (lbl) lbl.textContent = `Delete (${count})`;
     delDeskBtn.classList.add('visible');
     delDeskBtn.disabled = count >= bands.length;
   } else {
+    if (lbl) lbl.textContent = 'Delete';
     delDeskBtn.classList.remove('visible');
     delDeskBtn.disabled = false;
   }
+}
+
+let _eqScrollAnchorRaf = 0;
+function syncEqScrollRightAnchor(root, distFromRight) {
+  if (_eqScrollAnchorRaf) {
+    cancelAnimationFrame(_eqScrollAnchorRaf);
+    _eqScrollAnchorRaf = 0;
+  }
+  if (!root || distFromRight === null || distFromRight >= 160) return;
+  const start = performance.now();
+  const tick = () => {
+    _eqScrollAnchorRaf = 0;
+    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
+    if (performance.now() - start < 260) {
+      _eqScrollAnchorRaf = requestAnimationFrame(tick);
+    }
+  };
+  tick();
 }
 
 function enterSelectMode() {
@@ -5672,9 +6915,7 @@ function enterSelectMode() {
   if (root) root.classList.add('select-mode');
   syncMobileCardInteractiveState();
   updateSelectionUI();
-  if (root && distFromRight !== null && distFromRight < 160) {
-    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
-  }
+  syncEqScrollRightAnchor(root, distFromRight);
 }
 
 function exitSelectMode() {
@@ -5688,9 +6929,7 @@ function exitSelectMode() {
   syncMobileCardInteractiveState();
   updateActionCardButtons();
   updateDesktopDeleteBtnUI();
-  if (root && distFromRight !== null && distFromRight < 160) {
-    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
-  }
+  syncEqScrollRightAnchor(root, distFromRight);
 }
 
 function toggleBandSelection(index) {
@@ -5774,12 +7013,159 @@ function handleActionBottomClick() {
   }
 }
 
+const EQ_TOAST_DURATION = 6000;
+let lastDeletedBandsSnapshot = null;
+let eqUndoTimer = null;
+let eqToastRemainingMs = 0;
+let eqToastDeadline = 0;
+let eqToastPaused = false;
+let eqToastHovered = false;
+let eqToastTouchDown = false;
+let eqToastListenersBound = false;
+
+function scheduleEqToastDismiss(delayMs) {
+  clearTimeout(eqUndoTimer);
+  const wait = Math.max(0, delayMs);
+  eqToastRemainingMs = wait;
+  eqToastDeadline = performance.now() + wait;
+  eqUndoTimer = setTimeout(dismissEqToast, wait);
+}
+
+function pauseEqToastTimer() {
+  if (eqToastPaused) return;
+  const toast = document.getElementById('eq-undo-toast');
+  if (!toast || !toast.classList.contains('visible')) return;
+  eqToastPaused = true;
+  if (eqUndoTimer) {
+    clearTimeout(eqUndoTimer);
+    eqUndoTimer = null;
+  }
+  if (eqToastDeadline > 0) {
+    eqToastRemainingMs = Math.max(0, eqToastDeadline - performance.now());
+  }
+}
+
+function resumeEqToastTimer() {
+  if (!eqToastPaused) return;
+  const toast = document.getElementById('eq-undo-toast');
+  if (!toast || !toast.classList.contains('visible')) {
+    eqToastPaused = false;
+    return;
+  }
+  if (eqToastHovered || eqToastTouchDown || toast.contains(document.activeElement)) return;
+  eqToastPaused = false;
+  scheduleEqToastDismiss(Math.max(1500, eqToastRemainingMs));
+}
+
+function bindEqToastListeners(toast) {
+  if (eqToastListenersBound || !toast) return;
+  eqToastListenersBound = true;
+  toast.addEventListener('pointerenter', (e) => {
+    if (e.pointerType !== 'touch') {
+      eqToastHovered = true;
+      pauseEqToastTimer();
+    }
+  });
+  toast.addEventListener('pointerleave', (e) => {
+    if (e.pointerType !== 'touch') {
+      eqToastHovered = false;
+      resumeEqToastTimer();
+    }
+  });
+  toast.addEventListener('focusin', pauseEqToastTimer);
+  toast.addEventListener('focusout', (e) => {
+    if (!e.relatedTarget || !toast.contains(e.relatedTarget)) {
+      resumeEqToastTimer();
+    }
+  });
+  toast.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') {
+      eqToastTouchDown = true;
+      pauseEqToastTimer();
+    }
+  });
+  const endTouchPause = () => {
+    if (!eqToastTouchDown) return;
+    eqToastTouchDown = false;
+    resumeEqToastTimer();
+  };
+  toast.addEventListener('pointerup', endTouchPause);
+  toast.addEventListener('pointercancel', endTouchPause);
+}
+
+function showEqToast(text, snapshot) {
+  const toast = document.getElementById('eq-undo-toast');
+  const txtEl = document.getElementById('eq-undo-text');
+  const undoBtn = document.getElementById('eq-undo-btn');
+  if (!toast || !txtEl) return;
+  bindEqToastListeners(toast);
+  lastDeletedBandsSnapshot = snapshot || null;
+  txtEl.textContent = text;
+  if (undoBtn) undoBtn.style.display = snapshot ? 'inline-flex' : 'none';
+  toast.setAttribute('aria-hidden', 'false');
+  toast.classList.add('visible');
+  eqToastPaused = false;
+  eqToastRemainingMs = EQ_TOAST_DURATION;
+  eqToastDeadline = performance.now() + EQ_TOAST_DURATION;
+  if (eqToastHovered || eqToastTouchDown || toast.contains(document.activeElement)) {
+    eqToastPaused = true;
+    clearTimeout(eqUndoTimer);
+    eqUndoTimer = null;
+  } else {
+    scheduleEqToastDismiss(EQ_TOAST_DURATION);
+  }
+}
+
+function dismissEqToast() {
+  const toast = document.getElementById('eq-undo-toast');
+  if (toast) {
+    if (toast.contains(document.activeElement)) {
+      document.activeElement.blur();
+    }
+    toast.classList.remove('visible');
+    toast.setAttribute('aria-hidden', 'true');
+  }
+  clearTimeout(eqUndoTimer);
+  eqUndoTimer = null;
+  eqToastPaused = false;
+  eqToastHovered = false;
+  eqToastTouchDown = false;
+  eqToastRemainingMs = 0;
+  eqToastDeadline = 0;
+  lastDeletedBandsSnapshot = null;
+}
+
+function undoBandDelete() {
+  if (!Array.isArray(lastDeletedBandsSnapshot) || !lastDeletedBandsSnapshot.length) return;
+  const restored = lastDeletedBandsSnapshot.map((b, idx) => ({ ...b, band: idx }));
+  const prevLen = bands.length;
+  bands = restored;
+  dismissEqToast();
+  for (let k = prevLen; k < bands.length; k++) {
+    const nb = bands[k];
+    wsTx({
+      t: 'add_band',
+      freq: nb.freq,
+      gain: nb.gain,
+      q: nb.q,
+      type: nb.type || 0,
+      order: nb.order || 2
+    });
+  }
+  rebuildBandsUI();
+  bands.forEach((_, idx) => sendBand(idx));
+  requestDrawResponse();
+}
+
 function deleteSelectedBands() {
   if (selectedBandIndices.size === 0) return;
   if (selectedBandIndices.size >= bands.length) {
-    alert("Cannot remove all bands. At least 1 band must remain.");
+    showEqToast("At least 1 band must remain", null);
     return;
   }
+
+  const snapshot = bands.map(b => ({ ...b }));
+  const delCount = selectedBandIndices.size;
 
   const wasDeskDeleteVisible = !!document.getElementById('btn-delete-bands-desk')?.classList.contains('visible');
   const toDeleteAsc = Array.from(selectedBandIndices).sort((a, b) => a - b);
@@ -5803,9 +7189,14 @@ function deleteSelectedBands() {
   rebuildBandsUI({ exitingClones, animateHideDeskDelete: wasDeskDeleteVisible });
   bands.forEach((_, idx) => sendBand(idx));
   requestDrawResponse();
+  showEqToast(delCount === 1 ? 'Band removed' : `${delCount} bands removed`, snapshot);
 }
 
 function rebuildBandsUI(opts = {}) {
+  if (_eqScrollAnchorRaf) {
+    cancelAnimationFrame(_eqScrollAnchorRaf);
+    _eqScrollAnchorRaf = 0;
+  }
   const root = document.getElementById('bands-container');
   if (!root) return;
   const prevScrollLeft = root.scrollLeft;
@@ -5856,8 +7247,9 @@ function rebuildBandsUI(opts = {}) {
         </div>
         <div class="band-type-row eq-row-type">
           <div class="band-type-menu-wrap" id="band-type-wrap-${i}">
-            <button type="button" class="band-type-menu-btn" id="type-btn-${i}" onclick="toggleBandMenu(${i}, event)">
+            <button type="button" class="band-type-menu-btn" id="type-btn-${i}" aria-expanded="false" onclick="toggleBandMenu(${i}, event)">
               <span id="type-btn-label-${i}">${currentLabel}</span>
+              <span class="type-btn-caret" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
             </button>
             <div class="band-type-dropdown" id="band-type-menu-${i}">
               <div class="band-menu-opt ${b.type === 0 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 0)">Peaking</div>
@@ -5870,40 +7262,42 @@ function rebuildBandsUI(opts = {}) {
         </div>
         <div class="eq-row-field" id="f-col-${i}">
           <span class="eq-row-lbl">Frequency</span>
-          <div class="eq-scrub-box" id="scrub-box-f-${i}" title="Click to type, drag up/down to adjust">
-            <input type="text" inputmode="decimal" id="num-f-${i}" class="eq-scrub-input" value="${Math.round(b.freq)}">
+          <div class="eq-scrub-box" id="scrub-box-f-${i}" title="Click to type, drag up/down to adjust, double-click to reset">
+            <input type="text" inputmode="decimal" id="num-f-${i}" class="eq-scrub-input" aria-label="Band ${i + 1} Frequency (Hz)" value="${Math.round(b.freq)}">
             <span class="eq-scrub-unit">Hz</span>
           </div>
         </div>
         <div class="eq-row-field" id="gain-col-${i}" ${isPass ? 'style="display:none;"' : ''}>
           <span class="eq-row-lbl">Gain</span>
-          <div class="eq-scrub-box" id="scrub-box-g-${i}" title="Click to type, drag up/down to adjust">
-            <input type="text" inputmode="decimal" id="num-g-${i}" class="eq-scrub-input" value="${b.gain.toFixed(1)}">
+          <div class="eq-scrub-box" id="scrub-box-g-${i}" title="Click to type, drag up/down to adjust, double-click to reset">
+            <input type="text" inputmode="decimal" id="num-g-${i}" class="eq-scrub-input" aria-label="Band ${i + 1} Gain (dB)" value="${b.gain.toFixed(1)}">
             <span class="eq-scrub-unit">dB</span>
           </div>
         </div>
         <div class="eq-row-field" id="q-col-${i}">
           <span class="eq-row-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
-          <div class="eq-scrub-box" id="scrub-box-q-${i}" title="Click to type, drag up/down to adjust">
-            <input type="text" inputmode="decimal" id="num-q-${i}" class="eq-scrub-input" value="${isPass ? ((b.order || 2) * 6) : b.q.toFixed(2)}">
+          <div class="eq-scrub-box" id="scrub-box-q-${i}" title="Click to type, drag up/down to adjust, double-click to reset">
+            <input type="text" inputmode="decimal" id="num-q-${i}" class="eq-scrub-input" aria-label="Band ${i + 1} ${isPass ? 'Slope' : 'Q'}" value="${isPass ? ((b.order || 2) * 6) : b.q.toFixed(2)}">
             <span class="eq-scrub-unit" id="unit-q-${i}">${isPass ? 'dB/oct' : ''}</span>
           </div>
         </div>
         <div class="eq-row-actions">
-          <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" type="button">
+          <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" aria-pressed="${b.enabled ? 'false' : 'true'}" type="button">
             <span>Bypass</span>
           </button>
-          <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" onclick="removeBand(${i})" type="button" ${bands.length <= 1 ? 'disabled' : ''}>
+          <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" aria-label="Remove Band ${i + 1}" onclick="removeBand(${i})" type="button" ${bands.length <= 1 ? 'disabled' : ''}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/>
               <line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           </button>
-          <input type="checkbox" class="eq-row-select-cb" id="band-select-desk-${i}" title="Select Band" ${selectedBandIndices.has(i) ? 'checked' : ''}>
+          <input type="checkbox" class="eq-row-select-cb" id="band-select-desk-${i}" aria-label="Select Band ${i + 1}" title="Select Band" ${selectedBandIndices.has(i) ? 'checked' : ''}>
         </div>
       `;
 
       const applyDesktopRowStyle = () => {
+        const bypBtn = row.querySelector(`#band-bypass-${i}`);
+        if (bypBtn) bypBtn.setAttribute('aria-pressed', b.enabled ? 'false' : 'true');
         if (b.enabled) {
           row.style.backgroundColor = cardBg;
           row.style.borderColor = bandCardBorder(hsl, bandColor);
@@ -5954,7 +7348,7 @@ function rebuildBandsUI(opts = {}) {
       const numF = row.querySelector(`#num-f-${i}`);
       const boxF = row.querySelector(`#scrub-box-f-${i}`);
       attachScrubInput(boxF, numF, {
-        min: 20, max: 20000, step: 1, logScale: true, pixels: 180,
+        min: 20, max: 20000, step: 1, defaultVal: () => getBandDefaultFreq(b, i), logScale: true, pixels: 180,
         format: v => String(Math.round(v)),
         getVal: () => b.freq,
         onSlide: v => {
@@ -5974,7 +7368,7 @@ function rebuildBandsUI(opts = {}) {
       const numG = row.querySelector(`#num-g-${i}`);
       const boxG = row.querySelector(`#scrub-box-g-${i}`);
       attachScrubInput(boxG, numG, {
-        min: -18, max: 18, step: 0.1, logScale: false, pixels: 150,
+        min: -18, max: 18, step: 0.1, defaultVal: 0, logScale: false, pixels: 150,
         format: v => v.toFixed(1),
         getVal: () => b.gain,
         onSlide: v => {
@@ -5997,8 +7391,8 @@ function rebuildBandsUI(opts = {}) {
       const boxQ = row.querySelector(`#scrub-box-q-${i}`);
       attachScrubInput(boxQ, numQ, {
         getConfig: () => (b.type === 3 || b.type === 4)
-          ? { min: 6, max: 24, step: 6, logScale: false, pixels: 110, format: v => String(Math.max(6, Math.min(24, Math.round(v / 6) * 6))) }
-          : { min: 0.1, max: 8.0, step: 0.01, logScale: false, pixels: 150, format: v => v.toFixed(2) },
+          ? { min: 6, max: 24, step: 6, defaultVal: 12, logScale: false, pixels: 110, format: v => String(Math.max(6, Math.min(24, Math.round(v / 6) * 6))) }
+          : { min: 0.1, max: 8.0, step: 0.01, defaultVal: 0.707, logScale: false, pixels: 150, format: v => v.toFixed(2) },
         getVal: () => (b.type === 3 || b.type === 4) ? (Math.max(1, b.order || 2) * 6) : b.q,
         onSlide: v => {
           if (b.type === 3 || b.type === 4) {
@@ -6061,7 +7455,7 @@ function rebuildBandsUI(opts = {}) {
     delDeskBtn.className = 'eq-delete-row-btn' + ((showDel || opts.animateHideDeskDelete) ? ' visible' : '');
     delDeskBtn.id = 'btn-delete-bands-desk';
     delDeskBtn.disabled = selectedBandIndices.size >= bands.length;
-    delDeskBtn.innerHTML = '<span>Delete</span>';
+    delDeskBtn.innerHTML = `<span>${showDel ? `Delete (${selectedBandIndices.size})` : 'Delete'}</span>`;
     delDeskBtn.addEventListener('click', () => deleteSelectedBands());
     root.appendChild(delDeskBtn);
     if (opts.animateHideDeskDelete && !showDel) {
@@ -6108,6 +7502,7 @@ function rebuildBandsUI(opts = {}) {
     const chk = document.createElement('input');
     chk.type = 'checkbox';
     chk.className = 'band-select-checkbox';
+    chk.setAttribute('aria-label', `Select Band ${i + 1}`);
     chk.checked = selectedBandIndices.has(i);
     chk.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -6163,10 +7558,11 @@ function rebuildBandsUI(opts = {}) {
     typeRow.className = 'band-type-row';
     const currentLabel = getBandTypeLabel(b.type);
     typeRow.innerHTML = `
+      <span class="band-card-num-badge" id="band-num-${i}">${i + 1}</span>
       <div class="band-type-menu-wrap" id="band-type-wrap-${i}">
-        <button type="button" class="band-type-menu-btn" id="type-btn-${i}" onclick="toggleBandMenu(${i}, event)">
+        <button type="button" class="band-type-menu-btn" id="type-btn-${i}" aria-expanded="false" onclick="toggleBandMenu(${i}, event)">
           <span id="type-btn-label-${i}">${currentLabel}</span>
-          <span class="type-btn-caret">v</span>
+          <span class="type-btn-caret" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
         </button>
         <div class="band-type-dropdown" id="band-type-menu-${i}">
           <div class="band-menu-opt ${b.type === 0 ? 'selected' : ''}" onclick="selectBandFilter(${i}, 0)">Peaking</div>
@@ -6187,12 +7583,12 @@ function rebuildBandsUI(opts = {}) {
     gainCol.id = `gain-col-${i}`;
     gainCol.innerHTML = `
       <div class="band-slider-wrap">
-        <input type="range" id="slider-g-${i}" class="band-vslider" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}" orient="vertical">
+        <input type="range" id="slider-g-${i}" class="band-vslider" aria-label="Band ${i + 1} Gain Slider" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}" orient="vertical">
       </div>
       <div class="card-val-badge">
         <span class="badge-lbl">Gain</span>
         <div class="badge-input-row">
-          <input type="number" id="num-g-${i}" class="badge-val-input" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}">
+          <input type="number" id="num-g-${i}" class="badge-val-input" aria-label="Band ${i + 1} Gain (dB)" min="-18" max="18" step="0.1" value="${b.gain.toFixed(1)}">
         </div>
       </div>
     `;
@@ -6210,8 +7606,8 @@ function rebuildBandsUI(opts = {}) {
       <div class="card-val-badge">
         <span class="badge-lbl" id="lbl-q-${i}">${isPass ? 'SLOPE' : 'Q'}</span>
         <div class="badge-input-row">
-          <input type="number" id="num-q-${i}" class="badge-val-input" min="${isPass ? '6' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? (Math.max(1, b.order || 2) * 6) : b.q.toFixed(2)}">
-          ${isPass ? '<span class="badge-unit">dB</span>' : ''}
+          <input type="number" id="num-q-${i}" class="badge-val-input" aria-label="Band ${i + 1} ${isPass ? 'Slope' : 'Q'}" min="${isPass ? '6' : '0.1'}" max="${isPass ? '24' : '8.0'}" step="${isPass ? '6' : '0.01'}" value="${isPass ? (Math.max(1, b.order || 2) * 6) : b.q.toFixed(2)}">
+          <span class="badge-unit" id="unit-q-${i}">${isPass ? 'dB' : ''}</span>
         </div>
       </div>
     `;
@@ -6225,7 +7621,7 @@ function rebuildBandsUI(opts = {}) {
       <div class="card-val-badge">
         <span class="badge-lbl">FREQ</span>
         <div class="badge-input-row">
-          <input type="number" id="num-f-${i}" class="badge-val-input" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
+          <input type="number" id="num-f-${i}" class="badge-val-input" aria-label="Band ${i + 1} Frequency (Hz)" min="20" max="20000" step="1" value="${Math.round(b.freq)}">
         </div>
       </div>
     `;
@@ -6238,7 +7634,7 @@ function rebuildBandsUI(opts = {}) {
     bottomRow.className = 'band-card-bottom-row';
     bottomRow.innerHTML = `
       <div class="band-card-bottom-col band-bottom-gain">
-        <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" type="button">
+        <button class="band-bypass-btn" id="band-bypass-${i}" title="Toggle Band Bypass" aria-label="Bypass Band ${i + 1}" aria-pressed="${b.enabled ? 'false' : 'true'}" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18.36 6.64a9 9 0 1 1-12.73 0M12 2v10"/>
           </svg>
@@ -6246,7 +7642,7 @@ function rebuildBandsUI(opts = {}) {
       </div>
       <div class="band-card-bottom-col band-bottom-knobs">
         ${bands.length > 1 ? `
-        <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" onclick="removeBand(${i})" type="button">
+        <button class="band-delete-btn" id="band-delete-${i}" title="Remove Band" aria-label="Remove Band ${i + 1}" onclick="removeBand(${i})" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -6258,6 +7654,7 @@ function rebuildBandsUI(opts = {}) {
 
     const applyBandCardStyle = () => {
       const bypassBtn = card.querySelector(`#band-bypass-${i}`);
+      if (bypassBtn) bypassBtn.setAttribute('aria-pressed', b.enabled ? 'false' : 'true');
       if (b.enabled) {
         card.style.backgroundColor = cardBg;
         card.style.borderColor = bandCardBorder(hsl, bandColor);
@@ -6289,7 +7686,7 @@ function rebuildBandsUI(opts = {}) {
     root.appendChild(card);
 
     const fKnob = new Knob(card.querySelector(`#knob-f-${i}`), {
-      min: 20, max: 20000, value: b.freq, defaultVal: b.freq,
+      min: 20, max: 20000, value: b.freq, defaultVal: getBandDefaultFreq(b, i),
       logScale: true, color: bandColor,
       decimals: 0,
       onSlide: v => {
@@ -6400,6 +7797,20 @@ function rebuildBandsUI(opts = {}) {
       requestDrawResponse();
     });
 
+    const resetBandGain = (e) => {
+      e.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      b.gain = 0;
+      gSlider.value = 0;
+      gNumInput.value = '0.0';
+      activeGainSliderBand = null;
+      sendBandThrottled(i, true);
+      requestDrawResponse();
+      gNumInput.blur();
+    };
+    gSlider.addEventListener('dblclick', resetBandGain);
+    gNumInput.closest('.card-val-badge')?.addEventListener('dblclick', resetBandGain);
+
     bandKnobs.push({ fKnob, qKnob });
     updateBandCardParamStates(i);
   });
@@ -6486,16 +7897,18 @@ function syncBandCardUI(i) {
     card.style.backgroundColor = cardBg;
     card.style.borderColor = bandCardBorder(hsl, bandColor);
     card.style.borderWidth = isDeskRow ? '2px' : '3px';
-    if (bypassBtn && !isDeskRow) {
-      bypassBtn.style.color = bandCardBorder(hsl, bandColor);
+    if (bypassBtn) {
+      bypassBtn.setAttribute('aria-pressed', 'false');
+      if (!isDeskRow) bypassBtn.style.color = bandCardBorder(hsl, bandColor);
     }
     card.classList.remove('band-bypassed');
   } else {
     card.style.backgroundColor = 'var(--nord5)';
     card.style.borderColor = 'var(--border-strong)';
     card.style.borderWidth = isDeskRow ? '2px' : '3px';
-    if (bypassBtn && !isDeskRow) {
-      bypassBtn.style.color = 'var(--muted)';
+    if (bypassBtn) {
+      bypassBtn.setAttribute('aria-pressed', 'true');
+      if (!isDeskRow) bypassBtn.style.color = 'var(--muted)';
     }
     card.classList.add('band-bypassed');
   }
@@ -6511,6 +7924,7 @@ function syncBandCardUI(i) {
 
 function addBand() {
   if (bands.length >= MAX_BANDS) return;
+  dismissEqToast();
 
   const candidateFreqs = [250, 500, 2000, 4000, 8000, 16000, 63, 125, 315];
   let nextFreq = 1000;
@@ -6527,6 +7941,7 @@ function addBand() {
   const newBand = {
     band: newIndex,
     freq: nextFreq,
+    defaultFreq: nextFreq,
     gain: 0.0,
     q: 0.707,
     type: 0,
@@ -6549,6 +7964,7 @@ function addBand() {
 
 function removeBand(index) {
   if (bands.length <= 1) return;
+  const snapshot = bands.map(b => ({ ...b }));
   const el = document.getElementById(`band-card-${index}`);
   const exitingClones = [];
   if (el) {
@@ -6564,6 +7980,7 @@ function removeBand(index) {
   wsTx({ t: 'remove_band', band: index });
   bands.forEach((_, i) => sendBand(i));
   requestDrawResponse();
+  showEqToast(`Band ${index + 1} removed`, snapshot);
 }
 
 function updateBypassUI(mod, enabled) {
@@ -6623,13 +8040,22 @@ function isModuleCollapsed(box) {
   return box.classList.contains('collapsed') || box.classList.contains('is-collapsing');
 }
 
-function setModuleCollapsed(box, want) {
+function setModuleCollapsed(box, want, immediate = false) {
   if (isModuleCollapsed(box) === want) return;
+  const hdr = box.querySelector(':scope > .module-header');
+  if (hdr) hdr.setAttribute('aria-expanded', want ? 'false' : 'true');
   const body = box.querySelector(':scope > .module-body');
   if (box._cleanupCollapse) { box._cleanupCollapse(false); }
-  if (!body || REDUCED_MOTION.matches) {
+  if (!body || immediate || REDUCED_MOTION.matches) {
     box.classList.remove('is-collapsing');
     box.classList.toggle('collapsed', want);
+    if (body) {
+      body.style.transition = '';
+      body.style.overflow = '';
+      body.style.height = '';
+      body.style.paddingTop = '';
+      body.style.paddingBottom = '';
+    }
     if (!want && box.id === 'mod-eq') requestDrawResponse();
     return;
   }
@@ -6732,6 +8158,7 @@ function setModuleCollapsed(box, want) {
 }
 
 function toggleModuleCollapse(mod) {
+  if (document.body.classList.contains('reorder-modules') && isMobileViewport()) return;
   const map = {
     'eq': 'mod-eq',
     'subsonic': 'mod-subsonic',
@@ -6783,9 +8210,7 @@ function setBandReorder(on) {
   document.body.classList.toggle('reorder-bands', on);
   syncMobileCardInteractiveState();
   updateActionCardButtons();
-  if (root && distFromRight !== null && distFromRight < 160) {
-    root.scrollLeft = Math.max(0, (root.scrollWidth - root.clientWidth) - distFromRight);
-  }
+  syncEqScrollRightAnchor(root, distFromRight);
 }
 
 function toggleBandReorder() {
@@ -6826,6 +8251,17 @@ function toggleSubsonicModule(checked) {
   }
   updateBypassUI('subsonic', subsonicParams.enabled);
   sendSubsonic();
+  requestDrawResponse();
+}
+
+function toggleSubsonicFilter(checked) {
+  subsonicParams.subEnabled = (typeof checked === 'boolean') ? checked : !subsonicParams.subEnabled;
+  if (subsonicParams.subEnabled && (!subsonicParams.order || subsonicParams.order < 1)) {
+    subsonicParams.order = 2;
+  }
+  syncSubsonicUI();
+  sendSubsonic();
+  requestDrawResponse();
 }
 
 function toggleCompanderModule(checked) {
@@ -6872,8 +8308,12 @@ function initSubsonicKnobs() {
       subsonicParams.freq = v;
       document.getElementById('num-sub-freq').value = Math.round(v);
       sendSubsonicThrottled(false);
+      requestDrawResponse();
     },
-    onEnd: () => sendSubsonicThrottled(true)
+    onEnd: () => {
+      sendSubsonicThrottled(true);
+      requestDrawResponse();
+    }
   });
   document.getElementById('num-sub-freq').addEventListener('change', e => {
     let v = parseFloat(e.target.value);
@@ -6882,6 +8322,7 @@ function initSubsonicKnobs() {
       subsonicParams.freq = v;
       subsonicKnobs.freq.set(v, false);
       sendSubsonicThrottled(true);
+      requestDrawResponse();
     }
   });
 
@@ -6893,8 +8334,12 @@ function initSubsonicKnobs() {
       subsonicParams.order = ord;
       document.getElementById('num-sub-order').value = ord * 6;
       sendSubsonicThrottled(false);
+      requestDrawResponse();
     },
-    onEnd: () => sendSubsonicThrottled(true)
+    onEnd: () => {
+      sendSubsonicThrottled(true);
+      requestDrawResponse();
+    }
   });
   document.getElementById('num-sub-order').addEventListener('change', e => {
     let v = parseInt(e.target.value);
@@ -6905,6 +8350,7 @@ function initSubsonicKnobs() {
       e.target.value = ord * 6;
       subsonicKnobs.order.set(ord * 6, false);
       sendSubsonicThrottled(true);
+      requestDrawResponse();
     }
   });
 
@@ -7046,13 +8492,17 @@ function syncSubsonicUI() {
     const el = document.getElementById('num-spk-phase-r');
     if (el) el.value = subsonicParams.phaseR || 0;
   }
+  const subFilterSw = document.getElementById('switch-sub-filter');
+  if (subFilterSw) subFilterSw.checked = (subsonicParams.subEnabled !== false);
+  const subFilterGrid = document.getElementById('subsonic-filter-grid');
+  if (subFilterGrid) subFilterGrid.classList.toggle('sub-bypassed', subsonicParams.subEnabled === false);
 }
 
 function sendSubsonic() {
   wsTx({
     t: 'subsonic',
     freq: subsonicParams.freq,
-    order: subsonicParams.order,
+    order: (subsonicParams.subEnabled === false) ? 0 : (subsonicParams.order || 2),
     enabled: dspProcessingEnabled ? subsonicParams.enabled : false,
     balance: subsonicParams.balance,
     delayL: subsonicParams.delayL,
@@ -7060,6 +8510,7 @@ function sendSubsonic() {
     phaseL: subsonicParams.phaseL,
     phaseR: subsonicParams.phaseR
   });
+  requestDrawResponse();
 }
 
 let compSendTimer = null;
@@ -7288,6 +8739,7 @@ initPreamp();
 renderCustomPresets();
 rebuildBandsUI();
 initSubsonicKnobs();
+syncSubsonicUI();
 initCompanderKnobs();
 initLimiterKnobs();
 initModuleReordering();
@@ -7317,7 +8769,9 @@ document.addEventListener('click', (e) => {
     const inp = badge.querySelector('input.badge-val-input');
     if (inp) {
       inp.focus();
-      setTimeout(() => inp.select(), 10);
+      setTimeout(() => {
+        if (document.activeElement === inp) inp.select();
+      }, 10);
     }
   }
 });
@@ -7334,6 +8788,7 @@ document.addEventListener('click', (e) => {
       b.classList.toggle('active', on);
       b.setAttribute('aria-selected', on ? 'true' : 'false');
     });
+    if (name !== 'dsp') dismissEqToast();
     if (name === 'dsp') requestDrawResponse();
     window.scrollTo(0, 0);
   };
@@ -7394,6 +8849,7 @@ function applyImportedConfig(cfg) {
   if (cfg.version > CONFIG_VERSION) throw new Error('File is from a newer version');
 
   if (cfg.eq) {
+    dismissEqToast();
     if (Array.isArray(cfg.eq.bands) && cfg.eq.bands.length) {
       bands = cfg.eq.bands.slice(0, MAX_BANDS).map((b, idx) => ({
         band: idx,
@@ -7405,12 +8861,12 @@ function applyImportedConfig(cfg) {
         enabled: b.enabled !== false,
         color: BAND_COLORS[idx % BAND_COLORS.length]
       }));
-      document.querySelectorAll('.btn-preset').forEach(el => el.classList.remove('active'));
+      renderCustomPresets();
       rebuildBandsUI();
       bands.forEach((_, i) => sendBand(i));
     }
     if (cfg.eq.preamp !== undefined) {
-      eqPreamp = clampNum(cfg.eq.preamp, -18, 18, 0);
+      eqPreamp = clampNum(cfg.eq.preamp, -24, 24, 0);
       updatePreampUI();
       wsTx({ t: 'eq_preamp', preamp: Math.round(eqPreamp * 100) / 100 });
     }
@@ -7419,9 +8875,12 @@ function applyImportedConfig(cfg) {
 
   if (cfg.subsonic) {
     const s = cfg.subsonic;
+    const rawOrder = Math.round(clampNum(s.order, 0, 4, subsonicParams.order));
+    const hasSubFilter = (s.subEnabled !== undefined) ? !!s.subEnabled : (rawOrder > 0);
     Object.assign(subsonicParams, {
       freq: clampNum(s.freq, 20, 100, subsonicParams.freq),
-      order: Math.round(clampNum(s.order, 1, 4, subsonicParams.order)),
+      order: rawOrder > 0 ? rawOrder : (subsonicParams.order || 2),
+      subEnabled: hasSubFilter,
       balance: clampNum(s.balance, -100, 100, 0),
       delayL: clampNum(s.delayL, -20, 20, 0),
       delayR: clampNum(s.delayR, -20, 20, 0),
@@ -7498,13 +8957,20 @@ document.addEventListener('keydown', (e) => {
     closePresetModal();
     closeOtaModal();
     closeAboutModal();
+    closeHelpModal();
   }
 });
 
 function togglePassVisibility() {
   const passIn = document.getElementById('wifi-input-pass');
+  const btn = document.getElementById('wifi-pass-toggle-btn');
   if (!passIn) return;
-  passIn.type = (passIn.type === 'password') ? 'text' : 'password';
+  const showing = passIn.type === 'password';
+  passIn.type = showing ? 'text' : 'password';
+  if (btn) {
+    btn.classList.toggle('showing', showing);
+    btn.setAttribute('aria-pressed', showing ? 'true' : 'false');
+  }
 }
 
 function submitWiFiConfig() {
@@ -7518,14 +8984,14 @@ function submitWiFiConfig() {
   if (!ssid) {
     if (statusMsg) {
       statusMsg.className = 'wifi-status-msg error';
-      statusMsg.textContent = 'Please enter a Wi-Fi SSID.';
+      statusMsg.textContent = 'Enter SSID.';
     }
     return;
   }
 
   if (statusMsg) {
     statusMsg.className = 'wifi-status-msg';
-    statusMsg.textContent = `Connecting to "${ssid}"...`;
+    statusMsg.textContent = `Connecting to ${ssid}...`;
   }
 
   if (isMockMode) {
@@ -7550,7 +9016,7 @@ function submitWiFiConfig() {
       } catch (_) {}
       if (res.status === 401) {
         wsTx({ t: 'wifi_save', ssid: ssid, pass: pass });
-        errMsg = 'Authentication required for Wi-Fi changes.';
+        errMsg = 'Auth required.';
       }
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg error';
@@ -7559,7 +9025,7 @@ function submitWiFiConfig() {
     }).catch(() => {
       if (statusMsg) {
         statusMsg.className = 'wifi-status-msg error';
-        statusMsg.textContent = 'Network error sending Wi-Fi settings.';
+        statusMsg.textContent = 'Network error.';
       }
     });
   } catch (_) {}
@@ -7572,6 +9038,102 @@ function openAboutModal() {
 function closeAboutModal(e) {
   if (e && e.target !== e.currentTarget) return;
   const m = document.getElementById('about-modal');
+  if (m) m.classList.remove('open');
+}
+
+const MODULE_HELP_DOCS = {
+  input: {
+    title: 'Input Gain & Metering',
+    summary: 'Digital input trim and stereo peak/RMS/system telemetry.',
+    items: [
+      ['Input Gain', 'Pre-DSP level offset in dB.'],
+      ['Pre / Post', 'Input and processed output meters in dBFS, plus compressor gain reduction (GR).'],
+      ['CPU / Memory', 'Core 0/1 CPU load and PSRAM/Flash usage.']
+    ]
+  },
+  eq: {
+    title: 'Parametric EQ (1 to 16 Bands)',
+    summary: '64-bit biquad equalizer.',
+    items: [
+      ['Graph', 'Drag node for Frequency/Gain. Scroll wheel changes Q; double-click resets or adds band.'],
+      ['Auto Gain', 'Compensates Preamp gain for positive EQ boosts.'],
+      ['Presets', 'Built-in and browser-saved EQ curves. Undo restores deleted bands.']
+    ]
+  },
+  comp: {
+    title: 'Compressor',
+    summary: 'Dynamic range compressor.',
+    items: [
+      ['Threshold / Ratio', 'Level where compression starts and reduction slope.'],
+      ['Attack / Release', 'Gain reduction engage and recovery times.'],
+      ['Knee / Make-Up', 'Threshold transition width and post-compression gain.']
+    ]
+  },
+  lim: {
+    title: 'Peak Limiter',
+    summary: 'Output brickwall peak limiter.',
+    items: [
+      ['Ceiling', 'Maximum output peak level in dBFS.'],
+      ['Release', 'Gain recovery time after limiting.']
+    ]
+  },
+  subsonic: {
+    title: 'Speakers Correction & Subsonic Filter',
+    summary: 'Subsonic high-pass filter with channel alignment.',
+    items: [
+      ['Subsonic Switch', 'Bypasses or enables the high-pass filter (20 to 100 Hz, 6 to 24 dB/oct).'],
+      ['Balance / Delay', 'Left/Right trim (-100% to +100%) and delay (-20 to +20 ms).'],
+      ['Phase', 'All-pass phase offset in 45° steps (-180° to +180°).']
+    ]
+  },
+  wifi: {
+    title: 'Wi-Fi Network',
+    summary: 'Station credentials for Web UI and Squeezebox streaming.',
+    items: [
+      ['Network / Password', 'Target router SSID and WPA2 key.'],
+      ['Hotspot Fallback', 'Starts ESP32-DSP (192.168.4.1) if connection fails.']
+    ]
+  },
+  'boot-cfg': {
+    title: 'Power-On State',
+    summary: 'DSP configuration loaded at boot.',
+    items: [
+      ['Restore Last', 'Loads the last active settings from flash.'],
+      ['Custom', 'Loads the fixed module states selected below.']
+    ]
+  }
+};
+
+function openModuleHelp(modId, event) {
+  if (event) event.stopPropagation();
+  const doc = MODULE_HELP_DOCS[modId];
+  if (!doc) return;
+  const titleEl = document.getElementById('help-modal-title');
+  const bodyEl = document.getElementById('help-modal-body');
+  const modal = document.getElementById('help-modal');
+  if (!titleEl || !bodyEl || !modal) return;
+  titleEl.textContent = doc.title;
+  bodyEl.innerHTML = '';
+  const summary = document.createElement('p');
+  summary.textContent = doc.summary;
+  bodyEl.appendChild(summary);
+  const ul = document.createElement('ul');
+  ul.className = 'help-modal-list';
+  doc.items.forEach(([label, desc]) => {
+    const li = document.createElement('li');
+    const strong = document.createElement('strong');
+    strong.textContent = label + ': ';
+    li.appendChild(strong);
+    li.appendChild(document.createTextNode(desc));
+    ul.appendChild(li);
+  });
+  bodyEl.appendChild(ul);
+  modal.classList.add('open');
+}
+
+function closeHelpModal(e) {
+  if (e && e.target !== e.currentTarget) return;
+  const m = document.getElementById('help-modal');
   if (m) m.classList.remove('open');
 }
 

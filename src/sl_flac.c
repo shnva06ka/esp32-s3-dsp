@@ -14,6 +14,7 @@
 
 #include "squeezelite.h"
 #include "sl_resample.h"
+#include "xtensa_fpu_helpers.h"
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -216,14 +217,33 @@ static decode_state flac_decode(void) {
 
     if (s_rs) {
         // Deinterleave to float, resample to OUT_RATE, convert back to 32-bit PCM
-        const drflac_int32 *rsrc = s_flacDecBuf;
-        const bool stereo = (pFlac->channels > 1);
-        for (frames_t i = 0; i < (frames_t)framesRead; ++i) {
-            float l = (float)rsrc[0] * (1.0f / 2147483648.0f);
-            float r = stereo ? (float)rsrc[1] * (1.0f / 2147483648.0f) : l;
-            s_inL[i] = l;
-            s_inR[i] = r;
-            rsrc += stereo ? 2 : 1;
+        const float kScale32 = 1.0f / 2147483648.0f;
+        const frames_t inFrames = (frames_t)framesRead;
+        if (pFlac->channels > 1) {
+            dsp_unpack_i32_stereo_to_f32((const int32_t *)s_flacDecBuf, s_inL, s_inR, inFrames, kScale32, kScale32);
+        } else {
+            const drflac_int32 *rsrc = s_flacDecBuf;
+            float *dstL = s_inL;
+            float *dstR = s_inR;
+            frames_t i = 0;
+            for (; i + 4u <= inFrames; i += 4u) {
+                const float s0 = dsp_fclamp_pm1((float)rsrc[0] * kScale32);
+                const float s1 = dsp_fclamp_pm1((float)rsrc[1] * kScale32);
+                const float s2 = dsp_fclamp_pm1((float)rsrc[2] * kScale32);
+                const float s3 = dsp_fclamp_pm1((float)rsrc[3] * kScale32);
+                dstL[0] = s0; dstR[0] = s0;
+                dstL[1] = s1; dstR[1] = s1;
+                dstL[2] = s2; dstR[2] = s2;
+                dstL[3] = s3; dstR[3] = s3;
+                rsrc += 4;
+                dstL += 4;
+                dstR += 4;
+            }
+            for (; i < inFrames; ++i) {
+                const float s = dsp_fclamp_pm1((float)(*rsrc++) * kScale32);
+                *dstL++ = s;
+                *dstR++ = s;
+            }
         }
 
         size_t outN = resampler_process(s_rs, s_inL, s_inR, (size_t)framesRead, s_outL, s_outR, RS_OUT_CAP);
@@ -241,17 +261,7 @@ static decode_state flac_decode(void) {
         ISAMPLE_T *buf_start = (ISAMPLE_T *)(void *)outputbuf->buf;
         ISAMPLE_T *buf_wrap  = (ISAMPLE_T *)(void *)outputbuf->wrap;
 
-        for (size_t i = 0; i < outN; ++i) {
-            float rawL = isfinite(s_outL[i]) ? s_outL[i] : 0.0f;
-            float rawR = isfinite(s_outR[i]) ? s_outR[i] : 0.0f;
-            float l = fmaxf(-1.0f, fminf(1.0f, rawL));
-            float r = fmaxf(-1.0f, fminf(1.0f, rawR));
-            *rptr++ = (s32_t)(l * 2147483392.0f);
-            *rptr++ = (s32_t)(r * 2147483392.0f);
-            if (rptr >= buf_wrap) {
-                rptr = buf_start;
-            }
-        }
+        dsp_ring_pack_f32_to_i32(rptr, buf_start, buf_wrap, s_outL, s_outR, outN);
         _buf_inc_writep(outputbuf, (unsigned)outN * BYTES_PER_FRAME);
         UNLOCK_O;
         return DECODE_RUNNING;
@@ -323,12 +333,7 @@ static struct codec flac_codec = {
 };
 
 static void *flac_alloc_staging(size_t bytes) {
-    size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
-    void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p) p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    return p;
+    return dsp_alloc_staging(bytes);
 }
 
 struct codec *register_flac(void) {

@@ -783,12 +783,12 @@ private:
                     _wifiReconnectRequested = true;
                     _wifiReconnectTimer = millis() + 300;
                     portEXIT_CRITICAL(&_wifiMux);
-                    if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Initiating Wi-Fi connection...\"}");
+                    if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"connecting\",\"msg\":\"Connecting...\"}");
                 } else {
-                    if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Invalid SSID or password length (SSID 1-32, Pass 8-63)\"}");
+                    if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"SSID 1-32, pass 8-63.\"}");
                 }
             } else {
-                if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Use authenticated HTTP /api/wifi when connected to LAN\"}");
+                if (client->canSend()) client->text("{\"t\":\"wifi_status\",\"status\":\"failed\",\"msg\":\"Auth required.\"}");
             }
         }
         else if (strcmp(t, "boot_defaults") == 0) {
@@ -880,7 +880,7 @@ private:
         if (doc.containsKey("phaseR"))  p.phaseR   = doc["phaseR"].as<int16_t>();
 
         p.freq = _clamp(std::isfinite(p.freq) ? p.freq : 80.0f, 20.0f, 100.0f);
-        if (p.order < 1 || p.order > 4) p.order = 2;
+        if (p.order > 4) p.order = 2;
         p.balance  = _clamp(std::isfinite(p.balance)  ? p.balance  : 0.0f, -100.0f, 100.0f);
         p.delayMsL = _clamp(std::isfinite(p.delayMsL) ? p.delayMsL : 0.0f, -20.0f,   20.0f);
         p.delayMsR = _clamp(std::isfinite(p.delayMsR) ? p.delayMsR : 0.0f, -20.0f,   20.0f);
@@ -1089,7 +1089,7 @@ private:
         bool staConn = (WiFi.status() == WL_CONNECTED);
         bool hasAp = ((WiFi.getMode() & WIFI_MODE_AP) != 0);
         doc["wifi_con"]  = staConn;
-        doc["wifi_ssid"] = staConn ? WiFi.SSID() : (hasAp ? "ESP32-S3-DSP (AP)" : "Disconnected");
+        doc["wifi_ssid"] = staConn ? WiFi.SSID() : (hasAp ? "Hotspot" : "Offline");
         doc["wifi_ip"]   = staConn ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
         _appendResamplerJson(doc);
 

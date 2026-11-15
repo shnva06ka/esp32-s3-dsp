@@ -21,13 +21,10 @@ public:
         _update(p);
     }
 
+    bool isEnabled() const { return _enabled; }
+
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
-
-        for (size_t i = 0; i < frames; ++i) {
-            if (!std::isfinite(left[i]))  left[i]  = 0.0f;
-            if (!std::isfinite(right[i])) right[i] = 0.0f;
-        }
 
         _processStage(left, right, frames, _coeffs[0], _zL[0], _zR[0]);
         if (_hasSecondStage) {
@@ -36,30 +33,74 @@ public:
     }
 
 private:
-    // Hardware-FPU 32-bit float Transposed Direct Form II keeps internal state
-    // bounded to O(1) (avoiding DF-II's ~583,000 state blowup at 20 Hz / 96 kHz).
+    static inline void _sanitizeBlockAndState(float* buf, size_t frames, float* z) {
+        if (!std::isfinite(z[0]) || !std::isfinite(z[1])) {
+            z[0] = 0.0f;
+            z[1] = 0.0f;
+            for (size_t i = 0; i < frames; ++i) {
+                if (!std::isfinite(buf[i])) buf[i] = 0.0f;
+            }
+        } else {
+            if (fabsf(z[0]) < 1e-15f) z[0] = 0.0f;
+            if (fabsf(z[1]) < 1e-15f) z[1] = 0.0f;
+        }
+    }
+
+    // Transposed Direct Form II biquad
+    static inline void _processStageChannel(float* buf, size_t frames,
+                                            const float* c, float* z) {
+        const float b0 = c[0], b1 = c[1], b2 = c[2], a1 = c[3], a2 = c[4];
+        float z0 = z[0], z1 = z[1];
+#if defined(__XTENSA__)
+        float in, out, t0;
+        uint32_t cnt = static_cast<uint32_t>(frames);
+        asm volatile(
+            "loopnez %[cnt], 1f              \n\t"
+            "lsi     %[in],  %[buf], 0       \n\t"
+            "mov.s   %[out], %[z0]           \n\t"
+            "madd.s  %[out], %[b0],  %[in]   \n\t"
+            "mul.s   %[z0],  %[b1],  %[in]   \n\t"
+            "mul.s   %[t0],  %[b2],  %[in]   \n\t"
+            "msub.s  %[z0],  %[a1],  %[out]  \n\t"
+            "add.s   %[z0],  %[z0],  %[z1]   \n\t"
+            "msub.s  %[t0],  %[a2],  %[out]  \n\t"
+            "ssi     %[out], %[buf], 0       \n\t"
+            "mov.s   %[z1],  %[t0]           \n\t"
+            "addi    %[buf], %[buf], 4       \n\t"
+            "1:                              \n\t"
+            : [buf] "+&r" (buf),
+              [z0]  "+&f" (z0),
+              [z1]  "+&f" (z1),
+              [in]  "=&f" (in),
+              [out] "=&f" (out),
+              [t0]  "=&f" (t0)
+            : [cnt] "r"  (cnt),
+              [b0]  "f"  (b0),
+              [b1]  "f"  (b1),
+              [b2]  "f"  (b2),
+              [a1]  "f"  (a1),
+              [a2]  "f"  (a2)
+            : "memory"
+        );
+#else
+        for (size_t i = 0; i < frames; ++i) {
+            const float in = buf[i];
+            const float out = b0 * in + z0;
+            z0 = b1 * in - a1 * out + z1;
+            z1 = b2 * in - a2 * out;
+            buf[i] = out;
+        }
+#endif
+        z[0] = z0;
+        z[1] = z1;
+    }
+
     static inline void _processStage(float* left, float* right, size_t frames,
                                      const float* c, float* zL, float* zR) {
-        const float b0 = c[0], b1 = c[1], b2 = c[2], a1 = c[3], a2 = c[4];
-        for (size_t i = 0; i < frames; ++i) {
-            float inL = std::isfinite(left[i]) ? left[i] : 0.0f;
-            float outL = b0 * inL + zL[0];
-            zL[0] = b1 * inL - a1 * outL + zL[1];
-            zL[1] = b2 * inL - a2 * outL;
-            if (!std::isfinite(outL)) { outL = 0.0f; zL[0] = 0.0f; zL[1] = 0.0f; }
-            if (fabsf(zL[0]) < 1e-15f) zL[0] = 0.0f;
-            if (fabsf(zL[1]) < 1e-15f) zL[1] = 0.0f;
-            left[i] = outL;
-
-            float inR = std::isfinite(right[i]) ? right[i] : 0.0f;
-            float outR = b0 * inR + zR[0];
-            zR[0] = b1 * inR - a1 * outR + zR[1];
-            zR[1] = b2 * inR - a2 * outR;
-            if (!std::isfinite(outR)) { outR = 0.0f; zR[0] = 0.0f; zR[1] = 0.0f; }
-            if (fabsf(zR[0]) < 1e-15f) zR[0] = 0.0f;
-            if (fabsf(zR[1]) < 1e-15f) zR[1] = 0.0f;
-            right[i] = outR;
-        }
+        _processStageChannel(left,  frames, c, zL);
+        _sanitizeBlockAndState(left,  frames, zL);
+        _processStageChannel(right, frames, c, zR);
+        _sanitizeBlockAndState(right, frames, zR);
     }
 
     bool  _enabled{false};
@@ -72,7 +113,7 @@ private:
     bool  _hasSecondStage{false};
 
     void _update(const SubsonicParams& p) {
-        _enabled = p.enabled;
+        _enabled = p.enabled && (p.order >= 1 && p.order <= 4);
         const double rawFreq = std::isfinite(p.freq) ? static_cast<double>(p.freq) : 80.0;
         const double safeFreq = (rawFreq < 20.0) ? 20.0 : ((rawFreq > 100.0) ? 100.0 : rawFreq);
         _freq    = static_cast<float>(safeFreq);

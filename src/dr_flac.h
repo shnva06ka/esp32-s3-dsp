@@ -2840,6 +2840,28 @@ static DRFLAC_INLINE drflac_uint32 drflac__clz(drflac_cache_t x)
         return (x == 0) ? sizeof(x)*8 : drflac__clz_watcom(x);
 #elif defined(__MRC__)
         return __cntlzw(x);
+#elif defined(__XTENSA__)
+        if (x == 0) {
+            return (drflac_uint32)(sizeof(x) * 8);
+        }
+    #ifdef DRFLAC_64BIT
+        {
+            drflac_uint32 hi = (drflac_uint32)(x >> 32);
+            drflac_uint32 lz;
+            if (hi != 0) {
+                __asm__("nsau %0, %1" : "=r"(lz) : "r"(hi));
+                return lz;
+            }
+            __asm__("nsau %0, %1" : "=r"(lz) : "r"((drflac_uint32)x));
+            return 32u + lz;
+        }
+    #else
+        {
+            drflac_uint32 lz;
+            __asm__("nsau %0, %1" : "=r"(lz) : "r"((drflac_uint32)x));
+            return lz;
+        }
+    #endif
 #else
         return drflac__clz_software(x);
 #endif
@@ -2993,7 +3015,14 @@ static drflac_result drflac__read_utf8_coded_number(drflac_bs* bs, drflac_uint64
 
 static DRFLAC_INLINE drflac_uint32 drflac__ilog2_u32(drflac_uint32 x)
 {
-#if 1   /* Needs optimizing. */
+#if defined(__XTENSA__)
+    drflac_uint32 lz;
+    if (x == 0) {
+        return 0;
+    }
+    __asm__("nsau %0, %1" : "=r"(lz) : "r"(x));
+    return 32u - lz;
+#else
     drflac_uint32 result = 0;
     while (x > 0) {
         result += 1;
@@ -3022,11 +3051,56 @@ __attribute__((no_sanitize("signed-integer-overflow")))
 #endif
 static DRFLAC_INLINE drflac_int32 drflac__calculate_prediction_32(drflac_uint32 order, drflac_int32 shift, const drflac_int32* coefficients, drflac_int32* pDecodedSamples)
 {
-    drflac_int32 prediction = 0;
+    drflac_int32 prediction;
 
     DRFLAC_ASSERT(order <= 32);
 
     /* 32-bit version. */
+
+#if defined(__XTENSA__) && !defined(DRFLAC_64BIT)
+    {
+        const drflac_int32* coef = coefficients;
+        const drflac_int32* samp = pDecodedSamples - 2;
+        drflac_uint32 acc0 = 0;
+        drflac_uint32 acc1 = 0;
+        drflac_uint32 pairs = order >> 1;
+
+        if (pairs > 0) {
+            drflac_uint32 c0, s0, c1, s1;
+            __asm__ __volatile__ (
+                "loopnez %[pairs], 1f           \n\t"
+                "l32i    %[c0],   %[coef], 0    \n\t"
+                "l32i    %[s0],   %[samp], 4    \n\t"
+                "l32i    %[c1],   %[coef], 4    \n\t"
+                "l32i    %[s1],   %[samp], 0    \n\t"
+                "mull    %[c0],   %[c0],   %[s0]\n\t"
+                "mull    %[c1],   %[c1],   %[s1]\n\t"
+                "addi    %[coef], %[coef], 8    \n\t"
+                "addi    %[samp], %[samp], -8   \n\t"
+                "add.n   %[acc0], %[acc0], %[c0]\n\t"
+                "add.n   %[acc1], %[acc1], %[c1]\n\t"
+                "1:                             \n\t"
+                : [coef]  "+&r" (coef),
+                  [samp]  "+&r" (samp),
+                  [acc0]  "+&r" (acc0),
+                  [acc1]  "+&r" (acc1),
+                  [c0]    "=&r" (c0),
+                  [s0]    "=&r" (s0),
+                  [c1]    "=&r" (c1),
+                  [s1]    "=&r" (s1)
+                : [pairs] "r"   (pairs)
+                : "memory"
+            );
+        }
+
+        if (order & 1) {
+            acc0 += (drflac_uint32)coef[0] * (drflac_uint32)samp[1];
+        }
+
+        prediction = (drflac_int32)(acc0 + acc1);
+    }
+#else
+    prediction = 0;
 
     /* VC++ optimizes this to a single jmp. I've not yet verified this for other compilers. */
     switch (order)
@@ -3064,6 +3138,7 @@ static DRFLAC_INLINE drflac_int32 drflac__calculate_prediction_32(drflac_uint32 
     case  2: prediction += coefficients[ 1] * pDecodedSamples[- 2];
     case  1: prediction += coefficients[ 0] * pDecodedSamples[- 1];
     }
+#endif
 
     return (drflac_int32)(prediction >> shift);
 }
@@ -3076,6 +3151,47 @@ static DRFLAC_INLINE drflac_int32 drflac__calculate_prediction_64(drflac_uint32 
 
     /* 64-bit version. */
 
+#if defined(__XTENSA__) && !defined(DRFLAC_64BIT)
+    {
+        drflac_uint32 lo = 0;
+        drflac_uint32 hi = 0;
+
+        if (order > 0) {
+            const drflac_int32* coef = coefficients;
+            const drflac_int32* samp = pDecodedSamples - 1;
+            drflac_uint32 cnt = order;
+            drflac_uint32 c, s, plo, phi;
+
+            __asm__ __volatile__ (
+                "loopnez %[cnt], 2f             \n\t"
+                "l32i    %[c],    %[coef], 0    \n\t"
+                "l32i    %[s],    %[samp], 0    \n\t"
+                "addi    %[coef], %[coef], 4    \n\t"
+                "addi    %[samp], %[samp], -4   \n\t"
+                "mull    %[plo],  %[c],    %[s] \n\t"
+                "mulsh   %[phi],  %[c],    %[s] \n\t"
+                "add.n   %[lo],   %[lo],   %[plo]\n\t"
+                "bgeu    %[lo],   %[plo],  1f   \n\t"
+                "addi.n  %[hi],   %[hi],   1    \n\t"
+                "1:                             \n\t"
+                "add.n   %[hi],   %[hi],   %[phi]\n\t"
+                "2:                             \n\t"
+                : [coef] "+&r" (coef),
+                  [samp] "+&r" (samp),
+                  [lo]   "+&r" (lo),
+                  [hi]   "+&r" (hi),
+                  [c]    "=&r" (c),
+                  [s]    "=&r" (s),
+                  [plo]  "=&r" (plo),
+                  [phi]  "=&r" (phi)
+                : [cnt]  "r"   (cnt)
+                : "memory"
+            );
+        }
+
+        prediction = (drflac_int64)(((drflac_uint64)hi << 32) | (drflac_uint64)lo);
+    }
+#else
     /* This method is faster on the 32-bit build when compiling with VC++. See note below. */
 #ifndef DRFLAC_64BIT
     if (order == 8)
@@ -3244,6 +3360,7 @@ static DRFLAC_INLINE drflac_int32 drflac__calculate_prediction_64(drflac_uint32 
     case  2: prediction += coefficients[ 1] * (drflac_int64)pDecodedSamples[- 2];
     case  1: prediction += coefficients[ 0] * (drflac_int64)pDecodedSamples[- 1];
     }
+#endif
 #endif
 
     return (drflac_int32)(prediction >> shift);

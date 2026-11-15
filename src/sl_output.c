@@ -7,6 +7,7 @@
  * Hardware I2S DMA clock is the master clock pacing the entire pipeline
  */
 #include "squeezelite.h"
+#include "xtensa_fpu_helpers.h"
 
 static struct buffer buf;
 struct buffer *outputbuf = &buf;
@@ -24,18 +25,25 @@ static int _direct_write_frames(frames_t out_frames, bool silence, s32_t gainL, 
     if (!s_destLeft || !s_destRight) return 0;
 
     if (!silence) {
-        if (output.fade == FADE_ACTIVE && output.fade_dir == FADE_CROSS && *cross_ptr) {
-            _apply_cross(outputbuf, out_frames, cross_gain_in, cross_gain_out, cross_ptr);
-        }
-        _apply_gain(outputbuf, out_frames, gainL, gainR, flags);
+        const bool hasCrossfade = (output.fade == FADE_ACTIVE && output.fade_dir == FADE_CROSS && cross_ptr && *cross_ptr != NULL);
+        const bool monoDownmix  = ((flags & (MONO_LEFT | MONO_RIGHT)) != 0);
 
-        const s32_t *src = (const s32_t *)outputbuf->readp;
-        for (frames_t i = 0; i < out_frames; ++i) {
-            float l = (float)src[i * 2]     * (1.0f / 2147483648.0f);
-            float r = (float)src[i * 2 + 1] * (1.0f / 2147483648.0f);
-            s_destLeft[i]  = fmaxf(-1.0f, fminf(1.0f, l));
-            s_destRight[i] = fmaxf(-1.0f, fminf(1.0f, r));
+        float scaleL, scaleR;
+        if (!hasCrossfade && !monoDownmix) {
+            /* Fused gain + s32-to-float conversion */
+            scaleL = (float)gainL * (1.0f / (65536.0f * 2147483648.0f));
+            scaleR = (float)gainR * (1.0f / (65536.0f * 2147483648.0f));
+        } else {
+            if (hasCrossfade) {
+                _apply_cross(outputbuf, out_frames, cross_gain_in, cross_gain_out, cross_ptr);
+            }
+            _apply_gain(outputbuf, out_frames, gainL, gainR, flags);
+            scaleL = 1.0f / 2147483648.0f;
+            scaleR = 1.0f / 2147483648.0f;
         }
+
+        const s32_t *src = (const s32_t *)(const void *)outputbuf->readp;
+        dsp_unpack_i32_stereo_to_f32(src, s_destLeft, s_destRight, out_frames, scaleL, scaleR);
     } else {
         memset(s_destLeft,  0, out_frames * sizeof(float));
         memset(s_destRight, 0, out_frames * sizeof(float));

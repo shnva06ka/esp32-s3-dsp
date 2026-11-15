@@ -1,8 +1,8 @@
 #include "i2s_audio.h"
 #include "wireless_console.h"
+#include "xtensa_fpu_helpers.h"
 #include <Arduino.h>
 #include <esp_heap_caps.h>
-#include <cmath>
 #include <cstring>
 #include <algorithm>
 
@@ -195,12 +195,8 @@ void I2SAudio::process(const AudioCallback& cb)
         if (errAux == ESP_OK && bytesReadAux > 0) {
             size_t framesRead = bytesReadAux / (kChannels * sizeof(int32_t));
             if (framesRead > kBufferFrames) framesRead = kBufferFrames;
-            for (size_t i = 0; i < framesRead; ++i) {
-                float sL = static_cast<float>(_rxBufAux[i * 2    ]) * (kScale * kAuxPreamp);
-                float sR = static_cast<float>(_rxBufAux[i * 2 + 1]) * (kScale * kAuxPreamp);
-                _leftAux[i]  = fmaxf(-1.0f, fminf(1.0f, sL));
-                _rightAux[i] = fmaxf(-1.0f, fminf(1.0f, sR));
-            }
+            const float auxScale = kScale * kAuxPreamp;
+            dsp_unpack_i32_stereo_to_f32(_rxBufAux, _leftAux, _rightAux, framesRead, auxScale, auxScale);
             for (size_t i = framesRead; i < kBufferFrames; ++i) {
                 _leftAux[i]  = 0.0f;
                 _rightAux[i] = 0.0f;
@@ -294,14 +290,7 @@ void I2SAudio::process(const AudioCallback& cb)
         cb(_leftMix, _rightMix, kBufferFrames);
     }
 
-    for (size_t i = 0; i < kBufferFrames; ++i) {
-        float rawL = std::isfinite(_leftMix[i])  ? _leftMix[i]  : 0.0f;
-        float rawR = std::isfinite(_rightMix[i]) ? _rightMix[i] : 0.0f;
-        float sL = fminf(fmaxf(rawL, -1.0f), 1.0f);
-        float sR = fminf(fmaxf(rawR, -1.0f), 1.0f);
-        _txBuf[i * 2    ] = static_cast<int32_t>(sL * 2147483392.0f);
-        _txBuf[i * 2 + 1] = static_cast<int32_t>(sR * 2147483392.0f);
-    }
+    dsp_pack_f32_to_i32(_txBuf, _leftMix, _rightMix, kBufferFrames);
 
     size_t bytesWritten = 0;
     i2s_write(kI2SPortMaster, _txBuf, byteCount, &bytesWritten, pdMS_TO_TICKS(50));
@@ -378,10 +367,7 @@ void I2SAudio::_writeBtFrames(size_t frames)
 
     float bufL[kBufferFrames];
     float bufR[kBufferFrames];
-    for (size_t i = 0; i < frames; ++i) {
-        bufL[i] = static_cast<float>(_rxBufBt[i * 2    ]) * kScale;
-        bufR[i] = static_cast<float>(_rxBufBt[i * 2 + 1]) * kScale;
-    }
+    dsp_unpack_i32_stereo_to_f32(_rxBufBt, bufL, bufR, frames, kScale, kScale);
     if (_btResampler && _btOutL && _btOutR) {
         size_t outN = resampler_process(_btResampler, bufL, bufR, frames, _btOutL, _btOutR, _btOutCap);
         size_t written = _btRingBuffer.write(_btOutL, _btOutR, outN);

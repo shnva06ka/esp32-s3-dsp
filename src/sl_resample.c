@@ -1,11 +1,6 @@
 /*
- * Polyphase windowed-sinc (Kaiser) sample-rate converter, see sl_resample.h
+ * Polyphase windowed-sinc sample-rate converter (sl_resample.h)
  * SPDX-License-Identifier: GPL-3.0-or-later
- *
- * Uses exact rational stepping (L/M) so there is zero long-term clock drift,
- * paired with a compact polyphase table (up to 64 phases x 24 taps = 6 KB)
- * that stays resident in the ESP32-S3 L1 data cache.
- * Inner convolution loop uses a 4-way unrolled Xtensa pipelined kernel.
  */
 #include "sl_resample.h"
 
@@ -34,6 +29,12 @@ static void rs_log(const char* fmt, ...) {
 #define RS_TAPS        24
 #define RS_MAX_PHASES  64
 #define RS_KAISER_B    6.5f
+
+#ifdef __cplusplus
+static_assert((RS_TAPS > 0) && ((RS_TAPS % 4) == 0), "RS_TAPS must be a multiple of 4");
+#else
+_Static_assert((RS_TAPS > 0) && ((RS_TAPS % 4) == 0), "RS_TAPS must be a multiple of 4");
+#endif
 
 struct resampler {
     unsigned  L, M, P;
@@ -90,11 +91,7 @@ static float bessel_i0(float x) {
     return sum;
 }
 
-/*
- * Hot resampler buffers are placed in internal 8-bit RAM (16-byte aligned)
- * for optimal L1 cache line fills and zero-latency access.
- * PSRAM is used strictly as a fallback.
- */
+/* Internal RAM staging with PSRAM fallback */
 static void *rs_alloc(size_t bytes, int *used_psram) {
     size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
     void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -117,9 +114,9 @@ static void *rs_alloc(size_t bytes, int *used_psram) {
     return p;
 }
 
-/* 4-way unrolled Xtensa pipelined dot product (loads coefficient once for both channels) */
-static inline void rs_dotprod_stereo_unrolled(const float *h, const float *xl, const float *xr,
-                                              float *outL, float *outR) {
+/* Portable C reference dot product */
+static inline void rs_dotprod_stereo_c(const float *h, const float *xl, const float *xr,
+                                       float *outL, float *outR) {
     float accL0 = 0.0f, accL1 = 0.0f, accL2 = 0.0f, accL3 = 0.0f;
     float accR0 = 0.0f, accR1 = 0.0f, accR2 = 0.0f, accR3 = 0.0f;
     for (int j = 0; j < RS_TAPS; j += 4) {
@@ -135,6 +132,73 @@ static inline void rs_dotprod_stereo_unrolled(const float *h, const float *xl, c
     }
     *outL = (accL0 + accL1) + (accL2 + accL3);
     *outR = (accR0 + accR1) + (accR2 + accR3);
+}
+
+/* Xtensa pipelined dot product */
+static inline void rs_dotprod_stereo_unrolled(const float *h, const float *xl, const float *xr,
+                                              float *outL, float *outR) {
+#if defined(__XTENSA__) && defined(CONFIG_IDF_TARGET_ESP32S3)
+    const float *hp  = h;
+    const float *xlp = xl;
+    const float *xrp = xr;
+    uint32_t cnt = (uint32_t)(RS_TAPS / 4);
+
+    float accL0 = 0.0f, accL1 = 0.0f, accL2 = 0.0f, accL3 = 0.0f;
+    float accR0 = 0.0f, accR1 = 0.0f, accR2 = 0.0f, accR3 = 0.0f;
+    float th0, th1, tL, tR;
+
+    __asm__ __volatile__ (
+        "loopnez %[cnt], 1f\n\t"
+        "lsi     %[th0],   %[hp],  0\n\t"
+        "lsi     %[tL],    %[xlp], 0\n\t"
+        "lsi     %[tR],    %[xrp], 0\n\t"
+        "lsi     %[th1],   %[hp],  4\n\t"
+        "madd.s  %[accL0], %[th0], %[tL]\n\t"
+        "madd.s  %[accR0], %[th0], %[tR]\n\t"
+        "lsi     %[tL],    %[xlp], 4\n\t"
+        "lsi     %[tR],    %[xrp], 4\n\t"
+        "lsi     %[th0],   %[hp],  8\n\t"
+        "madd.s  %[accL1], %[th1], %[tL]\n\t"
+        "madd.s  %[accR1], %[th1], %[tR]\n\t"
+        "lsi     %[tL],    %[xlp], 8\n\t"
+        "lsi     %[tR],    %[xrp], 8\n\t"
+        "lsi     %[th1],   %[hp],  12\n\t"
+        "madd.s  %[accL2], %[th0], %[tL]\n\t"
+        "madd.s  %[accR2], %[th0], %[tR]\n\t"
+        "lsi     %[tL],    %[xlp], 12\n\t"
+        "lsi     %[tR],    %[xrp], 12\n\t"
+        "addi    %[hp],    %[hp],  16\n\t"
+        "addi    %[xlp],   %[xlp], 16\n\t"
+        "addi    %[xrp],   %[xrp], 16\n\t"
+        "madd.s  %[accL3], %[th1], %[tL]\n\t"
+        "madd.s  %[accR3], %[th1], %[tR]\n\t"
+        "1:\n\t"
+        : [hp]    "+&r" (hp),
+          [xlp]   "+&r" (xlp),
+          [xrp]   "+&r" (xrp),
+          [accL0] "+&f" (accL0),
+          [accL1] "+&f" (accL1),
+          [accL2] "+&f" (accL2),
+          [accL3] "+&f" (accL3),
+          [accR0] "+&f" (accR0),
+          [accR1] "+&f" (accR1),
+          [accR2] "+&f" (accR2),
+          [accR3] "+&f" (accR3),
+          [th0]   "=&f" (th0),
+          [th1]   "=&f" (th1),
+          [tL]    "=&f" (tL),
+          [tR]    "=&f" (tR)
+        : [cnt]   "r" (cnt),
+          "m" (*(const float (*)[RS_TAPS])h),
+          "m" (*(const float (*)[RS_TAPS])xl),
+          "m" (*(const float (*)[RS_TAPS])xr)
+    );
+
+    *outL = (accL0 + accL1) + (accL2 + accL3);
+    *outR = (accR0 + accR1) + (accR2 + accR3);
+#else
+    rs_dotprod_stereo_c(h, xl, xr, outL, outR);
+#endif
 }
 
 void resampler_destroy(resampler_t *r) {
@@ -217,7 +281,7 @@ resampler_t *resampler_create(unsigned in_rate, unsigned out_rate) {
         r->coef[(size_t)phase * RS_TAPS + (RS_TAPS - 1 - j)] = h;
     }
 
-    /* Normalise each phase individually for unity DC gain and zero phase ripple */
+    /* Normalize phase DC gain */
     for (unsigned ph = 0; ph < r->P; ++ph) {
         float *row = r->coef + (size_t)ph * RS_TAPS;
         double sum = 0.0;
@@ -445,6 +509,9 @@ void resampler_run_validation_iters(int iters) {
         inR[i] = cosf(2.0f * (float)M_PI * f * (float)i / 44100.0f) * 0.8f;
     }
 
+    const int k_bench_iters = (iters > 1) ? (iters * 400) : 2000;
+    volatile float bench_sink = 0.0f;
+
     rs_log("\n============================= RESAMPLER BENCHMARK & VALIDATION =============================\n");
     for (size_t idx = 0; idx < n_rates; ++idx) {
         unsigned in_r  = test_rates[idx][0];
@@ -466,15 +533,88 @@ void resampler_run_validation_iters(int iters) {
         }
         int64_t t_opt = (esp_timer_get_time() - t0) / iters;
 
+        int out_ok = (n_opt > 0 && n_opt <= cap);
+        for (size_t i = 0; i < n_opt; ++i) {
+            if (!isfinite(outL[i]) || !isfinite(outR[i])) {
+                out_ok = 0;
+                break;
+            }
+        }
+
         resampler_stats_t st;
         resampler_get_stats(r, &st);
 
-        rs_log("[RESAMPLE] %5u -> %5u Hz | L=%3u M=%3u P=%2u | in:%3u -> out:%3u | %4lld us | Mem: %s | %s\n",
-               in_r, out_r, st.ratio_L, st.ratio_M, st.phases,
-               (unsigned)test_n_in, (unsigned)n_opt,
-               t_opt,
-               st.is_psram ? "PSRAM" : "DRAM",
-               (n_opt > 0) ? "PASS" : "FAIL");
+        if (!r->bypass && r->coef && r->P > 0 && test_n_in >= RS_TAPS) {
+            float max_err = 0.0f;
+            int kernel_ok = 1;
+            const size_t max_off = test_n_in - RS_TAPS + 1;
+
+            for (unsigned ph = 0; ph < r->P; ++ph) {
+                const float *h_row = r->coef + (size_t)ph * RS_TAPS;
+                size_t off = (size_t)ph % max_off;
+                float optL = 0.0f, optR = 0.0f;
+                float refL = 0.0f, refR = 0.0f;
+                rs_dotprod_stereo_unrolled(h_row, inL + off, inR + off, &optL, &optR);
+                rs_dotprod_stereo_c(h_row, inL + off, inR + off, &refL, &refR);
+                float eL = fabsf(optL - refL);
+                float eR = fabsf(optR - refR);
+                if (eL > max_err) max_err = eL;
+                if (eR > max_err) max_err = eR;
+                if (!isfinite(optL) || !isfinite(optR) || !(eL < 1e-5f) || !(eR < 1e-5f)) {
+                    kernel_ok = 0;
+                }
+            }
+
+            float sum_optL = 0.0f, sum_optR = 0.0f;
+            unsigned ph_opt = 0;
+            int64_t kt0 = esp_timer_get_time();
+            for (int k = 0; k < k_bench_iters; ++k) {
+                size_t off = (size_t)k & 127u;
+                const float *h_row = r->coef + (size_t)ph_opt * RS_TAPS;
+                if (++ph_opt >= r->P) ph_opt = 0;
+                float oL, oR;
+                rs_dotprod_stereo_unrolled(h_row, inL + off, inR + off, &oL, &oR);
+                sum_optL += oL;
+                sum_optR += oR;
+            }
+            int64_t k_opt_us = esp_timer_get_time() - kt0;
+            bench_sink = sum_optL + sum_optR;
+            if (!isfinite(bench_sink)) kernel_ok = 0;
+
+            float sum_refL = 0.0f, sum_refR = 0.0f;
+            unsigned ph_ref = 0;
+            int64_t kt1 = esp_timer_get_time();
+            for (int k = 0; k < k_bench_iters; ++k) {
+                size_t off = (size_t)k & 127u;
+                const float *h_row = r->coef + (size_t)ph_ref * RS_TAPS;
+                if (++ph_ref >= r->P) ph_ref = 0;
+                float rL, rR;
+                rs_dotprod_stereo_c(h_row, inL + off, inR + off, &rL, &rR);
+                sum_refL += rL;
+                sum_refR += rR;
+            }
+            int64_t k_ref_us = esp_timer_get_time() - kt1;
+            bench_sink = sum_refL + sum_refR;
+            if (!isfinite(bench_sink)) kernel_ok = 0;
+
+            float speedup = (k_opt_us > 0) ? ((float)k_ref_us / (float)k_opt_us) : 0.0f;
+
+            rs_log("[RESAMPLE] %5u -> %5u Hz | L=%3u M=%3u P=%2u | in:%3u -> out:%3u | %4lld us | opt:%4lld us ref:%4lld us (%.2fx) | err=%.2e | Mem: %s | %s\n",
+                   in_r, out_r, st.ratio_L, st.ratio_M, st.phases,
+                   (unsigned)test_n_in, (unsigned)n_opt,
+                   (long long)t_opt,
+                   (long long)k_opt_us, (long long)k_ref_us, (double)speedup,
+                   (double)max_err,
+                   st.is_psram ? "PSRAM" : "DRAM",
+                   (out_ok && kernel_ok) ? "PASS" : "FAIL");
+        } else {
+            rs_log("[RESAMPLE] %5u -> %5u Hz | L=%3u M=%3u P=%2u | in:%3u -> out:%3u | %4lld us | bypass | Mem: %s | %s\n",
+                   in_r, out_r, st.ratio_L, st.ratio_M, st.phases,
+                   (unsigned)test_n_in, (unsigned)n_opt,
+                   (long long)t_opt,
+                   st.is_psram ? "PSRAM" : "DRAM",
+                   out_ok ? "PASS" : "FAIL");
+        }
 
         resampler_destroy(r);
     }

@@ -19,8 +19,7 @@ Real-time stereo audio processor built on the ESP32-S3, controlled from a web in
 - **Audio Converters**: PCM1808 (ADC) and PCM5102A (DAC), or any standard I2S DAC/ADC supporting 256fs MCLK (24.576 MHz generated via ESP32-S3 APLL).
 - **Bluetooth Bridge (Optional)**: ESP32-WROOM (or any classic ESP32 module) running the included bridge firmware.
 
-> [!WARNING]
-> The ESP32-S3-N16R8 is strictly required, modules without PSRAM or with Quad PSRAM (N8R2, N16R2) will panic on boot.
+**Note:** The ESP32-S3-N16R8 is strictly required; modules without PSRAM or with Quad PSRAM (N8R2, N16R2) will panic on boot.
 
 
 ## Getting Started
@@ -50,18 +49,12 @@ pio test -e yd_esp32s3_n16r8 --without-uploading --without-testing # Run test su
 pio device monitor -e yd_esp32s3_n16r8  # Serial monitor
 ```
 
-## Security & LAN-Only Architecture
+## Security & OTA
 
-- **100% LAN-Only Operation**: Designed strictly for private local networks. No external cloud endpoints, external telemetry, or internet access is required or attempted.
-- **Access Control**: Administrative endpoints (`/update`, `/api/ota/auth`, `/api/reboot`, `/console`, `/api/logs`) are protected by HTTP Digest Authentication.
-  - **Default Credentials**: Username `admin`, Password `admin`.
-  - **Change Password**: Update credentials via `POST /api/auth` (e.g., `curl -X POST --digest -u admin:admin -d "user=admin&pass=newpass" http://dsp.local/api/auth`). Credentials are persisted in NVS (`dsp_auth`).
-- **OTA Safety, Rollback & Bad-OTA Recovery**:
-  - Dual 6.25 MB partition layout (`app0` and `app1`) with ESP-IDF hardware bootloader rollback support.
-  - Binary header validation (0xE9 magic byte check) prevents flashing corrupted images.
-  - Rollback cancellation is deferred for 5 seconds of healthy system and audio task runtime after boot. If a watchdog reset or crash occurs during initial startup, the device automatically reverts to the previous working partition.
-  - ArduinoOTA network flashing requires an NVS password and is automatically disabled when operating in Access Point (AP) mode.
-  - **USB Recovery & Factory Reset**: If a bad flash or misconfiguration prevents booting or network access, connect via USB (`COM4` or auto-detected port) and run `pio run -e yd_esp32s3_n16r8 -t upload` (and `pio run -e yd_esp32s3_n16r8 -t erase` to factory-reset NVS settings, Wi-Fi config, and auth credentials).
+- LAN-only appliance; no external cloud endpoints or telemetry.
+- `/update`, `/api/ota/auth`, `/api/reboot`, `/console`, and `/api/logs` use HTTP Digest auth (default `admin` / `admin`, stored in NVS `dsp_auth`, updatable via `POST /api/auth`).
+- Dual 6.25 MB OTA partitions (`app0`, `app1`) with 0xE9 header check and 5 s boot rollback confirmation. ArduinoOTA requires an NVS password and is disabled in AP mode.
+- USB recovery: `pio run -e yd_esp32s3_n16r8 -t upload` (or `-t erase` to factory-reset NVS).
 
 ## Architecture
 
@@ -119,11 +112,11 @@ The board exposes a REST API and a WebSocket at `/ws`:
 
 ## License & Credits
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE](LICENSE), [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), and [SECURITY.md](SECURITY.md) for license terms, corresponding source notices, and security guidance.
+This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Third-Party Acknowledgements
 
-- **Squeezelite**: (c) 2012–2015 Adrian Smith, 2015–2021 Ralph Irving (GPLv3).
+- **Squeezelite**: (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving (GPLv3).
 - **squeezelite-esp32**: (c) Philippe G. / sle118 (GPLv3).
 - **dr_flac**: (c) 2023 David Reid (Public Domain / MIT-0).
 - **ESP32-A2DP**: (c) Phil Schatzmann (Apache-2.0).

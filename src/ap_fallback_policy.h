@@ -35,7 +35,7 @@ inline bool apIsCaptivePortalProbePath(const char* path) {
         if (strcmp(path, probe) == 0) {
             return true;
         }
-        // Handle probe URLs that carry query strings (e.g. /generate_204?...)
+        // Probe URL with query string
         if (strncmp(path, probe, probeLen) == 0 && path[probeLen] == '?') {
             return true;
         }
@@ -94,7 +94,7 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
         return 0;
     }
 
-    // Only respond to standard queries (QR=0, Opcode=0) with at least one question.
+    // Standard queries only
     if ((req[2] & 0x80U) != 0 || (req[2] & 0x78U) != 0) {
         return 0;
     }
@@ -103,7 +103,7 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
         return 0;
     }
 
-    // Bounds-check Question #1 QName labels and optional compression pointer.
+    // QName bounds check
     char qname[64];
     size_t qnameLen = 0;
     bool qnameOverflow = false;
@@ -157,8 +157,7 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
     const uint16_t qclass = (static_cast<uint16_t>(req[pos + 2]) << 8) | req[pos + 3];
     const size_t qEnd = pos + 4U;
 
-    // Resolve local DSP hostnames (IN/ANY A -> AP IP, AAAA/other -> NoError NODATA),
-    // and return NXDOMAIN for external domains so phones don't open captive popups.
+    // Local DSP A records, NXDOMAIN for external
     const bool wantAnswerA = isLocalHost && (qtype == 1U) && (qclass == 1U || qclass == 255U);
     const size_t respLen = qEnd + (wantAnswerA ? kDnsAnswerALen : 0U);
     if (respLen > outCap) {
@@ -225,8 +224,7 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
     WiFi.persistent(false);
     WiFi.setAutoReconnect(false);
 
-    // Ensure driver stays initialized while clearing STA credentials so
-    // wifiLowLevelDeinit() -> esp_wifi_init() doesn't reload stale NVS STA config.
+    // Clear STA credentials
     if (WiFi.getMode() & WIFI_MODE_STA) {
         esp_wifi_disconnect();
         wifi_config_t emptySta{};
@@ -239,7 +237,7 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
     WiFi.mode(WIFI_AP);
     delay(120); // Let arduino_events drain any already-queued STA_DISCONNECTED
 
-    // Guard against WiFiGeneric's static first_connect flipping mode back to AP_STA
+    // Keep pure AP mode
     WiFi.setAutoReconnect(false);
     if (WiFi.getMode() != WIFI_AP) {
         if (WiFi.getMode() & WIFI_MODE_STA) {
@@ -248,7 +246,7 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
         WiFi.mode(WIFI_AP);
     }
 
-    // Keep ESP-IDF's native 192.168.4.1/24 AP config & 100-address DHCPS pool intact.
+    // SoftAP & DHCPS setup
     WiFi.softAP(apSsid, nullptr, 1, 0, 4, false);
     apEnsureSoftApDhcpRunning();
     WiFi.setSleep(false);

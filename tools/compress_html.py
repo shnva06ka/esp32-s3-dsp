@@ -6,7 +6,6 @@ with open("data/index.html", "rb") as f:
 gz = gzip.compress(data, compresslevel=9, mtime=0)
 
 with open("src/eq_html.h", "w", encoding="utf-8", newline="\n") as f:
-    f.write("// Auto-generated from data/index.html\n")
     f.write("#pragma once\n")
     f.write("#include <Arduino.h>\n\n")
     f.write(f"inline const uint32_t PAGE_INDEX_HTML_GZ_LEN = {len(gz)};\n")

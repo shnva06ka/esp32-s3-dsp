@@ -4,7 +4,9 @@
 #include <cstring>
 #if __has_include(<esp_dsp.h>)
 #include <esp_dsp.h>
+#ifndef HAVE_ESP_DSP
 #define HAVE_ESP_DSP 1
+#endif
 #endif
 #include "audio_config.h"
 #include "param_store.h"
@@ -37,70 +39,73 @@ public:
     }
 
     void process(float* left, float* right, size_t frames, int numBands = kEQBands) {
+        if (frames == 0 || numBands <= 0) return;
         if (numBands > kEQBands) numBands = kEQBands;
-        for (size_t i = 0; i < frames; ++i) {
-            if (!std::isfinite(left[i]))  left[i]  = 0.0f;
-            if (!std::isfinite(right[i])) right[i] = 0.0f;
-        }
+        bool anyEnabled = false;
         for (int b = 0; b < numBands; ++b) {
             if (!_enabled[b]) continue;
+            anyEnabled = true;
 #if defined(HAVE_ESP_DSP)
             dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[b][0], _zL[b][0]);
             dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[b][0], _zR[b][0]);
-            _sanitizeBlockAndState(left, frames, _zL[b][0]);
-            _sanitizeBlockAndState(right, frames, _zR[b][0]);
+            _sanitizeBlockAndState(left, frames, _zL[b][0], _coeffs[b][0]);
+            _sanitizeBlockAndState(right, frames, _zR[b][0], _coeffs[b][0]);
             if (_hasSecondStage[b]) {
                 dsps_biquad_f32(left,  left,  static_cast<int>(frames), _coeffs[b][1], _zL[b][1]);
                 dsps_biquad_f32(right, right, static_cast<int>(frames), _coeffs[b][1], _zR[b][1]);
-                _sanitizeBlockAndState(left, frames, _zL[b][1]);
-                _sanitizeBlockAndState(right, frames, _zR[b][1]);
+                _sanitizeBlockAndState(left, frames, _zL[b][1], _coeffs[b][1]);
+                _sanitizeBlockAndState(right, frames, _zR[b][1], _coeffs[b][1]);
             }
 #else
-            _processStage(left, right, frames, _coeffs[b][0], _zL[b][0], _zR[b][0]);
+            _processStageChannel(left,  frames, _coeffs[b][0], _zL[b][0]);
+            _processStageChannel(right, frames, _coeffs[b][0], _zR[b][0]);
             if (_hasSecondStage[b]) {
-                _processStage(left, right, frames, _coeffs[b][1], _zL[b][1], _zR[b][1]);
+                _processStageChannel(left,  frames, _coeffs[b][1], _zL[b][1]);
+                _processStageChannel(right, frames, _coeffs[b][1], _zR[b][1]);
             }
 #endif
+        }
+        if (!anyEnabled) {
+            _scrubBlockNonFinite(left, frames);
+            _scrubBlockNonFinite(right, frames);
         }
     }
 
 private:
-    static inline void _sanitizeBlockAndState(float* buf, size_t frames, float* z) {
+    static inline void _scrubBlockNonFinite(float* buf, size_t frames) {
+        for (size_t i = 0; i < frames; ++i) {
+            if (!std::isfinite(buf[i])) buf[i] = 0.0f;
+        }
+    }
+
+    static inline void _sanitizeBlockAndState(float* buf, size_t frames, float* z, const float* c) {
+        const bool zeroFeedback = (c[3] == 0.0f && c[4] == 0.0f);
         if (!std::isfinite(z[0]) || !std::isfinite(z[1])) {
             z[0] = 0.0f;
             z[1] = 0.0f;
-            for (size_t i = 0; i < frames; ++i) {
-                if (!std::isfinite(buf[i])) buf[i] = 0.0f;
-            }
+            _scrubBlockNonFinite(buf, frames);
         } else {
+            if (zeroFeedback) {
+                _scrubBlockNonFinite(buf, frames);
+            }
             if (fabsf(z[0]) < 1e-15f) z[0] = 0.0f;
             if (fabsf(z[1]) < 1e-15f) z[1] = 0.0f;
         }
     }
 
-    static inline void _processStage(float* left, float* right, size_t frames,
-                                     const float* c, float* wL, float* wR) {
+    static inline void _processStageChannel(float* buf, size_t frames,
+                                            const float* c, float* w) {
+        const float b0 = c[0], b1 = c[1], b2 = c[2], a1 = c[3], a2 = c[4];
+        float w0 = w[0], w1 = w[1];
         for (size_t i = 0; i < frames; ++i) {
-            float inL = left[i];
-            if (!std::isfinite(inL)) inL = 0.0f;
-            float d0L = inL - c[3] * wL[0] - c[4] * wL[1];
-            if (fabsf(d0L) < 1e-15f) d0L = 0.0f;
-            float outL = c[0] * d0L + c[1] * wL[0] + c[2] * wL[1];
-            if (!std::isfinite(outL)) { outL = 0.0f; d0L = 0.0f; wL[0] = 0.0f; wL[1] = 0.0f; }
-            left[i]   = outL;
-            wL[1] = wL[0];
-            wL[0] = d0L;
-
-            float inR = right[i];
-            if (!std::isfinite(inR)) inR = 0.0f;
-            float d0R = inR - c[3] * wR[0] - c[4] * wR[1];
-            if (fabsf(d0R) < 1e-15f) d0R = 0.0f;
-            float outR = c[0] * d0R + c[1] * wR[0] + c[2] * wR[1];
-            if (!std::isfinite(outR)) { outR = 0.0f; d0R = 0.0f; wR[0] = 0.0f; wR[1] = 0.0f; }
-            right[i]  = outR;
-            wR[1] = wR[0];
-            wR[0] = d0R;
+            const float d0 = buf[i] - a1 * w0 - a2 * w1;
+            buf[i] = b0 * d0 + b1 * w0 + b2 * w1;
+            w1 = w0;
+            w0 = d0;
         }
+        w[0] = w0;
+        w[1] = w1;
+        _sanitizeBlockAndState(buf, frames, w, c);
     }
 
     float _coeffs[kEQBands][2][5]{};

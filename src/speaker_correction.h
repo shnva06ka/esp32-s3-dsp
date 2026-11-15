@@ -4,7 +4,9 @@
 #include <cstring>
 #if __has_include(<esp_dsp.h>)
 #include <esp_dsp.h>
+#ifndef HAVE_ESP_DSP
 #define HAVE_ESP_DSP 1
+#endif
 #endif
 #include "audio_config.h"
 #include "param_store.h"
@@ -60,7 +62,8 @@ public:
         float effL = (minD < 0.0f) ? (dMsL - minD) : dMsL;
         float effR = (minD < 0.0f) ? (dMsR - minD) : dMsR;
 
-        bool hadDelay = (_delaySamplesL > 0.01f || _delaySamplesR > 0.01f);
+        const bool hadDelayL = (_delaySamplesL > 0.01f);
+        const bool hadDelayR = (_delaySamplesR > 0.01f);
 
         _delaySamplesL = effL * (Fs / 1000.0f);
         _delaySamplesR = effR * (Fs / 1000.0f);
@@ -69,10 +72,15 @@ public:
         if (_delaySamplesL > maxDelaySamples) _delaySamplesL = maxDelaySamples;
         if (_delaySamplesR > maxDelaySamples) _delaySamplesR = maxDelaySamples;
 
-        bool hasDelay = (_delaySamplesL > 0.01f || _delaySamplesR > 0.01f);
-        if (!hadDelay && hasDelay) {
+        const bool hasDelayL = (_delaySamplesL > 0.01f);
+        const bool hasDelayR = (_delaySamplesR > 0.01f);
+        if (!hadDelayL && hasDelayL) {
             memset(_delayBufL, 0, sizeof(_delayBufL));
+        }
+        if (!hadDelayR && hasDelayR) {
             memset(_delayBufR, 0, sizeof(_delayBufR));
+        }
+        if (!hadDelayL && !hadDelayR && (hasDelayL || hasDelayR)) {
             _delayWriteIdx = 0;
         }
 
@@ -83,12 +91,12 @@ public:
     void process(float* left, float* right, size_t frames) {
         if (!_enabled || frames == 0) return;
 
-        for (size_t i = 0; i < frames; ++i) {
-            if (!std::isfinite(left[i]))  left[i]  = 0.0f;
-            if (!std::isfinite(right[i])) right[i] = 0.0f;
+        if (_subsonic.isEnabled()) {
+            _subsonic.process(left, right, frames);
+        } else {
+            _scrubNonFinite(left, frames);
+            _scrubNonFinite(right, frames);
         }
-
-        _subsonic.process(left, right, frames);
 
 #if defined(HAVE_ESP_DSP)
         if (fabsf(_gainL - 1.0f) > 1e-4f) {
@@ -98,9 +106,13 @@ public:
             dsps_mulc_f32(right, right, static_cast<int>(frames), _gainR, 1, 1);
         }
 #else
-        if (fabsf(_gainL - 1.0f) > 1e-4f || fabsf(_gainR - 1.0f) > 1e-4f) {
+        if (fabsf(_gainL - 1.0f) > 1e-4f) {
             for (size_t i = 0; i < frames; ++i) {
-                left[i]  *= _gainL;
+                left[i] *= _gainL;
+            }
+        }
+        if (fabsf(_gainR - 1.0f) > 1e-4f) {
+            for (size_t i = 0; i < frames; ++i) {
                 right[i] *= _gainR;
             }
         }
@@ -109,44 +121,18 @@ public:
         const bool needDelayL = (_delaySamplesL > 0.01f);
         const bool needDelayR = (_delaySamplesR > 0.01f);
 
-        if (!needDelayL && !needDelayR && _phaseDegL == 0 && _phaseDegR == 0) {
-            return;
+        if (needDelayL) {
+            _processDelayChannel(left, frames, _delayBufL, _delayWriteIdx, _delaySamplesL);
+        }
+        if (needDelayR) {
+            _processDelayChannel(right, frames, _delayBufR, _delayWriteIdx, _delaySamplesR);
+        }
+        if (needDelayL || needDelayR) {
+            _delayWriteIdx = (_delayWriteIdx + frames) & (kDelayBufSize - 1);
         }
 
-        const size_t delayIntL = static_cast<size_t>(_delaySamplesL);
-        const float  fracL     = _delaySamplesL - static_cast<float>(delayIntL);
-        const float  invFracL  = 1.0f - fracL;
-
-        const size_t delayIntR = static_cast<size_t>(_delaySamplesR);
-        const float  fracR     = _delaySamplesR - static_cast<float>(delayIntR);
-        const float  invFracR  = 1.0f - fracR;
-
-        constexpr size_t kMask = kDelayBufSize - 1;
-
-        for (size_t i = 0; i < frames; ++i) {
-            float sL = left[i];
-            float sR = right[i];
-
-            _delayBufL[_delayWriteIdx] = sL;
-            _delayBufR[_delayWriteIdx] = sR;
-
-            if (needDelayL) {
-                size_t idxA = (_delayWriteIdx - delayIntL) & kMask;
-                size_t idxB = (idxA - 1) & kMask;
-                sL = _delayBufL[idxA] * invFracL + _delayBufL[idxB] * fracL;
-            }
-
-            if (needDelayR) {
-                size_t idxA = (_delayWriteIdx - delayIntR) & kMask;
-                size_t idxB = (idxA - 1) & kMask;
-                sR = _delayBufR[idxA] * invFracR + _delayBufR[idxB] * fracR;
-            }
-
-            _delayWriteIdx = (_delayWriteIdx + 1) & kMask;
-
-            left[i]  = _applyPhase(sL, _phaseDegL, _hStateL);
-            right[i] = _applyPhase(sR, _phaseDegR, _hStateR);
-        }
+        _processPhaseChannel(left,  frames, _phaseDegL, _hStateL, needDelayL ? _delayBufL : nullptr);
+        _processPhaseChannel(right, frames, _phaseDegR, _hStateR, needDelayR ? _delayBufR : nullptr);
     }
 
 private:
@@ -178,21 +164,80 @@ private:
         return 180;
     }
 
-    static inline float _ap1(float x, float c, float& s) {
-        if (!std::isfinite(s)) s = 0.0f;
-        float y = c * x + s;
-        s = x - c * y;
-        if (!std::isfinite(y) || !std::isfinite(s)) {
-            s = 0.0f;
-            return 0.0f;
+    static inline void _scrubNonFinite(float* buf, size_t count) {
+        for (size_t i = 0; i < count; ++i) {
+            if (!std::isfinite(buf[i])) buf[i] = 0.0f;
         }
-        if (fabsf(s) < 1e-15f) s = 0.0f;
+    }
+
+    static inline bool _sanitizeHilbertState(float* state, size_t count) {
+        bool fault = false;
+        for (size_t k = 0; k < count; ++k) {
+            if (!std::isfinite(state[k])) {
+                fault = true;
+                break;
+            }
+        }
+        if (fault) {
+            memset(state, 0, count * sizeof(float));
+            return true;
+        }
+        for (size_t k = 0; k < count; ++k) {
+            if (fabsf(state[k]) < 1e-15f) {
+                state[k] = 0.0f;
+            }
+        }
+        return false;
+    }
+
+    static inline void _processDelayChannel(float* buf, size_t frames, float* delayBuf,
+                                            size_t writeIdx, float delaySamples) {
+        constexpr size_t kMask = kDelayBufSize - 1;
+        const size_t delayInt = static_cast<size_t>(delaySamples);
+        const float  frac     = delaySamples - static_cast<float>(delayInt);
+        const float  invFrac  = 1.0f - frac;
+
+        for (size_t i = 0; i < frames; ++i) {
+            delayBuf[writeIdx] = buf[i];
+            const size_t idxA = (writeIdx - delayInt) & kMask;
+            const size_t idxB = (idxA - 1) & kMask;
+            buf[i] = delayBuf[idxA] * invFrac + delayBuf[idxB] * frac;
+            writeIdx = (writeIdx + 1) & kMask;
+        }
+    }
+
+    static inline float _ap1(float x, float c, float& s) {
+        const float y = c * x + s;
+        s = x - c * y;
         return y;
     }
 
-    static inline float _applyPhase(float x, int16_t deg, float* state) {
-        if (deg == 0) return x;
-        if (deg == 180 || deg == -180) return -x;
+    static inline void _processPhaseChannel(float* buf, size_t frames, int16_t deg,
+                                            float* state, float* delayBuf) {
+        if (deg == 0) return;
+        if (deg == 180 || deg == -180) {
+#if defined(HAVE_ESP_DSP)
+            dsps_mulc_f32(buf, buf, static_cast<int>(frames), -1.0f, 1, 1);
+#else
+            for (size_t i = 0; i < frames; ++i) {
+                buf[i] = -buf[i];
+            }
+#endif
+            return;
+        }
+
+        static constexpr float kSqrtHalf = 0.70710678f;
+        float wI = 0.0f;
+        float wQ = 0.0f;
+        switch (deg) {
+            case 90:   wI =  0.0f;       wQ = -1.0f;       break;
+            case -90:  wI =  0.0f;       wQ =  1.0f;       break;
+            case 45:   wI =  kSqrtHalf;  wQ = -kSqrtHalf;  break;
+            case -45:  wI =  kSqrtHalf;  wQ =  kSqrtHalf;  break;
+            case 135:  wI = -kSqrtHalf;  wQ = -kSqrtHalf;  break;
+            case -135: wI = -kSqrtHalf;  wQ =  kSqrtHalf;  break;
+            default:   return;
+        }
 
         // 7+7 first-order all-pass Hilbert network tuned for 96 kHz (20 Hz..20 kHz, <= 1.1 deg error)
         static constexpr float kCoeffsI[7] = {
@@ -202,20 +247,21 @@ private:
             -0.99992052f, -0.99929639f, -0.99555072f, -0.97214268f, -0.83572099f, -0.27635952f, 0.56445904f
         };
 
-        float xI = x;
-        float xQ = x;
-        for (int k = 0; k < 7; ++k) {
-            xI = _ap1(xI, kCoeffsI[k], state[k]);
-            xQ = _ap1(xQ, kCoeffsQ[k], state[7 + k]);
+        for (size_t i = 0; i < frames; ++i) {
+            float xI = buf[i];
+            float xQ = xI;
+            for (int k = 0; k < 7; ++k) {
+                xI = _ap1(xI, kCoeffsI[k], state[k]);
+                xQ = _ap1(xQ, kCoeffsQ[k], state[7 + k]);
+            }
+            buf[i] = wI * xI + wQ * xQ;
         }
 
-        if (deg == 90)   return -xQ;
-        if (deg == -90)  return  xQ;
-        if (deg == 45)   return  0.70710678f * xI - 0.70710678f * xQ;
-        if (deg == -45)  return  0.70710678f * xI + 0.70710678f * xQ;
-        if (deg == 135)  return -0.70710678f * xI - 0.70710678f * xQ;
-        if (deg == -135) return -0.70710678f * xI + 0.70710678f * xQ;
-
-        return x;
+        if (_sanitizeHilbertState(state, 14)) {
+            _scrubNonFinite(buf, frames);
+            if (delayBuf) {
+                _scrubNonFinite(delayBuf, kDelayBufSize);
+            }
+        }
     }
 };

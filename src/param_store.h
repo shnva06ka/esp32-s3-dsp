@@ -131,7 +131,7 @@ public:
                 xSemaphoreTake(_mutex, portMAX_DELAY);
                 _eqEnabled = (blob.eqEnabled != 0);
                 _eqCount   = (blob.eqCount >= 1 && blob.eqCount <= kEQBands) ? blob.eqCount : 5;
-                _preampDb  = (std::isfinite(blob.preampDb) && blob.preampDb >= -18.0f && blob.preampDb <= 18.0f) ? blob.preampDb : 0.0f;
+                _preampDb  = (std::isfinite(blob.preampDb) && blob.preampDb >= -24.0f && blob.preampDb <= 24.0f) ? blob.preampDb : 0.0f;
                 memcpy(_eq, blob.eq, sizeof(_eq));
                 for (int b = 0; b < kEQBands; ++b) _sanitizeEQBand(_eq[b]);
                 _subsonic = blob.subsonic;
@@ -168,7 +168,7 @@ public:
                 int eqCnt = prefs.getInt("eq_cnt", 5);
                 if (eqCnt < 1 || eqCnt > kEQBands) eqCnt = 5;
                 float preamp = prefs.getFloat("preamp", 0.0f);
-                if (!std::isfinite(preamp) || preamp < -18.0f || preamp > 18.0f) preamp = 0.0f;
+                if (!std::isfinite(preamp) || preamp < -24.0f || preamp > 24.0f) preamp = 0.0f;
 
                 if (prefs.getBytes("eq_bands", _eq, sizeof(_eq)) != sizeof(_eq)) {
                     _loadDefaults();
@@ -443,8 +443,8 @@ public:
     void setPreamp(float db) {
         xSemaphoreTake(_mutex, portMAX_DELAY);
         if (!std::isfinite(db)) db = 0.0f;
-        if (db < -18.0f) db = -18.0f;
-        if (db >  18.0f) db =  18.0f;
+        if (db < -24.0f) db = -24.0f;
+        if (db >  24.0f) db =  24.0f;
         _preampDb = db;
         _eqVersion.fetch_add(1, std::memory_order_release);
         _markDirtyLocked();
@@ -770,7 +770,8 @@ private:
     static void _sanitizeSubsonic(SubsonicParams& s) {
         if (!std::isfinite(s.freq) || s.freq < 20.0f) s.freq = 20.0f;
         if (s.freq > 100.0f) s.freq = 100.0f;
-        if (s.order < 1 || s.order > 4) s.order = 2;
+            // order == 0 means the Subsonic high-pass filter is bypassed independently of Channel Correction
+        if (s.order > 4) s.order = 2;
         if (!std::isfinite(s.balance)) s.balance = 0.0f;
         if (s.balance < -100.0f) s.balance = -100.0f;
         if (s.balance >  100.0f) s.balance =  100.0f;

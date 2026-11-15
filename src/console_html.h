@@ -1,34 +1,60 @@
 #pragma once
 
 static const char s_consoleHtml[] PROGMEM = R"rawhtml(<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ESP32-S3-DSP Live Console</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232E3440'/%3E%3Cpath d='M4 16 C 8 6, 12 6, 16 16 C 20 26, 24 26, 28 16' fill='none' stroke='%2388C0D0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0c0c0e; color: #e1e1e6; margin: 0; padding: 15px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
-.header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #27272a; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
-.title { font-size: 18px; font-weight: 700; color: #a855f7; display: flex; align-items: center; gap: 8px; }
+:root {
+  --bg: #1A1E25;
+  --card-bg: #232831;
+  --card-header: #2B313C;
+  --border: #353C49;
+  --border-strong: #4A5262;
+  --text: #ECEFF4;
+  --muted: #9AA5BA;
+  --accent: #88C0D0;
+  --on-accent: #1A1E25;
+  --aurora-red: #BF616A;
+  --aurora-orange: #D08770;
+  --aurora-yellow: #EBCB8B;
+  --aurora-green: #A3BE8C;
+  --aurora-purple: #B48EAD;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+::selection { background: var(--accent); color: var(--on-accent); }
+body { font-family: var(--mono); font-variant-numeric: tabular-nums; background: var(--bg); color: var(--text); margin: 0; padding: 14px 16px; display: flex; flex-direction: column; height: 100vh; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
+.title { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); display: flex; align-items: center; gap: 10px; }
 .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-button, .btn-link { background: #27272a; color: #e4e4e7; border: 1px solid #3f3f46; padding: 6px 12px; font-size: 13px; font-weight: 500; border-radius: 6px; cursor: pointer; transition: 0.2s; text-decoration: none; display: inline-flex; align-items: center; }
-button:hover, .btn-link:hover { background: #3f3f46; }
-button.active { background: #7c3aed; border-color: #a855f7; color: #fff; }
-button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
-.btn-link.ota { background: #9333ea; border-color: #a855f7; color: #fff; }
-.btn-link.ota:hover { background: #7e22ce; }
-.badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #18181b; border: 1px solid #27272a; color: #a1a1aa; }
-.badge.green { color: #4ade80; border-color: #166534; background: #052e16; }
-.badge.red { color: #f87171; border-color: #991b1b; background: #450a0a; }
-.terminal { flex: 1; background: #141417; border: 1px solid #27272a; border-radius: 8px; margin-top: 12px; padding: 12px; font-family: "JetBrains Mono", Consolas, "Courier New", monospace; font-size: 13px; line-height: 1.45; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #d4d4d8; }
+button, .btn-link { font-family: var(--mono); background: var(--card-header); color: var(--text); border: 1px solid var(--border-strong); padding: 5px 11px; font-size: 11px; font-weight: 700; border-radius: 4px; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; text-decoration: none; display: inline-flex; align-items: center; }
+button:hover, .btn-link:hover { background: #353C49; border-color: var(--accent); }
+button:focus-visible, .btn-link:focus-visible, .footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.danger:hover { background: var(--aurora-red); border-color: var(--aurora-red); color: #ECEFF4; }
+.btn-link.ota { background: var(--card-header); border-color: var(--accent); color: var(--accent); }
+.btn-link.ota:hover { background: var(--accent); color: var(--on-accent); }
+.badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--card-header); border: 1px solid var(--border-strong); color: var(--muted); text-transform: none; letter-spacing: 0; }
+.badge.green { color: var(--aurora-green); border-color: rgba(163, 190, 140, 0.4); background: rgba(163, 190, 140, 0.12); }
+.badge.red { color: var(--aurora-red); border-color: rgba(191, 97, 106, 0.4); background: rgba(191, 97, 106, 0.12); }
+.terminal { flex: 1; background: #000000; border: 1px solid var(--border); border-radius: 6px; margin-top: 12px; padding: 12px 14px; font-family: var(--mono); font-size: 12px; line-height: 1.5; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #D8DEE9; scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--card-bg); }
+.terminal::-webkit-scrollbar { width: 8px; height: 8px; }
+.terminal::-webkit-scrollbar-track { background: var(--card-bg); border-radius: 4px; }
+.terminal::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+.terminal::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 .log-line { margin: 0; padding: 1px 0; }
-.log-line.boot { color: #38bdf8; }
-.log-line.audio { color: #c084fc; }
-.log-line.slim { color: #4ade80; }
-.log-line.warn { color: #fbbf24; }
-.log-line.err { color: #f87171; }
-.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 12px; color: #9ca3af; flex-shrink: 0; }
-.footer a { color: #a855f7; text-decoration: none; }
+.log-line.boot { color: var(--accent); }
+.log-line.audio { color: var(--aurora-purple); }
+.log-line.slim { color: var(--aurora-green); }
+.log-line.warn { color: var(--aurora-yellow); }
+.log-line.err { color: var(--aurora-red); }
+.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.footer code { color: var(--text); }
+.footer a { color: var(--accent); text-decoration: none; font-weight: 700; text-underline-offset: 3px; }
 .footer a:hover { text-decoration: underline; }
 </style>
 </head>
@@ -36,13 +62,13 @@ button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
 <div class="header">
   <div class="title">
     <span>ESP32-S3-DSP Live Console</span>
-    <span id="wsStatus" class="badge red">Connecting...</span>
+    <span id="wsStatus" class="badge red" role="status" aria-live="polite">Connecting...</span>
   </div>
   <div class="controls">
-    <button id="scrollBtn" class="active" onclick="toggleScroll()">Auto-scroll: ON</button>
-    <button onclick="clearLogs()">Clear</button>
-    <button onclick="copyLogs()">Copy</button>
-    <button class="danger" onclick="rebootEsp()">Reboot</button>
+    <button type="button" id="scrollBtn" class="active" onclick="toggleScroll()" aria-pressed="true">Auto-scroll: ON</button>
+    <button type="button" onclick="clearLogs()">Clear</button>
+    <button type="button" id="copyBtn" onclick="copyLogs()">Copy</button>
+    <button type="button" id="rebootBtn" class="danger" onclick="rebootEsp()">Reboot</button>
     <a class="btn-link ota" href="/?ota=1">OTA Update</a>
   </div>
 </div>
@@ -51,7 +77,7 @@ button.danger:hover { background: #dc2626; border-color: #ef4444; color: #fff; }
 
 <div class="footer">
   <div>Telnet mirror: <code>port 23</code> &bull; WebSocket: <code>/ws</code></div>
-  <div><a href="/">&larr; Return to DSP Dashboard</a> &bull; <a href="/?ota=1">Firmware Update (OTA) &rarr;</a></div>
+  <div><a class="btn-link" href="/">&larr; Return to DSP Dashboard</a></div>
 </div>
 
 <script>
@@ -64,16 +90,29 @@ function toggleScroll() {
   const btn = document.getElementById('scrollBtn');
   btn.innerText = 'Auto-scroll: ' + (autoScroll ? 'ON' : 'OFF');
   btn.className = autoScroll ? 'active' : '';
+  btn.setAttribute('aria-pressed', autoScroll ? 'true' : 'false');
 }
 
 function clearLogs() {
   term.innerHTML = '';
 }
 
+function flashCopyBtn(msg) {
+  const btn = document.getElementById('copyBtn');
+  if (!btn) return;
+  btn.innerText = msg;
+  btn.classList.add('active');
+  clearTimeout(flashCopyBtn._t);
+  flashCopyBtn._t = setTimeout(() => {
+    btn.innerText = 'Copy';
+    btn.classList.remove('active');
+  }, 1500);
+}
+
 function copyLogs() {
   const text = term.innerText;
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).then(() => alert('Logs copied to clipboard!')).catch(() => fallbackCopy(text));
+    navigator.clipboard.writeText(text).then(() => flashCopyBtn('Copied!')).catch(() => fallbackCopy(text));
   } else {
     fallbackCopy(text);
   }
@@ -87,25 +126,56 @@ function fallbackCopy(text) {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    alert('Logs copied to clipboard!');
+    flashCopyBtn('Copied!');
   } catch (e) {
-    alert('Failed to copy logs: ' + e);
+    flashCopyBtn('Copy failed');
   }
 }
 
+let rebootArmed = false;
+let rebootArmTimer = null;
 function rebootEsp() {
-  if (confirm('Reboot the ESP32-S3 audio processor?')) {
-    fetch('/api/reboot', { method: 'POST' }).then(res => {
-      if (res.ok) {
-        alert('Reboot command sent. Reconnecting in 5s...');
-        setTimeout(() => location.reload(), 5000);
-      } else {
-        alert('Reboot failed: HTTP ' + res.status);
+  const btn = document.getElementById('rebootBtn');
+  if (!rebootArmed) {
+    rebootArmed = true;
+    if (btn) {
+      btn.innerText = 'Confirm Reboot?';
+      btn.style.background = 'var(--aurora-red)';
+      btn.style.borderColor = 'var(--aurora-red)';
+      btn.style.color = '#ECEFF4';
+    }
+    clearTimeout(rebootArmTimer);
+    rebootArmTimer = setTimeout(() => {
+      rebootArmed = false;
+      if (btn) {
+        btn.innerText = 'Reboot';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
       }
-    }).catch(err => {
-      alert('Reboot network error: ' + err);
-    });
+    }, 3500);
+    return;
   }
+  clearTimeout(rebootArmTimer);
+  rebootArmed = false;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Rebooting...';
+  }
+  appendLog('[BOOT] Sending reboot command to ESP32-S3...');
+  fetch('/api/reboot', { method: 'POST' }).then(res => {
+    if (res.ok) {
+      statusBadge.className = 'badge red';
+      statusBadge.innerText = 'Rebooting (5s)...';
+      setTimeout(() => location.reload(), 5000);
+    } else {
+      if (btn) { btn.disabled = false; btn.innerText = 'Reboot'; btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
+      appendLog('[ERR] Reboot failed: HTTP ' + res.status);
+    }
+  }).catch(err => {
+    if (btn) { btn.disabled = false; btn.innerText = 'Reboot'; btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
+    appendLog('[ERR] Reboot network error: ' + err);
+  });
 }
 
 function appendLog(line) {

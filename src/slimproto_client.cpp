@@ -119,13 +119,14 @@ void SlimprotoClient::_runTelemetry() {
         meta.bitDepth   = sl_source_bits ? sl_source_bits : 16;
         meta.pos        = curFramesPlayed / (uint32_t)SAMPLE_RATE;
 
+        static bool wasStreaming = false;
         if (isStream) {
             idleSinceMs = 0;
             unsigned srcRate = sl_source_rate ? sl_source_rate : (unsigned)SAMPLE_RATE;
             unsigned bits = sl_source_bits ? sl_source_bits : 16;
             snprintf(meta.formatInfo, sizeof(meta.formatInfo), "%u.%u kHz %u-bit",
                      srcRate / 1000, (srcRate % 1000) / 100, bits);
-            if (_params.getInputMode() != INPUT_MODE_WIFI) {
+            if (!wasStreaming && _params.getInputMode() != INPUT_MODE_WIFI) {
                 Console.println("[SLIMPROTO] Auto-switching input mode to Squeezebox");
                 _params.setInputMode(INPUT_MODE_WIFI, false);
             }
@@ -142,6 +143,7 @@ void SlimprotoClient::_runTelemetry() {
             }
         }
 
+        wasStreaming = isStream;
         _params.setWiFiStreamMetadata(meta);
 
         uint32_t now = millis();

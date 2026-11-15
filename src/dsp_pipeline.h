@@ -5,7 +5,9 @@
 #include <cstring>
 #if __has_include(<esp_dsp.h>)
 #include <esp_dsp.h>
+#ifndef HAVE_ESP_DSP
 #define HAVE_ESP_DSP 1
+#endif
 #endif
 #include "param_store.h"
 #include "biquad_eq.h"

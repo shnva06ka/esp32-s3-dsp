@@ -3,7 +3,9 @@
 #include <cmath>
 #if __has_include(<esp_dsp.h>)
 #include <esp_dsp.h>
+#ifndef HAVE_ESP_DSP
 #define HAVE_ESP_DSP 1
+#endif
 #endif
 #include "audio_config.h"
 #include "param_store.h"
@@ -86,12 +88,38 @@ public:
 #endif
             }
         } else {
-            const float gainStep = (targetGain - _currentGain) / static_cast<float>(frames);
-            for (size_t i = 0; i < frames; ++i) {
-                _currentGain += gainStep;
-                left[i]  *= _currentGain;
-                right[i] *= _currentGain;
+            const float startGain = _currentGain;
+            const float gainStep  = (targetGain - startGain) / static_cast<float>(frames);
+            const float step4     = gainStep * 4.0f;
+
+            float g0 = startGain + gainStep;
+            float g1 = startGain + gainStep * 2.0f;
+            float g2 = startGain + gainStep * 3.0f;
+            float g3 = startGain + step4;
+
+            size_t i = 0;
+            for (; i + 3 < frames; i += 4) {
+                left[i]      *= g0;
+                left[i + 1]  *= g1;
+                left[i + 2]  *= g2;
+                left[i + 3]  *= g3;
+
+                right[i]     *= g0;
+                right[i + 1] *= g1;
+                right[i + 2] *= g2;
+                right[i + 3] *= g3;
+
+                g0 += step4;
+                g1 += step4;
+                g2 += step4;
+                g3 += step4;
             }
+            for (; i < frames; ++i) {
+                left[i]  *= g0;
+                right[i] *= g0;
+                g0 += gainStep;
+            }
+            _currentGain = startGain + gainStep * static_cast<float>(frames);
         }
     }
 

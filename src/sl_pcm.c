@@ -7,6 +7,7 @@
  */
 #include "squeezelite.h"
 #include "sl_resample.h"
+#include "xtensa_fpu_helpers.h"
 
 extern struct buffer *streambuf;
 extern struct buffer *outputbuf;
@@ -209,6 +210,125 @@ static void _check_header(bool toend) {
     }
 }
 
+static inline s32_t _pcm_decode_s32(const u8_t *p, u32_t sz, bool be) {
+    if (sz == 1) {
+        return ((s32_t)*p - 128) << 24;
+    }
+    if (sz == 2) {
+        return be
+            ? (s32_t)(((u32_t)p[0] << 24) | ((u32_t)p[1] << 16))
+            : (s32_t)(((u32_t)p[0] << 16) | ((u32_t)p[1] << 24));
+    }
+    if (sz == 3) {
+        return be
+            ? (s32_t)(((u32_t)p[0] << 24) | ((u32_t)p[1] << 16) | ((u32_t)p[2] << 8))
+            : (s32_t)(((u32_t)p[0] << 8)  | ((u32_t)p[1] << 16) | ((u32_t)p[2] << 24));
+    }
+    return be
+        ? (s32_t)(((u32_t)p[0] << 24) | ((u32_t)p[1] << 16) | ((u32_t)p[2] << 8) | (u32_t)p[3])
+        : (s32_t)((u32_t)p[0] | ((u32_t)p[1] << 8) | ((u32_t)p[2] << 16) | ((u32_t)p[3] << 24));
+}
+
+static inline u32_t _pcm_load_u32_aligned(const u8_t *p) {
+    u32_t w;
+    memcpy(&w, p, sizeof(w));
+    return w;
+}
+
+static void _pcm_unpack_to_float(const u8_t *iptr, frames_t frames,
+                                 u32_t ch, u32_t sz, bool be,
+                                 float * DSP_RESTRICT dstL, float * DSP_RESTRICT dstR) {
+    const float kScale32 = 1.0f / 2147483648.0f;
+
+    if (ch == 2 && !be) {
+        if (sz == 4 && (((uintptr_t)iptr & 3u) == 0u)) {
+            dsp_unpack_i32_stereo_to_f32((const int32_t *)(const void *)iptr,
+                                         dstL, dstR, frames, kScale32, kScale32);
+            return;
+        }
+        if (sz == 2 && (((uintptr_t)iptr & 3u) == 0u)) {
+#if defined(__GNUC__) || defined(__clang__)
+            iptr = (const u8_t *)__builtin_assume_aligned(iptr, 4);
+#endif
+            frames_t i = 0;
+            for (; i + 4u <= frames; i += 4u) {
+                const u32_t w0 = _pcm_load_u32_aligned(iptr);
+                const u32_t w1 = _pcm_load_u32_aligned(iptr + 4);
+                dstL[0] = (float)(s32_t)(w0 << 16)         * kScale32;
+                dstR[0] = (float)(s32_t)(w0 & 0xFFFF0000u) * kScale32;
+                dstL[1] = (float)(s32_t)(w1 << 16)         * kScale32;
+                dstR[1] = (float)(s32_t)(w1 & 0xFFFF0000u) * kScale32;
+
+                const u32_t w2 = _pcm_load_u32_aligned(iptr + 8);
+                const u32_t w3 = _pcm_load_u32_aligned(iptr + 12);
+                dstL[2] = (float)(s32_t)(w2 << 16)         * kScale32;
+                dstR[2] = (float)(s32_t)(w2 & 0xFFFF0000u) * kScale32;
+                dstL[3] = (float)(s32_t)(w3 << 16)         * kScale32;
+                dstR[3] = (float)(s32_t)(w3 & 0xFFFF0000u) * kScale32;
+
+                iptr += 16;
+                dstL += 4;
+                dstR += 4;
+            }
+            for (; i < frames; ++i) {
+                const u32_t w = _pcm_load_u32_aligned(iptr);
+                *dstL++ = (float)(s32_t)(w << 16)         * kScale32;
+                *dstR++ = (float)(s32_t)(w & 0xFFFF0000u) * kScale32;
+                iptr += 4;
+            }
+            return;
+        }
+        if (sz == 3) {
+            frames_t i = 0;
+            for (; i + 4u <= frames; i += 4u) {
+                const s32_t sl0 = _pcm_decode_s32(iptr,      3, false);
+                const s32_t sr0 = _pcm_decode_s32(iptr + 3,  3, false);
+                const s32_t sl1 = _pcm_decode_s32(iptr + 6,  3, false);
+                const s32_t sr1 = _pcm_decode_s32(iptr + 9,  3, false);
+                dstL[0] = (float)sl0 * kScale32;
+                dstR[0] = (float)sr0 * kScale32;
+                dstL[1] = (float)sl1 * kScale32;
+                dstR[1] = (float)sr1 * kScale32;
+
+                const s32_t sl2 = _pcm_decode_s32(iptr + 12, 3, false);
+                const s32_t sr2 = _pcm_decode_s32(iptr + 15, 3, false);
+                const s32_t sl3 = _pcm_decode_s32(iptr + 18, 3, false);
+                const s32_t sr3 = _pcm_decode_s32(iptr + 21, 3, false);
+                dstL[2] = (float)sl2 * kScale32;
+                dstR[2] = (float)sr2 * kScale32;
+                dstL[3] = (float)sl3 * kScale32;
+                dstR[3] = (float)sr3 * kScale32;
+
+                iptr += 24;
+                dstL += 4;
+                dstR += 4;
+            }
+            for (; i < frames; ++i) {
+                *dstL++ = (float)_pcm_decode_s32(iptr,     3, false) * kScale32;
+                *dstR++ = (float)_pcm_decode_s32(iptr + 3, 3, false) * kScale32;
+                iptr += 6;
+            }
+            return;
+        }
+    }
+
+    if (ch == 2) {
+        const size_t step = sz * 2u;
+        for (frames_t i = 0; i < frames; ++i) {
+            *dstL++ = (float)_pcm_decode_s32(iptr,      sz, be) * kScale32;
+            *dstR++ = (float)_pcm_decode_s32(iptr + sz, sz, be) * kScale32;
+            iptr += step;
+        }
+    } else {
+        for (frames_t i = 0; i < frames; ++i) {
+            const float s = (float)_pcm_decode_s32(iptr, sz, be) * kScale32;
+            *dstL++ = s;
+            *dstR++ = s;
+            iptr += sz;
+        }
+    }
+}
+
 static decode_state pcm_decode(void) {
     LOCK_S;
 
@@ -287,7 +407,7 @@ static decode_state pcm_decode(void) {
         return DECODE_RUNNING;
     }
 
-    if (!s_pcmRawIn) {
+    if (!s_pcmRawIn || !s_pcmInL || !s_pcmInR) {
         UNLOCK_S;
         return DECODE_ERROR;
     }
@@ -306,71 +426,12 @@ static decode_state pcm_decode(void) {
     u32_t out_seq = outputbuf->flush_seq;
     UNLOCK_S;
 
-    const u8_t *iptr = s_pcmRawIn;
-    static const float kScale32 = 1.0f / 2147483648.0f;
-
-    for (frames_t i = 0; i < frames; ++i) {
-        s32_t sl = 0, sr = 0;
-        if (channels == 2) {
-            if (sample_size == 1) {
-                sl = ((s32_t)*iptr++ - 128) << 24;
-                sr = ((s32_t)*iptr++ - 128) << 24;
-            } else if (sample_size == 2) {
-                if (bigendian) {
-                    sl = (s32_t)(((u32_t)iptr[0] << 24) | ((u32_t)iptr[1] << 16));
-                    sr = (s32_t)(((u32_t)iptr[2] << 24) | ((u32_t)iptr[3] << 16));
-                } else {
-                    sl = (s32_t)(((u32_t)iptr[0] << 16) | ((u32_t)iptr[1] << 24));
-                    sr = (s32_t)(((u32_t)iptr[2] << 16) | ((u32_t)iptr[3] << 24));
-                }
-                iptr += 4;
-            } else if (sample_size == 3) {
-                if (bigendian) {
-                    sl = (s32_t)(((u32_t)iptr[0] << 24) | ((u32_t)iptr[1] << 16) | ((u32_t)iptr[2] << 8));
-                    sr = (s32_t)(((u32_t)iptr[3] << 24) | ((u32_t)iptr[4] << 16) | ((u32_t)iptr[5] << 8));
-                } else {
-                    sl = (s32_t)(((u32_t)iptr[0] << 8) | ((u32_t)iptr[1] << 16) | ((u32_t)iptr[2] << 24));
-                    sr = (s32_t)(((u32_t)iptr[3] << 8) | ((u32_t)iptr[4] << 16) | ((u32_t)iptr[5] << 24));
-                }
-                iptr += 6;
-            } else if (sample_size == 4) {
-                if (bigendian) {
-                    sl = (s32_t)(((u32_t)iptr[0] << 24) | ((u32_t)iptr[1] << 16) | ((u32_t)iptr[2] << 8) | (u32_t)iptr[3]);
-                    sr = (s32_t)(((u32_t)iptr[4] << 24) | ((u32_t)iptr[5] << 16) | ((u32_t)iptr[6] << 8) | (u32_t)iptr[7]);
-                } else {
-                    sl = (s32_t)((u32_t)iptr[0] | ((u32_t)iptr[1] << 8) | ((u32_t)iptr[2] << 16) | ((u32_t)iptr[3] << 24));
-                    sr = (s32_t)((u32_t)iptr[4] | ((u32_t)iptr[5] << 8) | ((u32_t)iptr[6] << 16) | ((u32_t)iptr[7] << 24));
-                }
-                iptr += 8;
-            }
-        } else {
-            // Mono
-            if (sample_size == 1) {
-                sl = sr = ((s32_t)*iptr++ - 128) << 24;
-            } else if (sample_size == 2) {
-                if (bigendian) sl = sr = (s32_t)(((u32_t)iptr[0] << 24) | ((u32_t)iptr[1] << 16));
-                else sl = sr = (s32_t)(((u32_t)iptr[0] << 16) | ((u32_t)iptr[1] << 24));
-                iptr += 2;
-            } else if (sample_size == 3) {
-                if (bigendian) sl = sr = (s32_t)(((u32_t)iptr[0] << 24) | ((u32_t)iptr[1] << 16) | ((u32_t)iptr[2] << 8));
-                else sl = sr = (s32_t)(((u32_t)iptr[0] << 8) | ((u32_t)iptr[1] << 16) | ((u32_t)iptr[2] << 24));
-                iptr += 3;
-            } else if (sample_size == 4) {
-                if (bigendian) sl = sr = (s32_t)(((u32_t)iptr[0] << 24) | ((u32_t)iptr[1] << 16) | ((u32_t)iptr[2] << 8) | (u32_t)iptr[3]);
-                else sl = sr = (s32_t)((u32_t)iptr[0] | ((u32_t)iptr[1] << 8) | ((u32_t)iptr[2] << 16) | ((u32_t)iptr[3] << 24));
-                iptr += 4;
-            }
-        }
-        if (s_pcmInL && s_pcmInR) {
-            s_pcmInL[i] = (float)sl * kScale32;
-            s_pcmInR[i] = (float)sr * kScale32;
-        }
-    }
+    _pcm_unpack_to_float(s_pcmRawIn, frames, channels, sample_size, bigendian, s_pcmInL, s_pcmInR);
 
     size_t out_frames = 0;
     float *writeL = s_pcmInL;
     float *writeR = s_pcmInR;
-    if (s_pcm_rs && s_pcmInL && s_pcmInR && s_pcmOutL && s_pcmOutR) {
+    if (s_pcm_rs && s_pcmOutL && s_pcmOutR) {
         out_frames = resampler_process(s_pcm_rs, s_pcmInL, s_pcmInR, (size_t)frames, s_pcmOutL, s_pcmOutR, RS_OUT_CAP);
         writeL = s_pcmOutL;
         writeR = s_pcmOutR;
@@ -385,17 +446,7 @@ static decode_state pcm_decode(void) {
             ISAMPLE_T *buf_start = (ISAMPLE_T *)(void *)outputbuf->buf;
             ISAMPLE_T *buf_wrap  = (ISAMPLE_T *)(void *)outputbuf->wrap;
 
-            for (size_t i = 0; i < out_frames; ++i) {
-                float rawL = isfinite(writeL[i]) ? writeL[i] : 0.0f;
-                float rawR = isfinite(writeR[i]) ? writeR[i] : 0.0f;
-                float l = fmaxf(-1.0f, fminf(1.0f, rawL));
-                float r = fmaxf(-1.0f, fminf(1.0f, rawR));
-                *optr++ = (s32_t)(l * 2147483392.0f);
-                *optr++ = (s32_t)(r * 2147483392.0f);
-                if (optr >= buf_wrap) {
-                    optr = buf_start;
-                }
-            }
+            dsp_ring_pack_f32_to_i32(optr, buf_start, buf_wrap, writeL, writeR, out_frames);
             _buf_inc_writep(outputbuf, (unsigned)out_frames * BYTES_PER_FRAME);
         }
         UNLOCK_O;
@@ -455,12 +506,7 @@ static struct codec pcm_codec = {
 };
 
 static void *pcm_alloc_staging(size_t bytes) {
-    size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
-    void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!p) p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    if (!p) p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    return p;
+    return dsp_alloc_staging(bytes);
 }
 
 struct codec *register_pcm(void) {

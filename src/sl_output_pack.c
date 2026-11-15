@@ -45,12 +45,24 @@ void _apply_gain(struct buffer *outputbuf, frames_t count, s32_t gainL, s32_t ga
             ptr += 2;
         }
     } else {
-        ISAMPLE_T *ptrL = (ISAMPLE_T *)(void *)outputbuf->readp;
-        ISAMPLE_T *ptrR = (ISAMPLE_T *)(void *)outputbuf->readp + 1;
-        while (count--) {
-            *ptrL = gain(gainL, *ptrL);
-            *ptrR = gain(gainR, *ptrR);
-            ptrL += 2; ptrR += 2;
+        ISAMPLE_T *ptr = (ISAMPLE_T *)(void *)outputbuf->readp;
+        frames_t n = count >> 2;
+        while (n--) {
+            ptr[0] = gain(gainL, ptr[0]);
+            ptr[1] = gain(gainR, ptr[1]);
+            ptr[2] = gain(gainL, ptr[2]);
+            ptr[3] = gain(gainR, ptr[3]);
+            ptr[4] = gain(gainL, ptr[4]);
+            ptr[5] = gain(gainR, ptr[5]);
+            ptr[6] = gain(gainL, ptr[6]);
+            ptr[7] = gain(gainR, ptr[7]);
+            ptr += 8;
+        }
+        frames_t rem = count & 3u;
+        while (rem--) {
+            ptr[0] = gain(gainL, ptr[0]);
+            ptr[1] = gain(gainR, ptr[1]);
+            ptr += 2;
         }
     }
 }
