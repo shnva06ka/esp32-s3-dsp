@@ -12,7 +12,7 @@
 #include "dsp_module_id.h"
 #include "dsp_pipeline.h"
 #include "param_store.h"
-#include "sl_resample.h"
+#include "lms_resample.h"
 #include "ap_fallback_policy.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
@@ -32,7 +32,7 @@ void console_log(const char* buf) {
         Serial.print(buf);
     }
 }
-#include "../../src/sl_resample.c"
+#include "../../src/lms_resample.c"
 #include "../../src/lwip_tcp_tuning.c"
 }
 

@@ -20,18 +20,28 @@ public:
         _right = nullptr;
     }
 
-    bool allocate() {
+    bool allocate(bool preferInternal = true) {
         if (_left && _right) return true;
+        const size_t bytes = CapacityFrames * sizeof(float);
+        auto allocBuf = [bytes, preferInternal]() -> float* {
+            float* p = nullptr;
+            if (preferInternal) {
+                p = static_cast<float*>(heap_caps_aligned_alloc(16, bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+                if (!p) p = static_cast<float*>(heap_caps_malloc(bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT));
+            }
 #if defined(BOARD_HAS_PSRAM)
-        if (psramFound()) {
-            if (!_left)  _left  = static_cast<float*>(heap_caps_malloc(CapacityFrames * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-            if (!_right) _right = static_cast<float*>(heap_caps_malloc(CapacityFrames * sizeof(float), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-        }
+            if (!p && psramFound()) {
+                p = static_cast<float*>(heap_caps_aligned_alloc(16, bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+                if (!p) p = static_cast<float*>(heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+            }
 #endif
-        if (!_left)  _left  = static_cast<float*>(malloc(CapacityFrames * sizeof(float)));
-        if (!_right) _right = static_cast<float*>(malloc(CapacityFrames * sizeof(float)));
-        if (_left)  memset(_left,  0, CapacityFrames * sizeof(float));
-        if (_right) memset(_right, 0, CapacityFrames * sizeof(float));
+            if (!p) p = static_cast<float*>(malloc(bytes));
+            return p;
+        };
+        if (!_left)  _left  = allocBuf();
+        if (!_right) _right = allocBuf();
+        if (_left)  memset(_left,  0, bytes);
+        if (_right) memset(_right, 0, bytes);
         clear();
         return (_left != nullptr && _right != nullptr);
     }

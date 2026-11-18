@@ -10,60 +10,6 @@
 #include <cmath>
 #include "audio_config.h"
 
-enum EQFilterType : uint8_t {
-    EQ_FILTER_PEAK           = 0,
-    EQ_FILTER_LOW_SHELF      = 1,
-    EQ_FILTER_HIGH_SHELF     = 2,
-    EQ_FILTER_LOW_PASS       = 3,
-    EQ_FILTER_HIGH_PASS      = 4,
-    EQ_FILTER_FLAT_LOW_PASS  = 5,
-    EQ_FILTER_FLAT_HIGH_PASS = 6
-};
-
-struct EQBandParams {
-    float   freq{1000.0f};
-    float   gain{0.0f};
-    float   q{0.707f};
-    bool    enabled{true};
-    uint8_t type{EQ_FILTER_PEAK};
-    uint8_t order{2};
-
-    EQBandParams() = default;
-    EQBandParams(float f, float g, float q_, bool en = true, uint8_t t = EQ_FILTER_PEAK, uint8_t ord = 2)
-        : freq(f), gain(g), q(q_), enabled(en), type(t), order(ord) {}
-};
-
-struct SubsonicParams {
-    float   freq{80.0f};
-    uint8_t order{2};
-    bool    enabled{false};
-
-    float   balance{0.0f};
-    float   delayMsL{0.0f};
-    float   delayMsR{0.0f};
-    int16_t phaseL{0};
-    int16_t phaseR{0};
-
-    SubsonicParams() = default;
-    SubsonicParams(float f, uint8_t ord, bool en)
-        : freq(f), order(ord), enabled(en) {}
-};
-
-struct CompanderParams {
-    float threshold{-18.0f};
-    float ratio{4.0f};
-    float attackMs{5.0f};
-    float releaseMs{150.0f};
-    float makeupGain{0.0f};
-    bool  enabled{false};
-};
-
-struct LimiterParams {
-    float ceilingDb{-0.5f};
-    float kneeDb{3.0f};
-    bool  enabled{false};
-};
-
 enum InputSourceMode : uint8_t {
     INPUT_MODE_AUX  = 1,
     INPUT_MODE_BT   = 2,
@@ -239,6 +185,17 @@ public:
                 xSemaphoreGive(_mutex);
             }
         }
+
+        // Load sample rate preferences from separate keys (preserves NvsBlobV2 compatibility).
+        Preferences ratePrefs;
+        if (ratePrefs.begin("dsp_cfg", true)) {
+            const uint32_t savedAdc = ratePrefs.getUInt("adc_rate", audio_rate::kDefaultRate);
+            const uint32_t savedDac = ratePrefs.getUInt("dac_max", audio_rate::kDefaultRate);
+            ratePrefs.end();
+            _adcRate.store(audio_rate::clampAdcRate(savedAdc), std::memory_order_relaxed);
+            _maxDacRate.store(audio_rate::clampDacRate(savedDac), std::memory_order_relaxed);
+        }
+        _activeRate.store(getInitialRate(), std::memory_order_relaxed);
     }
 
     void save() {
@@ -271,6 +228,8 @@ public:
             return;
         }
         bool ok = (prefs.putBytes("blob_v2", &blob, sizeof(blob)) == sizeof(blob));
+        prefs.putUInt("adc_rate", _adcRate.load(std::memory_order_relaxed));
+        prefs.putUInt("dac_max", _maxDacRate.load(std::memory_order_relaxed));
         prefs.end();
 
         if (ok) {
@@ -682,6 +641,49 @@ public:
         return false;
     }
 
+    uint32_t getAdcRate() const { return _adcRate.load(std::memory_order_acquire); }
+    uint32_t getMaxDacRate() const { return _maxDacRate.load(std::memory_order_acquire); }
+    uint32_t getActiveRate() const { return _activeRate.load(std::memory_order_acquire); }
+    uint32_t getWifiInputRate() const { return _wifiInputRate.load(std::memory_order_acquire); }
+    uint32_t getRateVersion() const { return _rateVersion.load(std::memory_order_acquire); }
+
+    uint32_t getInitialRate() const {
+        const InputSourceMode mode = _inputMode.load(std::memory_order_relaxed);
+        const audio_rate::Source src =
+            (mode == INPUT_MODE_BT)   ? audio_rate::Source::Bt :
+            (mode == INPUT_MODE_WIFI) ? audio_rate::Source::Wifi :
+                                        audio_rate::Source::Aux;
+        return audio_rate::activeRate(src, getAdcRate(), getMaxDacRate(), getWifiInputRate());
+    }
+
+    bool setAdcRate(uint32_t rate) {
+        const uint32_t clamped = audio_rate::clampAdcRate(rate);
+        if (_adcRate.exchange(clamped, std::memory_order_acq_rel) != clamped) {
+            _rateVersion.fetch_add(1, std::memory_order_release);
+            markDirty();
+            return true;
+        }
+        return false;
+    }
+
+    bool setMaxDacRate(uint32_t rate) {
+        const uint32_t clamped = audio_rate::clampDacRate(rate);
+        if (_maxDacRate.exchange(clamped, std::memory_order_acq_rel) != clamped) {
+            _rateVersion.fetch_add(1, std::memory_order_release);
+            markDirty();
+            return true;
+        }
+        return false;
+    }
+
+    void setActiveRate(uint32_t rate) {
+        if (rate != 0) _activeRate.store(rate, std::memory_order_release);
+    }
+
+    void setWifiInputRate(uint32_t rate) {
+        _wifiInputRate.store(rate, std::memory_order_release);
+    }
+
 private:
     mutable SemaphoreHandle_t      _mutex;
     char                           _authUser[32]{"admin"};
@@ -710,6 +712,11 @@ private:
     std::atomic<uint32_t>          _limVersion{1};
     std::atomic<uint32_t>          _inputVersion{1};
     std::atomic<uint32_t>          _wifiMetaVersion{1};
+    std::atomic<uint32_t>          _adcRate{audio_rate::kDefaultRate};
+    std::atomic<uint32_t>          _maxDacRate{audio_rate::kDefaultRate};
+    std::atomic<uint32_t>          _activeRate{audio_rate::kDefaultRate};
+    std::atomic<uint32_t>          _wifiInputRate{0};
+    std::atomic<uint32_t>          _rateVersion{1};
     char                           _moduleOrder[64]{"eq,subsonic,comp,lim"};
     std::atomic<uint32_t>          _orderVersion{1};
 

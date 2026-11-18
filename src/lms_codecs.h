@@ -1,12 +1,39 @@
-/*
- * Polyphase windowed-sinc (Kaiser) sample rate converter
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
+
+// === src/lms_flac.h ===
+// Thin C wrapper around dr_flac (public domain / MIT-0) for streaming FLAC decode.
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct lms_flac lms_flac_t;
+typedef size_t (*lms_flac_read_fn)(void *user, void *buf, size_t bytes);
+
+/* Opens a sequential FLAC stream. Returns NULL on failure (including more than 2 channels). */
+lms_flac_t *lms_flac_open(lms_flac_read_fn read_fn, void *user,
+                          unsigned *rate, unsigned *channels, unsigned *bits);
+
+/* Decodes up to `frames` PCM frames into interleaved, left-justified int32. Returns frames decoded, 0 at end/error. */
+size_t lms_flac_read(lms_flac_t *f, int32_t *out, size_t frames);
+
+void lms_flac_close(lms_flac_t *f);
+
+#ifdef __cplusplus
+}
+#endif
+
+// === src/lms_resample.h ===
+/*
+ * Polyphase windowed-sinc (Kaiser) sample rate converter
+ * License: see the LICENSE file at the repository root
+ */
+
 
 #ifdef __cplusplus
 extern "C" {

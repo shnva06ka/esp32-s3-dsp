@@ -1,8 +1,94 @@
+#define DR_FLAC_IMPLEMENTATION
+#define DR_FLAC_NO_STDIO
+#define DR_FLAC_NO_CRC
+#define DR_FLAC_BUFFER_SIZE 4096
+
+#include "dr_flac.h"
+#include "lms_codecs.h"
+
+// === src/lms_flac.c ===
+
+
+#ifdef ESP_PLATFORM
+#include <esp_heap_caps.h>
+static void *lms_flac_malloc(size_t sz, void *user) {
+    (void)user;
+    void *p = heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : heap_caps_malloc(sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+static void *lms_flac_realloc(void *ptr, size_t sz, void *user) {
+    (void)user;
+    void *p = heap_caps_realloc(ptr, sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    return p ? p : heap_caps_realloc(ptr, sz, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+static void lms_flac_free(void *ptr, void *user) {
+    (void)user;
+    heap_caps_free(ptr);
+}
+static const drflac_allocation_callbacks kFlacAlloc = {
+    .pUserData = NULL,
+    .onMalloc  = lms_flac_malloc,
+    .onRealloc = lms_flac_realloc,
+    .onFree    = lms_flac_free
+};
+static const drflac_allocation_callbacks *kFlacAllocPtr = &kFlacAlloc;
+#else
+static const drflac_allocation_callbacks *kFlacAllocPtr = NULL;
+#endif
+
+struct lms_flac {
+    drflac *flac;
+};
+
+static drflac_bool32 lms_flac_seek(void *user, int offset, drflac_seek_origin origin) {
+    (void)user; (void)offset; (void)origin;
+    return DRFLAC_FALSE;   /* sequential stream: seeking is never possible */
+}
+
+lms_flac_t *lms_flac_open(lms_flac_read_fn read_fn, void *user,
+                          unsigned *rate, unsigned *channels, unsigned *bits) {
+    drflac *d = drflac_open((drflac_read_proc)read_fn, lms_flac_seek, NULL, user, kFlacAllocPtr);
+    if (!d) return NULL;
+    if (d->channels == 0 || d->channels > 2) {
+        drflac_close(d);
+        return NULL;
+    }
+#ifdef ESP_PLATFORM
+    lms_flac_t *f = (lms_flac_t *)lms_flac_malloc(sizeof(*f), NULL);
+#else
+    lms_flac_t *f = (lms_flac_t *)drflac__malloc_default(sizeof(*f), NULL);
+#endif
+    if (!f) {
+        drflac_close(d);
+        return NULL;
+    }
+    f->flac = d;
+    if (rate)     *rate = d->sampleRate;
+    if (channels) *channels = d->channels;
+    if (bits)     *bits = d->bitsPerSample;
+    return f;
+}
+
+size_t lms_flac_read(lms_flac_t *f, int32_t *out, size_t frames) {
+    if (!f || !f->flac || !out || frames == 0) return 0;
+    return (size_t)drflac_read_pcm_frames_s32(f->flac, (drflac_uint64)frames, (drflac_int32 *)out);
+}
+
+void lms_flac_close(lms_flac_t *f) {
+    if (!f) return;
+    if (f->flac) drflac_close(f->flac);
+#ifdef ESP_PLATFORM
+    lms_flac_free(f, NULL);
+#else
+    drflac__free_default(f, NULL);
+#endif
+}
+
+// === src/lms_resample.c ===
 /*
- * Polyphase windowed-sinc sample-rate converter (sl_resample.h)
- * SPDX-License-Identifier: GPL-3.0-or-later
+ * Polyphase windowed-sinc sample-rate converter (lms_resample.h)
+ * License: see the LICENSE file at the repository root
  */
-#include "sl_resample.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -38,6 +124,9 @@ _Static_assert((RS_TAPS > 0) && ((RS_TAPS % 4) == 0), "RS_TAPS must be a multipl
 
 struct resampler {
     unsigned  L, M, P;
+    uint32_t  step_int;
+    uint32_t  step_rem;
+    uint32_t  phase_mul;
     int       bypass;
     uint32_t  pos;            /* output position in 1/L input-sample units, relative to first new sample */
     float    *coef;           /* [P][RS_TAPS] aligned to 16 bytes */
@@ -240,6 +329,9 @@ resampler_t *resampler_create(unsigned in_rate, unsigned out_rate) {
     }
 
     r->P = (r->L <= RS_MAX_PHASES) ? r->L : RS_MAX_PHASES;
+    r->step_int  = r->M / r->L;
+    r->step_rem  = r->M % r->L;
+    r->phase_mul = (r->P == r->L) ? 0u : (uint32_t)((((uint64_t)r->P << 20) + r->L - 1u) / r->L);
 
     int used_psram = 0;
     const size_t ncoef = (size_t)r->P * RS_TAPS;
@@ -337,7 +429,10 @@ size_t resampler_process(resampler_t *r,
 
     if (n_in > RS_MAX_IN) n_in = RS_MAX_IN;
 
-    const unsigned T = RS_TAPS, L = r->L, M = r->M, P = r->P;
+    const unsigned T = RS_TAPS, L = r->L, P = r->P;
+    const uint32_t step_int  = r->step_int;
+    const uint32_t step_rem  = r->step_rem;
+    const uint32_t phase_mul = r->phase_mul;
 
     memcpy(r->bufL, r->histL, (T - 1) * sizeof(float));
     memcpy(r->bufR, r->histR, (T - 1) * sizeof(float));
@@ -345,12 +440,11 @@ size_t resampler_process(resampler_t *r,
     memcpy(r->bufR + (T - 1), inR, n_in * sizeof(float));
 
     size_t   produced = 0;
-    uint32_t pos      = r->pos;
-    while (produced < max_out) {
-        uint32_t idx = pos / L;
-        if (idx >= n_in) break;
-        uint32_t rem = pos - idx * L;
-        uint32_t ph  = (P == L) ? rem : (rem * P) / L;
+    uint32_t idx      = r->pos / L;
+    uint32_t rem      = r->pos % L;
+    while (produced < max_out && idx < (uint32_t)n_in) {
+        uint32_t ph = (P == L) ? rem : (uint32_t)(((uint64_t)rem * phase_mul) >> 20);
+        if (ph >= P) ph = P - 1u;
 
         const float *h  = r->coef + (size_t)ph * T;
         const float *xl = r->bufL + idx;
@@ -358,13 +452,16 @@ size_t resampler_process(resampler_t *r,
 
         rs_dotprod_stereo_unrolled(h, xl, xr, &outL[produced], &outR[produced]);
         ++produced;
-        pos += M;
+        idx += step_int;
+        rem += step_rem;
+        if (rem >= L) {
+            rem -= L;
+            ++idx;
+        }
     }
 
-    uint32_t consumed_in = (pos / L);
-    if (consumed_in > (uint32_t)n_in) consumed_in = (uint32_t)n_in;
-    uint32_t consumed = consumed_in * L;
-    r->pos = (pos >= consumed) ? (pos - consumed) : 0;
+    uint32_t consumed_in = (idx < (uint32_t)n_in) ? idx : (uint32_t)n_in;
+    r->pos = (idx >= (uint32_t)n_in) ? ((idx - (uint32_t)n_in) * L + rem) : rem;
 
     memcpy(r->histL, r->bufL + consumed_in, (T - 1) * sizeof(float));
     memcpy(r->histR, r->bufR + consumed_in, (T - 1) * sizeof(float));
@@ -483,7 +580,10 @@ void resampler_run_validation_iters(int iters) {
         { 44100, 96000 },
         { 48000, 96000 },
         { 88200, 96000 },
-        { 96000, 96000 }
+        { 96000, 96000 },
+        { 176400, 44100 },
+        { 192000, 96000 },
+        { 192000, 44100 }
     };
     const size_t n_rates = sizeof(test_rates) / sizeof(test_rates[0]);
     const size_t test_n_in = 256;

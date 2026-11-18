@@ -5,10 +5,8 @@
 #include "i2s_audio.h"
 #include "dsp_pipeline.h"
 #include "web_ui.h"
-#include "sys_monitor.h"
-#include "slimproto_client.h"
-#include "squeezelite.h"
-#include "resampler_telemetry.h"
+#include "system_services.h"
+#include "lms_client.h"
 #include "wireless_console.h"
 #include <esp_ota_ops.h>
 #include <esp_task_wdt.h>
@@ -50,7 +48,6 @@ void setup()
     SystemMonitor::begin();
 
     g_params.begin();
-    output_init(lINFO, OUTPUTBUF_SIZE, NULL);
 
     Console.println("[RESAMPLE] Running quick arbitrary-rate resampler self-test...");
     resampler_run_self_test();
@@ -77,7 +74,7 @@ void setup()
         1
     );
 
-    ResamplerTelemetry::setTaskHandles(g_audio.getBtTaskHandle(), s_audioTaskHandle, s_webTaskHandle, sl_decode_task_handle());
+    ResamplerTelemetry::setTaskHandles(g_audio.getBtTaskHandle(), s_audioTaskHandle, s_webTaskHandle, lms_decode_task_handle());
 }
 
 void loop()
@@ -100,14 +97,20 @@ static void audioTask(void* /*pvParameters*/)
     Console.println("[AUDIO] I2S_NUM_1 Slave (Bluetooth A2DP Receiver) ready");
 
     static DSPPipeline dsp(g_params);
+    dsp.setSampleRate(g_audio.activeRate());
     Console.println("[AUDIO] DSP Pipeline active on Core 1");
 
     esp_task_wdt_add(nullptr);
 
     for (;;) {
-        g_audio.process([&](float* left, float* right, size_t frames) {
-            dsp.process(left, right, frames);
-        });
+        g_audio.process(
+            [&](float* left, float* right, size_t frames) {
+                dsp.process(left, right, frames);
+            },
+            [&](uint32_t newRate) {
+                dsp.setSampleRate(newRate);
+            }
+        );
         esp_task_wdt_reset();
     }
 }
@@ -118,9 +121,9 @@ static void webTask(void* /*pvParameters*/)
     static WebUI ui(g_params);
     ui.begin();
 
-    Console.println("[NET] Starting Squeezelite / SlimProto Wi-Fi streaming client on Core 0...");
-    static SlimprotoClient slimproto(g_params);
-    slimproto.begin();
+    Console.println("[NET] Starting LMS / SlimProto Wi-Fi streaming client on Core 0...");
+    static LmsClient lms(g_params);
+    lms.begin();
 
     esp_task_wdt_add(nullptr);
 

@@ -10,16 +10,419 @@
 #include <ArduinoJson.h>
 #include <cstring>
 #include <esp_heap_caps.h>
-#include "ap_fallback_policy.h"
+#include <atomic>
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #include "eq_html.h"
-#include "console_html.h"
 #include "wireless_console.h"
-#include "ota_manager.h"
+#include "system_services.h"
 #include "param_store.h"
-#include "sys_monitor.h"
-#include "dsp_module_id.h"
-#include "resampler_telemetry.h"
+#include "dsp_pipeline.h"
+#include "lms_codecs.h"
+#include "lms_client.h"
 #include "i2s_audio.h"
+
+// === src/console_html.h ===
+
+static const char s_consoleHtml[] PROGMEM = R"rawhtml(<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32-S3-DSP Live Console</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232E3440'/%3E%3Cpath d='M4 16 C 8 6, 12 6, 16 16 C 20 26, 24 26, 28 16' fill='none' stroke='%2388C0D0' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #1A1E25;
+  --card-bg: #232831;
+  --card-header: #2B313C;
+  --border: #353C49;
+  --border-strong: #4A5262;
+  --text: #ECEFF4;
+  --muted: #9AA5BA;
+  --accent: #88C0D0;
+  --on-accent: #1A1E25;
+  --aurora-red: #BF616A;
+  --aurora-orange: #D08770;
+  --aurora-yellow: #EBCB8B;
+  --aurora-green: #A3BE8C;
+  --aurora-purple: #B48EAD;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", "Liberation Mono", Menlo, Monaco, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+::selection { background: var(--accent); color: var(--on-accent); }
+body { font-family: var(--mono); font-variant-numeric: tabular-nums; background: var(--bg); color: var(--text); margin: 0; padding: 14px 16px; display: flex; flex-direction: column; height: 100vh; }
+.header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; flex-shrink: 0; flex-wrap: wrap; gap: 10px; }
+.title { font-size: 13px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text); display: flex; align-items: center; gap: 10px; }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button, .btn-link { font-family: var(--mono); background: var(--card-header); color: var(--text); border: 1px solid var(--border-strong); padding: 5px 11px; font-size: 11px; font-weight: 700; border-radius: 4px; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease; text-decoration: none; display: inline-flex; align-items: center; }
+button:hover, .btn-link:hover { background: #353C49; border-color: var(--accent); }
+button:focus-visible, .btn-link:focus-visible, .footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.danger:hover { background: var(--aurora-red); border-color: var(--aurora-red); color: #ECEFF4; }
+.btn-link.ota { background: var(--card-header); border-color: var(--accent); color: var(--accent); }
+.btn-link.ota:hover { background: var(--accent); color: var(--on-accent); }
+.badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--card-header); border: 1px solid var(--border-strong); color: var(--muted); text-transform: none; letter-spacing: 0; }
+.badge.green { color: var(--aurora-green); border-color: rgba(163, 190, 140, 0.4); background: rgba(163, 190, 140, 0.12); }
+.badge.red { color: var(--aurora-red); border-color: rgba(191, 97, 106, 0.4); background: rgba(191, 97, 106, 0.12); }
+.terminal { flex: 1; background: #000000; border: 1px solid var(--border); border-radius: 6px; margin-top: 12px; padding: 12px 14px; font-family: var(--mono); font-size: 12px; line-height: 1.5; overflow-y: auto; white-space: pre-wrap; word-break: break-all; color: #D8DEE9; scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--card-bg); }
+.terminal::-webkit-scrollbar { width: 8px; height: 8px; }
+.terminal::-webkit-scrollbar-track { background: var(--card-bg); border-radius: 4px; }
+.terminal::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+.terminal::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+.log-line { margin: 0; padding: 1px 0; }
+.log-line.boot { color: var(--accent); }
+.log-line.audio { color: var(--aurora-purple); }
+.log-line.slim { color: var(--aurora-green); }
+.log-line.warn { color: var(--aurora-yellow); }
+.log-line.err { color: var(--aurora-red); }
+.footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.footer code { color: var(--text); }
+.footer a { color: var(--accent); text-decoration: none; font-weight: 700; text-underline-offset: 3px; }
+.footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="title">
+    <span>ESP32-S3-DSP Live Console</span>
+    <span id="wsStatus" class="badge red" role="status" aria-live="polite">Connecting...</span>
+  </div>
+  <div class="controls">
+    <button type="button" id="scrollBtn" class="active" onclick="toggleScroll()" aria-pressed="true">Auto-scroll: ON</button>
+    <button type="button" onclick="clearLogs()">Clear</button>
+    <button type="button" id="copyBtn" onclick="copyLogs()">Copy</button>
+    <button type="button" id="rebootBtn" class="danger" onclick="rebootEsp()">Reboot</button>
+    <a class="btn-link ota" href="/?ota=1">OTA Update</a>
+  </div>
+</div>
+
+<div class="terminal" id="term"></div>
+
+<div class="footer">
+  <div>Telnet mirror: <code>port 23</code> &bull; WebSocket: <code>/ws</code></div>
+  <div><a class="btn-link" href="/">&larr; Return to DSP Dashboard</a></div>
+</div>
+
+<script>
+let autoScroll = true;
+const term = document.getElementById('term');
+const statusBadge = document.getElementById('wsStatus');
+
+function toggleScroll() {
+  autoScroll = !autoScroll;
+  const btn = document.getElementById('scrollBtn');
+  btn.innerText = 'Auto-scroll: ' + (autoScroll ? 'ON' : 'OFF');
+  btn.className = autoScroll ? 'active' : '';
+  btn.setAttribute('aria-pressed', autoScroll ? 'true' : 'false');
+}
+
+function clearLogs() {
+  term.innerHTML = '';
+}
+
+function flashCopyBtn(msg) {
+  const btn = document.getElementById('copyBtn');
+  if (!btn) return;
+  btn.innerText = msg;
+  btn.classList.add('active');
+  clearTimeout(flashCopyBtn._t);
+  flashCopyBtn._t = setTimeout(() => {
+    btn.innerText = 'Copy';
+    btn.classList.remove('active');
+  }, 1500);
+}
+
+function copyLogs() {
+  const text = term.innerText;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => flashCopyBtn('Copied!')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    flashCopyBtn('Copied!');
+  } catch (e) {
+    flashCopyBtn('Copy failed');
+  }
+}
+
+let rebootArmed = false;
+let rebootArmTimer = null;
+function rebootEsp() {
+  const btn = document.getElementById('rebootBtn');
+  if (!rebootArmed) {
+    rebootArmed = true;
+    if (btn) {
+      btn.innerText = 'Confirm Reboot?';
+      btn.style.background = 'var(--aurora-red)';
+      btn.style.borderColor = 'var(--aurora-red)';
+      btn.style.color = '#ECEFF4';
+    }
+    clearTimeout(rebootArmTimer);
+    rebootArmTimer = setTimeout(() => {
+      rebootArmed = false;
+      if (btn) {
+        btn.innerText = 'Reboot';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }
+    }, 3500);
+    return;
+  }
+  clearTimeout(rebootArmTimer);
+  rebootArmed = false;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Rebooting...';
+  }
+  appendLog('[BOOT] Sending reboot command to ESP32-S3...');
+  fetch('/api/reboot', { method: 'POST' }).then(res => {
+    if (res.ok) {
+      statusBadge.className = 'badge red';
+      statusBadge.innerText = 'Rebooting (5s)...';
+      setTimeout(() => location.reload(), 5000);
+    } else {
+      if (btn) { btn.disabled = false; btn.innerText = 'Reboot'; btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
+      appendLog('[ERR] Reboot failed: HTTP ' + res.status);
+    }
+  }).catch(err => {
+    if (btn) { btn.disabled = false; btn.innerText = 'Reboot'; btn.style.background = ''; btn.style.borderColor = ''; btn.style.color = ''; }
+    appendLog('[ERR] Reboot network error: ' + err);
+  });
+}
+
+function appendLog(line) {
+  if (!line || !line.trim()) return;
+  const el = document.createElement('div');
+  el.className = 'log-line';
+  if (line.includes('[SLIMPROTO]')) el.classList.add('slim');
+  else if (line.includes('[AUDIO]')) el.classList.add('audio');
+  else if (line.includes('[BOOT]') || line.includes('[NET]')) el.classList.add('boot');
+  else if (line.includes('WARN') || line.includes('warning')) el.classList.add('warn');
+  else if (line.includes('ERR') || line.includes('error') || line.includes('FAIL') || line.includes('FATAL')) el.classList.add('err');
+  el.innerText = line;
+  term.appendChild(el);
+  while (term.childElementCount > 1000) {
+    term.removeChild(term.firstElementChild);
+  }
+  if (autoScroll) {
+    term.scrollTop = term.scrollHeight;
+  }
+}
+
+// Fetch historical buffer first
+fetch('/api/logs').then(r => {
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.text();
+}).then(txt => {
+  txt.split('\n').forEach(appendLog);
+}).catch(err => {
+  appendLog('[WARN] Failed to load log history: ' + err.message);
+});
+
+// Setup WebSocket
+let ws;
+function connectWs() {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(protocol + '//' + window.location.host + '/ws');
+
+  ws.onopen = () => {
+    statusBadge.className = 'badge green';
+    statusBadge.innerText = 'Live';
+  };
+
+  ws.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      if (data.t === 'log') {
+        appendLog(data.msg);
+      }
+    } catch(err) {}
+  };
+
+  ws.onclose = () => {
+    statusBadge.className = 'badge red';
+    statusBadge.innerText = 'Disconnected';
+    setTimeout(connectWs, 2000);
+  };
+}
+connectWs();
+</script>
+</body>
+</html>
+)rawhtml";
+
+
+// === src/resampler_telemetry.h ===
+
+
+extern I2SAudio g_audio;
+
+class ResamplerTelemetry {
+public:
+    struct SystemDiag {
+        const char* resetReason;
+        float       temperatureC;
+        uint32_t    btStackHighWaterBytes;
+        uint32_t    audioStackHighWaterBytes;
+        uint32_t    webStackHighWaterBytes;
+        uint32_t    decodeStackHighWaterBytes;
+    };
+
+    static void setTaskHandles(TaskHandle_t bt, TaskHandle_t audio, TaskHandle_t web, TaskHandle_t decode) {
+        _s().btTask.store(bt, std::memory_order_release);
+        _s().audioTask.store(audio, std::memory_order_release);
+        _s().webTask.store(web, std::memory_order_release);
+        _s().decodeTask.store(decode, std::memory_order_release);
+    }
+
+    static void setBtTaskHandle(TaskHandle_t h)     { _s().btTask.store(h, std::memory_order_release); }
+    static void setAudioTaskHandle(TaskHandle_t h)  { _s().audioTask.store(h, std::memory_order_release); }
+    static void setWebTaskHandle(TaskHandle_t h)    { _s().webTask.store(h, std::memory_order_release); }
+    static void setDecodeTaskHandle(TaskHandle_t h) { _s().decodeTask.store(h, std::memory_order_release); }
+
+    static void setLoggingEnabled(bool en) {
+        _s().loggingEnabled.store(en, std::memory_order_release);
+    }
+
+    static bool isLoggingEnabled() {
+        return _s().loggingEnabled.load(std::memory_order_acquire);
+    }
+
+    static bool getBtStats(resampler_stats_t* out) {
+        return g_audio.getBtResamplerStats(out);
+    }
+
+    static bool getFlacStats(resampler_stats_t* out) {
+        return lms_get_resampler_stats(out);
+    }
+
+    static const char* getResetReasonString() {
+        switch (esp_reset_reason()) {
+            case ESP_RST_POWERON:   return "Power-on";
+            case ESP_RST_EXT:       return "External pin";
+            case ESP_RST_SW:        return "Software reboot";
+            case ESP_RST_PANIC:     return "Software panic / exception";
+            case ESP_RST_INT_WDT:   return "Interrupt watchdog";
+            case ESP_RST_TASK_WDT:  return "Task watchdog";
+            case ESP_RST_WDT:       return "Watchdog reset";
+            case ESP_RST_DEEPSLEEP: return "Deep sleep wake";
+            case ESP_RST_BROWNOUT:  return "Brownout reset";
+            case ESP_RST_SDIO:      return "SDIO reset";
+            default:                return "Unknown";
+        }
+    }
+
+    static SystemDiag getSystemDiag() {
+        SystemDiag d{};
+        d.resetReason = getResetReasonString();
+        d.temperatureC = temperatureRead();
+
+        TaskHandle_t bt  = _s().btTask.load(std::memory_order_acquire);
+        TaskHandle_t aud = _s().audioTask.load(std::memory_order_acquire);
+        TaskHandle_t web = _s().webTask.load(std::memory_order_acquire);
+        TaskHandle_t dec = _s().decodeTask.load(std::memory_order_acquire);
+        if (!dec) dec = lms_decode_task_handle();
+
+        if (bt && eTaskGetState(bt) != eDeleted) {
+            d.btStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(bt) * sizeof(StackType_t);
+        }
+        if (aud && eTaskGetState(aud) != eDeleted) {
+            d.audioStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(aud) * sizeof(StackType_t);
+        }
+        if (web && eTaskGetState(web) != eDeleted) {
+            d.webStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(web) * sizeof(StackType_t);
+        }
+        if (dec && eTaskGetState(dec) != eDeleted) {
+            d.decodeStackHighWaterBytes = (uint32_t)uxTaskGetStackHighWaterMark(dec) * sizeof(StackType_t);
+        }
+        return d;
+    }
+
+    /*
+     * Rate-limited periodic report (every 5000ms).
+     * Only emits logs when resampling is active so normal playback is not disturbed.
+     */
+    static void periodicReport(const resampler_stats_t* btStats, const resampler_stats_t* flacStats) {
+        if (!_s().loggingEnabled.load(std::memory_order_acquire)) return;
+
+        unsigned long now = millis();
+        if (now - _s().lastReportMs < 5000) return;
+        _s().lastReportMs = now;
+
+        SystemDiag diag = getSystemDiag();
+
+        bool hasBt = (btStats && !btStats->bypass && btStats->total_calls > 0);
+        bool hasFlac = (flacStats && !flacStats->bypass && flacStats->total_calls > 0);
+
+        if (hasBt) {
+            Serial.printf("[RESAMPLE-BT] %u->%u Hz (%u/%u, P=%u, %s) | "
+                          "proc: %u us (avg %u, max %u, worst %u) | CPU: %.1f%% | "
+                          "Ring: %u/%u (%u%%) | U/O/D: %u/%u/%u | Stack: Bt=%u Aud=%u | Temp: %.1fC | Reset: %s\n",
+                          btStats->in_rate, btStats->out_rate,
+                          btStats->ratio_L, btStats->ratio_M, btStats->phases,
+                          btStats->is_psram ? "PSRAM" : "DRAM",
+                          btStats->last_duration_us, btStats->avg_duration_us,
+                          btStats->max_duration_us, btStats->recent_worst_us,
+                          btStats->cpu_util_pct,
+                          btStats->buf_occupancy_frames, btStats->buf_capacity_frames,
+                          btStats->buf_capacity_frames ? (btStats->buf_occupancy_frames * 100 / btStats->buf_capacity_frames) : 0,
+                          btStats->underruns, btStats->overruns, btStats->dropped_frames,
+                          diag.btStackHighWaterBytes, diag.audioStackHighWaterBytes,
+                          diag.temperatureC, diag.resetReason);
+        }
+
+        if (hasFlac) {
+            Serial.printf("[RESAMPLE-FLAC] %u->%u Hz (%u/%u, P=%u, %s) | "
+                          "proc: %u us (avg %u, max %u, worst %u) | CPU: %.1f%% | "
+                          "OutBuf: %u/%u | U/O/D: %u/%u/%u | Stack: Dec=%u Aud=%u\n",
+                          flacStats->in_rate, flacStats->out_rate,
+                          flacStats->ratio_L, flacStats->ratio_M, flacStats->phases,
+                          flacStats->is_psram ? "PSRAM" : "DRAM",
+                          flacStats->last_duration_us, flacStats->avg_duration_us,
+                          flacStats->max_duration_us, flacStats->recent_worst_us,
+                          flacStats->cpu_util_pct,
+                          flacStats->buf_occupancy_frames, flacStats->buf_capacity_frames,
+                          flacStats->underruns, flacStats->overruns, flacStats->dropped_frames,
+                          diag.decodeStackHighWaterBytes, diag.audioStackHighWaterBytes);
+        }
+    }
+
+    static void poll() {
+        resampler_stats_t btStats{}, flacStats{};
+        bool hasBt = getBtStats(&btStats);
+        bool hasFlac = getFlacStats(&flacStats);
+        periodicReport(hasBt ? &btStats : nullptr, hasFlac ? &flacStats : nullptr);
+    }
+
+private:
+    struct State {
+        std::atomic<TaskHandle_t> btTask{nullptr};
+        std::atomic<TaskHandle_t> audioTask{nullptr};
+        std::atomic<TaskHandle_t> webTask{nullptr};
+        std::atomic<TaskHandle_t> decodeTask{nullptr};
+        std::atomic<bool>         loggingEnabled{true};
+        unsigned long             lastReportMs{0};
+    };
+
+    static State& _s() {
+        static State s;
+        return s;
+    }
+};
+
 
 #if __has_include("wifi_credentials.h")
 #  include "wifi_credentials.h"
@@ -95,6 +498,11 @@ public:
         InputSourceMode mode;
         ActiveInputSource active;
         if (_params.getInputStateIfChanged(mode, active, _lastInputVersion)) {
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
+        }
+        const uint32_t curActiveRate = _params.getActiveRate();
+        if (curActiveRate != _lastBroadcastActiveRate) {
+            _lastBroadcastActiveRate = curActiveRate;
             _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
 
@@ -267,6 +675,7 @@ private:
     unsigned long     _lastIpPrint{0};
     unsigned long     _lastSysBroadcast{0};
     uint32_t          _lastInputVersion{1};
+    uint32_t          _lastBroadcastActiveRate{0};
     uint32_t          _lastWifiMetaVersion{1};
     std::atomic<bool> _stateBroadcastPending{false};
     std::atomic<bool> _sysBroadcastPending{false};
@@ -767,6 +1176,15 @@ private:
             }
             _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
+        else if (strcmp(t, "set_rates") == 0) {
+            if (doc.containsKey("adc_rate")) {
+                _params.setAdcRate(doc["adc_rate"].as<uint32_t>());
+            }
+            if (doc.containsKey("max_dac_rate")) {
+                _params.setMaxDacRate(doc["max_dac_rate"].as<uint32_t>());
+            }
+            _stateBroadcastPending.store(true, std::memory_order_relaxed);
+        }
         else if (strcmp(t, "wifi_save") == 0 || strcmp(t, "wifi_config") == 0) {
             // Unauthenticated WS Wi-Fi provisioning is restricted exclusively to AP initial setup mode
             if ((WiFi.getMode() & WIFI_MODE_AP) && WiFi.status() != WL_CONNECTED) {
@@ -916,6 +1334,12 @@ private:
         JsonObject inObj = doc.createNestedObject("input");
         inObj["source"] = static_cast<uint8_t>(_params.getInputMode());
         inObj["active"] = static_cast<uint8_t>(_params.getActiveSource());
+
+        JsonObject rateObj = doc.createNestedObject("rates");
+        rateObj["active"]  = _params.getActiveRate();
+        rateObj["input"]   = _params.getWifiInputRate();
+        rateObj["adc"]     = _params.getAdcRate();
+        rateObj["max_dac"] = _params.getMaxDacRate();
 
         JsonObject eqObj = doc.createNestedObject("eq");
         eqObj["enabled"] = _params.getEQEnabled();
@@ -1102,16 +1526,17 @@ private:
     }
 
     String _buildWiFiMetaJson(const WiFiStreamMetadata& wf) {
-        StaticJsonDocument<256> doc;
-        doc["t"]         = "wifi_meta";
-        doc["server"]    = wf.serverName;
-        doc["server_ip"] = wf.serverIp;
-        doc["format"]    = wf.formatInfo;
-        doc["connected"] = wf.connected;
-        doc["streaming"] = wf.streaming;
-        doc["paused"]    = wf.paused;
-        doc["rate"]      = wf.sampleRate;
-        doc["bits"]      = wf.bitDepth;
+        StaticJsonDocument<384> doc;
+        doc["t"]           = "wifi_meta";
+        doc["server"]      = wf.serverName;
+        doc["server_ip"]   = wf.serverIp;
+        doc["format"]      = wf.formatInfo;
+        doc["connected"]   = wf.connected;
+        doc["streaming"]   = wf.streaming;
+        doc["paused"]      = wf.paused;
+        doc["rate"]        = wf.sampleRate;
+        doc["bits"]        = wf.bitDepth;
+        doc["active_rate"] = _params.getActiveRate();
         String out;
         serializeJson(doc, out);
         return out;

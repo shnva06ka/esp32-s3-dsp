@@ -112,12 +112,10 @@ The board exposes a REST API and a WebSocket at `/ws`:
 
 ## License & Credits
 
-This project is licensed under the **GNU General Public License v3.0 (GPLv3)**. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ### Third-Party Acknowledgements
 
-- **Squeezelite**: (c) 2012-2015 Adrian Smith, 2015-2021 Ralph Irving (GPLv3).
-- **squeezelite-esp32**: (c) Philippe G. / sle118 (GPLv3).
 - **dr_flac**: (c) 2023 David Reid (Public Domain / MIT-0).
 - **ESP32-A2DP**: (c) Phil Schatzmann (Apache-2.0).
 - **ESPAsyncWebServer & AsyncTCP**: (c) Mathieu Carbou (LGPLv3).

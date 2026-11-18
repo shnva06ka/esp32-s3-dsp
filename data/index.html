@@ -3529,6 +3529,17 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
             <div class="input-card-title">Firmware Update</div>
           </div>
         </button>
+
+        <button class="input-card" id="dsp-rates-open-btn" onclick="openDspModal()" type="button">
+          <div class="input-card-main">
+            <div class="input-card-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="2 12 6 12 9 4 13 20 16 12 22 12"/>
+              </svg>
+            </div>
+            <div class="input-card-title">DSP</div>
+          </div>
+        </button>
       </div>
 
       <div class="sys-stats-container">
@@ -4169,6 +4180,49 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     </div>
   </div>
 
+  <div class="wifi-modal-backdrop" id="dsp-modal" onclick="closeDspModal(event)">
+    <div class="wifi-cfg-panel" role="dialog" aria-modal="true" aria-labelledby="dsp-modal-title" onclick="event.stopPropagation()">
+      <div class="wifi-cfg-header">
+        <div class="wifi-cfg-title-row">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="2 12 6 12 9 4 13 20 16 12 22 12"/>
+          </svg>
+          <span class="wifi-cfg-title" id="dsp-modal-title">DSP Sample Rates</span>
+        </div>
+        <button type="button" class="wifi-modal-close" onclick="closeDspModal()" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="wifi-cfg-body" style="gap: 12px;">
+        <p class="wifi-cfg-note">Configure the analog ADC clock and the maximum Squeezebox DAC sample rate. Bluetooth always operates at 44.1 kHz.</p>
+        <div class="wifi-stream-meta-grid">
+          <div class="wifi-info-item">
+            <label class="wifi-info-lbl" for="adc-rate-sel">ADC (AUX) Rate</label>
+            <select id="adc-rate-sel" class="eq-type-select" onchange="setSampleRates()">
+              <option value="44100">44.1 kHz</option>
+              <option value="48000">48 kHz</option>
+              <option value="88200">88.2 kHz</option>
+              <option value="96000">96 kHz</option>
+            </select>
+          </div>
+          <div class="wifi-info-item">
+            <label class="wifi-info-lbl" for="max-dac-rate-sel">Max DAC Rate</label>
+            <select id="max-dac-rate-sel" class="eq-type-select" onchange="setSampleRates()">
+              <option value="44100">44.1 kHz</option>
+              <option value="48000">48 kHz</option>
+              <option value="88200">88.2 kHz</option>
+              <option value="96000">96 kHz</option>
+              <option value="176400">176.4 kHz</option>
+              <option value="192000">192 kHz</option>
+            </select>
+          </div>
+          <div class="wifi-info-item" style="grid-column: 1 / -1;">
+            <span class="wifi-info-lbl">Active Clock (Input &rarr; DAC/DSP)</span>
+            <span class="wifi-info-val" id="rate-live-val">44.1 kHz</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="wifi-modal-backdrop" id="about-modal" onclick="closeAboutModal(event)">
     <div class="wifi-cfg-panel" role="dialog" aria-modal="true" aria-labelledby="about-modal-title" onclick="event.stopPropagation()">
       <div class="wifi-cfg-header">
@@ -4240,7 +4294,7 @@ function bandCardBorder(hsl, hex) {
     bands.forEach((_, idx) => syncBandCardUI(idx));
   }
 }
-const FS = 96000;
+let FS = 44100;
 const MAX_BANDS = 10;
 const BAND_COLORS = [
   '#BF616A',
@@ -5122,6 +5176,10 @@ function handleMsg(d) {
   }
   if (d.t === 'wifi_meta') {
     updateWiFiStreamUI(d);
+    if (d.active_rate && d.active_rate !== FS) {
+      FS = d.active_rate;
+      if (typeof draw === 'function') draw();
+    }
     return;
   }
   if (d.t === 'sys') {
@@ -5129,6 +5187,10 @@ function handleMsg(d) {
     return;
   }
   if (d.t !== 'state') return;
+
+  if (d.rates) {
+    updateSampleRatesUI(d.rates);
+  }
 
   if (d.sys) {
     updateSysStatsUI(d.sys);
@@ -5606,6 +5668,41 @@ function applyModuleOrder(orderList) {
 
 let selectedInputSource = 1;
 let activeInputSource   = 1;
+
+function fmtKhz(hz) {
+  if (!hz) return '--';
+  const k = hz / 1000;
+  return (Number.isInteger(k) ? k.toFixed(0) : k.toFixed(1)) + ' kHz';
+}
+
+function updateSampleRatesUI(rates) {
+  if (!rates) return;
+  const adcSel = document.getElementById('adc-rate-sel');
+  const dacSel = document.getElementById('max-dac-rate-sel');
+  const liveEl = document.getElementById('rate-live-val');
+  if (adcSel && rates.adc) adcSel.value = String(rates.adc);
+  if (dacSel && rates.max_dac) dacSel.value = String(rates.max_dac);
+  if (rates.active && rates.active !== FS) {
+    FS = rates.active;
+    if (typeof draw === 'function') draw();
+  }
+  if (liveEl) {
+    const act = rates.active || FS;
+    liveEl.textContent = (rates.input && rates.input !== act)
+      ? (fmtKhz(rates.input) + ' \u2192 ' + fmtKhz(act))
+      : fmtKhz(act);
+  }
+}
+
+function setSampleRates() {
+  const adcSel = document.getElementById('adc-rate-sel');
+  const dacSel = document.getElementById('max-dac-rate-sel');
+  wsTx({
+    t: 'set_rates',
+    adc_rate: adcSel ? parseInt(adcSel.value, 10) : 44100,
+    max_dac_rate: dacSel ? parseInt(dacSel.value, 10) : 44100
+  });
+}
 
 function setInputSource(src) {
   selectedInputSource = src;
@@ -9137,6 +9234,17 @@ function closeHelpModal(e) {
   if (m) m.classList.remove('open');
 }
 
+function openDspModal() {
+  const m = document.getElementById('dsp-modal');
+  if (!m) return;
+  m.classList.add('open');
+  setTimeout(() => document.getElementById('adc-rate-sel')?.focus(), 20);
+}
+function closeDspModal(e) {
+  if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+  const m = document.getElementById('dsp-modal');
+  if (m) m.classList.remove('open');
+}
 let otaSelectedFile = null;
 let otaUploading = false;
 function openOtaModal() {

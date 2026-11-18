@@ -9,19 +9,27 @@
 #include "audio_config.h"
 #include "param_store.h"
 #include "audio_ring_buffer.h"
-#include "runtime_tuning.h"
-#include "sl_resample.h"
+#include "lms_codecs.h"
 
-using AudioCallback = std::function<void(float*, float*, size_t)>;
+using AudioCallback      = std::function<void(float*, float*, size_t)>;
+using RateChangeCallback = std::function<void(uint32_t)>;
+
+void     i2s_request_wifi_rate(uint32_t rate);
+uint32_t i2s_active_rate();
 
 class I2SAudio {
 public:
+    static constexpr size_t kMaxBlockFrames = 512;
+
     explicit I2SAudio(ParamStore& params);
     ~I2SAudio() { end(); }
 
     bool begin();
-    void process(const AudioCallback& cb);
+    void process(const AudioCallback& cb, const RateChangeCallback& onRateChange = nullptr);
     void end();
+
+    void     requestWifiSampleRate(uint32_t rate);
+    uint32_t activeRate() const { return _activeRateAtomic.load(std::memory_order_acquire); }
 
     bool getBtResamplerStats(resampler_stats_t* out) const;
     TaskHandle_t getBtTaskHandle() const { return _btTaskHandle; }
@@ -58,9 +66,28 @@ private:
 
     ActiveInputSource _lastActiveSource{ACTIVE_SRC_AUX};
 
-    static constexpr float kScale = 1.0f / 2147483648.0f;
-    static constexpr float kFadeStep = 1.0f / (static_cast<float>(kSampleRate) * 0.050f);
+    uint32_t              _activeRate{audio_rate::kDefaultRate};
+    size_t                _blockFrames{256};
+    float                 _fadeStep{1.0f / (static_cast<float>(audio_rate::kDefaultRate) * 0.050f)};
+    size_t                _fadeInSamples{0};
+    std::atomic<uint32_t> _activeRateAtomic{audio_rate::kDefaultRate};
+    std::atomic<uint32_t> _requestedWifiRate{0};
 
+    // Diagnostics (Core 1 only)
+    int64_t  _statsLastUs{0};
+    uint64_t _statsFrames{0};
+    uint64_t _statsDspUsSum{0};
+    uint32_t _statsDspUsMax{0};
+    uint32_t _statsBlocks{0};
+    uint32_t _statsZeroCross{0};
+    uint32_t _statsPitchSamples{0};
+    float    _statsPrevL{0.0f};
+    uint32_t _rateSwitches{0};
+
+    static constexpr float kScale = 1.0f / 2147483648.0f;
+
+    bool _installMasterI2S(uint32_t rate);
+    void _switchMasterRate(uint32_t newRate, const RateChangeCallback& onRateChange);
     bool _allocBuffers();
     void _freeBuffers();
     void _writeBtFrames(size_t frames);
