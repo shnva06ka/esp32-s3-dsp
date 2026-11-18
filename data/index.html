@@ -4165,9 +4165,6 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
           <span class="wifi-status-msg" id="ota-status" role="status" aria-live="polite"></span>
           <button type="button" class="btn-wifi-connect" id="ota-up-btn" disabled onclick="uploadOtaFirmware()">Upload Firmware</button>
         </div>
-        <div class="module-help-row">
-          <button type="button" class="module-info-btn" onclick="openModuleHelp('ota', event)" title="Firmware Update Help" aria-label="Firmware Update Help">?</button>
-        </div>
       </div>
     </div>
   </div>
@@ -9165,13 +9162,6 @@ function closeAboutModal(e) {
 }
 
 const MODULE_HELP_DOCS = {
-  ota: {
-    title: 'Firmware Update (OTA)',
-    summary: 'Select or drag and drop firmware.bin compiled by PlatformIO.',
-    items: [
-      ['Dual-OTA Partitions', 'Protect your device: if an upload is interrupted or invalid, the active firmware remains untouched.']
-    ]
-  },
   rates: {
     title: 'Sample Rate',
     summary: 'Enter the maximum sample rates of your ADC and DAC.',
