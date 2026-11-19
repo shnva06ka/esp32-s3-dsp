@@ -18,9 +18,6 @@
 #include "param_store.h"
 #include "wireless_console.h"
 
-// === src/ap_fallback_policy.h ===
-
-
 esp_netif_t* get_esp_interface_netif(esp_interface_t interface);
 
 inline const char* const* apCaptivePortalProbePaths(size_t& outCount) {
@@ -50,7 +47,6 @@ inline bool apIsCaptivePortalProbePath(const char* path) {
         if (strcmp(path, probe) == 0) {
             return true;
         }
-        // Probe URL with query string
         if (strncmp(path, probe, probeLen) == 0 && path[probeLen] == '?') {
             return true;
         }
@@ -109,7 +105,6 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
         return 0;
     }
 
-    // Standard queries only
     if ((req[2] & 0x80U) != 0 || (req[2] & 0x78U) != 0) {
         return 0;
     }
@@ -118,7 +113,6 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
         return 0;
     }
 
-    // QName bounds check
     char qname[64];
     size_t qnameLen = 0;
     bool qnameOverflow = false;
@@ -172,7 +166,6 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
     const uint16_t qclass = (static_cast<uint16_t>(req[pos + 2]) << 8) | req[pos + 3];
     const size_t qEnd = pos + 4U;
 
-    // Local DSP A records, NXDOMAIN for external
     const bool wantAnswerA = isLocalHost && (qtype == 1U) && (qclass == 1U || qclass == 255U);
     const size_t respLen = qEnd + (wantAnswerA ? kDnsAnswerALen : 0U);
     if (respLen > outCap) {
@@ -183,24 +176,24 @@ inline size_t apBuildCaptiveDnsResponse(const uint8_t* req, size_t reqLen,
         memcpy(outBuf, req, qEnd);
     }
 
-    outBuf[2] = static_cast<uint8_t>(0x84U | (req[2] & 0x01U)); // QR=1, AA=1, preserve RD
-    outBuf[3] = isLocalHost ? 0x00U : 0x03U;                     // 0=NoError, 3=NXDOMAIN
+    outBuf[2] = static_cast<uint8_t>(0x84U | (req[2] & 0x01U));
+    outBuf[3] = isLocalHost ? 0x00U : 0x03U;
     outBuf[4] = 0x00U;
-    outBuf[5] = 0x01U;                                           // QDCount=1
+    outBuf[5] = 0x01U;
     outBuf[6] = 0x00U;
-    outBuf[7] = wantAnswerA ? 0x01U : 0x00U;                     // ANCount
+    outBuf[7] = wantAnswerA ? 0x01U : 0x00U;
     outBuf[8] = 0x00U;
-    outBuf[9] = 0x00U;                                           // NSCount=0
+    outBuf[9] = 0x00U;
     outBuf[10] = 0x00U;
-    outBuf[11] = 0x00U;                                          // ARCount=0 (strip EDNS0 OPT)
+    outBuf[11] = 0x00U;
 
     if (wantAnswerA) {
         uint8_t* ans = outBuf + qEnd;
-        ans[0] = 0xC0U; ans[1] = 0x0CU;  // Name pointer to offset 12
-        ans[2] = 0x00U; ans[3] = 0x01U;  // Type A
-        ans[4] = 0x00U; ans[5] = 0x01U;  // Class IN
-        ans[6] = 0x00U; ans[7] = 0x00U; ans[8] = 0x00U; ans[9] = 0x3CU; // TTL 60s
-        ans[10] = 0x00U; ans[11] = 0x04U; // RDLen 4
+        ans[0] = 0xC0U; ans[1] = 0x0CU;
+        ans[2] = 0x00U; ans[3] = 0x01U;
+        ans[4] = 0x00U; ans[5] = 0x01U;
+        ans[6] = 0x00U; ans[7] = 0x00U; ans[8] = 0x00U; ans[9] = 0x3CU;
+        ans[10] = 0x00U; ans[11] = 0x04U;
         ans[12] = apIp[0];
         ans[13] = apIp[1];
         ans[14] = apIp[2];
@@ -239,7 +232,6 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
     WiFi.persistent(false);
     WiFi.setAutoReconnect(false);
 
-    // Clear STA credentials
     if (WiFi.getMode() & WIFI_MODE_STA) {
         esp_wifi_disconnect();
         wifi_config_t emptySta{};
@@ -250,9 +242,8 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
     }
 
     WiFi.mode(WIFI_AP);
-    delay(120); // Let arduino_events drain any already-queued STA_DISCONNECTED
+    delay(120);
 
-    // Keep pure AP mode
     WiFi.setAutoReconnect(false);
     if (WiFi.getMode() != WIFI_AP) {
         if (WiFi.getMode() & WIFI_MODE_STA) {
@@ -261,7 +252,6 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
         WiFi.mode(WIFI_AP);
     }
 
-    // SoftAP & DHCPS setup
     WiFi.softAP(apSsid, nullptr, 1, 0, 4, false);
     apEnsureSoftApDhcpRunning();
     WiFi.setSleep(false);
@@ -270,9 +260,6 @@ inline void apEnterPureSoftApMode(const char* apSsid) {
     esp_wifi_set_inactive_time(WIFI_IF_AP, 60);
     WiFi.setTxPower(WIFI_POWER_19_5dBm);
 }
-
-// === src/sys_monitor.h ===
-
 
 class SystemMonitor {
 private:
@@ -401,9 +388,6 @@ public:
     }
 };
 
-// === src/ota_manager.h ===
-
-
 class OTAManager {
 public:
     static inline bool s_initialized{false};
@@ -421,7 +405,6 @@ public:
 
     static void beginArduinoOTA(const char* password = "admin") {
         if (s_initialized) return;
-        // Never open unauthenticated ArduinoOTA, and do not listen in AP-only mode
         if (WiFi.status() != WL_CONNECTED) {
             return;
         }
@@ -474,7 +457,6 @@ public:
     }
 
     static void setupWebRoutes(AsyncWebServer& server, ParamStore& params) {
-        // GET /api/ota/auth - Pre-flight auth check so browser prompts before streaming firmware binary
         server.on("/api/ota/auth", HTTP_GET, [&params](AsyncWebServerRequest* req) {
             char u[32], p[64];
             params.getAuth(u, sizeof(u), p, sizeof(p));
@@ -484,12 +466,10 @@ public:
             req->send(200, "application/json", "{\"ok\":true}");
         });
 
-        // GET /update - Redirect legacy direct link to main UI OTA modal
         server.on("/update", HTTP_GET, [](AsyncWebServerRequest* req) {
             req->redirect("/?ota=1");
         });
 
-        // POST /update - Handles upload stream and calls Update.write
         server.on(
             "/update",
             HTTP_POST,

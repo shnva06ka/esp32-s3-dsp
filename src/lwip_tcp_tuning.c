@@ -1,24 +1,3 @@
-/*
- * Runtime lwIP TCP & ESP32-S3 Wi-Fi RX buffer tuning via linker wrappers (-Wl,--wrap).
- *
- * Why this file exists:
- * The precompiled Arduino-ESP32 SDK (esp32s3/opi_opi/include/sdkconfig.h) ships with:
- *   1. CONFIG_LWIP_TCP_WND_DEFAULT = 5760 (4 MSS segments)
- *      -> Caps TCP throughput at WND / RTT (~190-570 KB/s at 10-30 ms Wi-Fi RTT),
- *         starving hi-res FLAC and PCM audio streams regardless of PSRAM ring buffer size.
- *   2. CONFIG_LWIP_TCP_RECVMBOX_SIZE = 6
- *      -> Only 6 segments can queue in a socket's netconn recvmbox before recv_tcp()
- *         returns ERR_MEM, setting pcb->refused_data and dropping subsequent segments
- *         in the burst until the 250 ms tcp_fasttmr tick.
- *   3. CONFIG_ESP32_WIFI_STATIC_RX_BUFFER_NUM = 8 with CONFIG_ESP32_WIFI_RX_BA_WIN = 16
- *      -> Violates Espressif's requirement that static_rx_buf_num >= rx_ba_win when
- *         AMPDU RX is enabled, overflowing hardware RX DMA buffers on 16-MPDU bursts.
- *
- * Wrapping these symbols upgrades the TCP receive window to 65535 bytes, the netconn
- * and tcpip mailboxes to 64 slots, and the Wi-Fi static/dynamic RX buffers to 16/64 within
- * the standard Arduino framework build without breaking the dual-board PlatformIO setup.
- */
-
 #include <esp_wifi.h>
 #include "lwip/opt.h"
 #include "lwip/tcp.h"
@@ -115,8 +94,6 @@ void __wrap_tcp_recved(struct tcp_pcb *pcb, u16_t len)
 err_t __wrap_tcp_close(struct tcp_pcb *pcb)
 {
     if (pcb != NULL && pcb->state != LISTEN && pcb->rcv_wnd > 0) {
-        /* Match compiled TCP_WND_MAX (5760) so tcp_close_shutdown() sees a full window
-         * and performs a clean FIN close instead of sending TCP RST and purging unsent data. */
         pcb->rcv_wnd = (tcpwnd_size_t)STOCK_TCP_WND;
     }
     return __real_tcp_close(pcb);

@@ -73,7 +73,6 @@ private:
     std::atomic<uint32_t> _activeRateAtomic{audio_rate::kDefaultRate};
     std::atomic<uint32_t> _requestedWifiRate{0};
 
-    // Diagnostics (Core 1 only)
     int64_t  _statsLastUs{0};
     uint64_t _statsFrames{0};
     uint64_t _statsDspUsSum{0};

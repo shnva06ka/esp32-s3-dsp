@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-"""Independent fixture generator for the LMS (SlimProto) client tests.
-
-Builds the expected wire bytes straight from docs/lms_protocol_spec.md using struct,
-so the C++ tests in test/test_lms compare against bytes that did NOT come from the C++ code.
-Run:  python tools/lms_fixtures.py          (prints C arrays)
-      python tools/lms_fixtures.py --check  (asserts the arrays embedded in test_main.cpp match)
-"""
 import re
 import struct
 import sys

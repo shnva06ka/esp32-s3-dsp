@@ -19,9 +19,6 @@
 #include "wireless_console.h"
 #endif
 
-// === src/dsp_module_id.h ===
-
-
 enum class DspModuleId : uint8_t {
     Eq = 0,
     Subsonic,
@@ -49,9 +46,6 @@ static inline const char* toDspModuleToken(DspModuleId id) {
     }
 }
 
-// === src/xtensa_fpu_helpers.h ===
-
-
 #if defined(ESP_PLATFORM)
 #  include "esp_heap_caps.h"
 #endif
@@ -66,7 +60,6 @@ static inline const char* toDspModuleToken(DspModuleId id) {
 #  define DSP_RESTRICT
 #endif
 
-// Clamp float sample to [-1.0f, 1.0f]
 static inline float dsp_fclamp_pm1(float x) {
 #if defined(__XTENSA__)
     const float hi = 1.0f;
@@ -88,7 +81,6 @@ static inline float dsp_fclamp_pm1(float x) {
 #endif
 }
 
-// Sanitize, clamp, and convert float to i32
 static inline int32_t dsp_sanitize_clamp_f32_to_i32(float x) {
 #if defined(__XTENSA__)
     const float fltmax = FLT_MAX;
@@ -125,7 +117,6 @@ static inline int32_t dsp_sanitize_clamp_f32_to_i32(float x) {
 #endif
 }
 
-// 16-byte aligned staging buffer allocation
 static inline void *dsp_alloc_staging(size_t bytes) {
     if (bytes == 0 || bytes > (SIZE_MAX - 15u)) {
         return NULL;
@@ -167,7 +158,6 @@ static inline void *dsp_alloc_staging(size_t bytes) {
 #endif
 }
 
-// Unpack interleaved i32 stereo to planar f32
 static inline void dsp_unpack_i32_stereo_to_f32(const int32_t * DSP_RESTRICT src,
                                                 float * DSP_RESTRICT dstL,
                                                 float * DSP_RESTRICT dstR,
@@ -201,7 +191,6 @@ static inline void dsp_unpack_i32_stereo_to_f32(const int32_t * DSP_RESTRICT src
     }
 }
 
-// Pack planar f32 to interleaved i32
 static inline void dsp_pack_f32_to_i32(int32_t * DSP_RESTRICT dst,
                                        const float * DSP_RESTRICT srcL,
                                        const float * DSP_RESTRICT srcR,
@@ -233,7 +222,6 @@ static inline void dsp_pack_f32_to_i32(int32_t * DSP_RESTRICT dst,
     }
 }
 
-// Pack planar f32 into ring buffer
 static inline void dsp_ring_pack_f32_to_i32(int32_t *writep,
                                             int32_t *buf_start,
                                             const int32_t *buf_wrap,
@@ -252,12 +240,9 @@ static inline void dsp_ring_pack_f32_to_i32(int32_t *writep,
     }
 }
 
-// === src/biquad_eq.h ===
-
-
-class BiquadEQ {
+class IirEQ {
 public:
-    BiquadEQ() {
+    IirEQ() {
         reset();
         constexpr float defaultFreqs[kEQBands] = {
             100.0f, 1000.0f, 10000.0f, 250.0f, 500.0f,
@@ -536,9 +521,6 @@ private:
     }
 };
 
-// === src/subsonic.h ===
-
-
 class SubsonicFilter {
 public:
     SubsonicFilter() {
@@ -584,7 +566,6 @@ private:
         }
     }
 
-    // Transposed Direct Form II biquad
     static inline void _processStageChannel(float* buf, size_t frames,
                                             const float* c, float* z) {
         const float b0 = c[0], b1 = c[1], b2 = c[2], a1 = c[3], a2 = c[4];
@@ -718,9 +699,6 @@ private:
         }
     }
 };
-
-// === src/speaker_correction.h ===
-
 
 class SpeakerCorrection {
 public:
@@ -966,7 +944,6 @@ private:
             default:   return;
         }
 
-        // 7+7 first-order all-pass Hilbert network tuned for 96 kHz (20 Hz..20 kHz, <= 1.1 deg error)
         static constexpr float kCoeffsI[7] = {
             -0.99972040f, -0.99822995f, -0.98883874f, -0.93133342f, -0.63232144f, 0.17593976f, 0.85340188f
         };
@@ -987,9 +964,6 @@ private:
         _sanitizeHilbertState(state, 14);
     }
 };
-
-// === src/compander.h ===
-
 
 class Compander {
 public:
@@ -1157,9 +1131,6 @@ private:
     }
 };
 
-// === src/limiter.h ===
-
-
 class SoftLimiter {
 public:
     SoftLimiter() {
@@ -1179,7 +1150,6 @@ public:
             float sL = left[i];
             float sR = right[i];
 
-            // Fast-path threshold check
             uint32_t uL = 0, uR = 0;
             std::memcpy(&uL, &sL, sizeof(uL));
             std::memcpy(&uR, &sR, sizeof(uR));
@@ -1229,7 +1199,6 @@ private:
     float    _invKneeLog2{0.0f};
     float    _negHalfKneeLog2{0.0f};
 
-    // Fast log2f approximation
     static inline float _fastLog2f(float x) {
         uint32_t ix = 0;
         std::memcpy(&ix, &x, sizeof(ix));
@@ -1246,7 +1215,6 @@ private:
         return static_cast<float>(exp) + p;
     }
 
-    // Fast exp2f approximation
     static inline float _fastExp2f(float x) {
         const float xc = (x >= -126.0f) ? ((x <= 127.0f) ? x : 127.0f) : -126.0f;
         int32_t k = static_cast<int32_t>(xc);
@@ -1285,8 +1253,6 @@ private:
     }
 };
 
-// === src/dsp_pipeline.h ===
-
 #if defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_ESP32)
 
 class IDSPModule {
@@ -1297,7 +1263,7 @@ public:
     virtual const char* name() const = 0;
     virtual void process(float* left, float* right, size_t frames) = 0;
     virtual void syncParams(ParamStore& params) = 0;
-    virtual void setSampleRate(uint32_t /*fs*/) {}
+    virtual void setSampleRate(uint32_t) {}
     virtual void reset() {}
 };
 
@@ -1342,7 +1308,7 @@ public:
     }
 
 private:
-    BiquadEQ _eq;
+    IirEQ    _eq;
     uint32_t _localEqVersion{0};
     int      _localEqCount{5};
     bool     _localEqEnabled{false};
@@ -1559,4 +1525,4 @@ private:
     }
 };
 
-#endif  // ESP_PLATFORM || ARDUINO_ARCH_ESP32
+#endif

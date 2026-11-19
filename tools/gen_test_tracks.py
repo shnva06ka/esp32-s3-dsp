@@ -1,5 +1,3 @@
-"""Generate tagged stereo FLAC test tracks across 44.1..192 kHz in test_track/."""
-
 from pathlib import Path
 import numpy as np
 import soundfile as sf
@@ -14,7 +12,7 @@ TRACKS = [
     ("07_96k_24bit_b.flac", 96000,  "PCM_24", "07 - 96 kHz 24-bit B",  "7"),
 ]
 
-AMP = 10.0 ** (-12.0 / 20.0)  # -12 dBFS
+AMP = 10.0 ** (-12.0 / 20.0)
 TONE_SEC = 10.0
 SWEEP_SEC = 10.0
 

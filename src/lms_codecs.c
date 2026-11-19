@@ -6,9 +6,6 @@
 #include "dr_flac.h"
 #include "lms_codecs.h"
 
-// === src/lms_flac.c ===
-
-
 #ifdef ESP_PLATFORM
 #include <esp_heap_caps.h>
 static void *lms_flac_malloc(size_t sz, void *user) {
@@ -42,7 +39,7 @@ struct lms_flac {
 
 static drflac_bool32 lms_flac_seek(void *user, int offset, drflac_seek_origin origin) {
     (void)user; (void)offset; (void)origin;
-    return DRFLAC_FALSE;   /* sequential stream: seeking is never possible */
+    return DRFLAC_FALSE;
 }
 
 lms_flac_t *lms_flac_open(lms_flac_read_fn read_fn, void *user,
@@ -84,12 +81,6 @@ void lms_flac_close(lms_flac_t *f) {
 #endif
 }
 
-// === src/lms_resample.c ===
-/*
- * Polyphase windowed-sinc sample-rate converter (lms_resample.h)
- * License: see the LICENSE file at the repository root
- */
-
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -128,18 +119,16 @@ struct resampler {
     uint32_t  step_rem;
     uint32_t  phase_mul;
     int       bypass;
-    uint32_t  pos;            /* output position in 1/L input-sample units, relative to first new sample */
-    float    *coef;           /* [P][RS_TAPS] aligned to 16 bytes */
-    float    *histL, *histR;  /* RS_TAPS-1 previous input samples */
-    float    *bufL,  *bufR;   /* RS_TAPS-1 + RS_MAX_IN working buffer */
+    uint32_t  pos;
+    float    *coef;
+    float    *histL, *histR;
+    float    *bufL,  *bufR;
 
-    /* Memory tracking */
     uint32_t  in_rate;
     uint32_t  out_rate;
     uint8_t   is_psram;
     uint32_t  alloc_failures;
 
-    /* Telemetry metrics (concurrency-safe via spinlock + seq counter) */
     portMUX_TYPE stats_mux;
     volatile uint32_t seq;
     uint64_t  total_calls;
@@ -152,14 +141,12 @@ struct resampler {
     uint64_t  total_duration_us;
     int32_t   frame_mismatch;
 
-    /* Buffer & flow metrics */
     uint32_t  dropped_frames;
     uint32_t  underruns;
     uint32_t  overruns;
     uint32_t  buf_occupancy_frames;
     uint32_t  buf_capacity_frames;
 
-    /* CPU load estimation */
     int64_t   last_calc_time_us;
     uint32_t  window_proc_time_us;
     float     estimated_cpu_pct;
@@ -180,7 +167,6 @@ static float bessel_i0(float x) {
     return sum;
 }
 
-/* Internal RAM staging with PSRAM fallback */
 static void *rs_alloc(size_t bytes, int *used_psram) {
     size_t aligned_bytes = (bytes + 15) & ~((size_t)15);
     void *p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
@@ -192,7 +178,6 @@ static void *rs_alloc(size_t bytes, int *used_psram) {
         return p;
     }
 
-    /* Fallback to PSRAM */
     p = heap_caps_aligned_alloc(16, aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!p) {
         p = heap_caps_malloc(aligned_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
@@ -203,7 +188,6 @@ static void *rs_alloc(size_t bytes, int *used_psram) {
     return p;
 }
 
-/* Portable C reference dot product */
 static inline void rs_dotprod_stereo_c(const float *h, const float *xl, const float *xr,
                                        float *outL, float *outR) {
     float accL0 = 0.0f, accL1 = 0.0f, accL2 = 0.0f, accL3 = 0.0f;
@@ -223,7 +207,6 @@ static inline void rs_dotprod_stereo_c(const float *h, const float *xl, const fl
     *outR = (accR0 + accR1) + (accR2 + accR3);
 }
 
-/* Xtensa pipelined dot product */
 static inline void rs_dotprod_stereo_unrolled(const float *h, const float *xl, const float *xr,
                                               float *outL, float *outR) {
 #if defined(__XTENSA__) && defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -373,7 +356,6 @@ resampler_t *resampler_create(unsigned in_rate, unsigned out_rate) {
         r->coef[(size_t)phase * RS_TAPS + (RS_TAPS - 1 - j)] = h;
     }
 
-    /* Normalize phase DC gain */
     for (unsigned ph = 0; ph < r->P; ++ph) {
         float *row = r->coef + (size_t)ph * RS_TAPS;
         double sum = 0.0;
@@ -469,7 +451,6 @@ size_t resampler_process(resampler_t *r,
     int64_t t1 = esp_timer_get_time();
     uint32_t dur = (uint32_t)(t1 - t0);
 
-    /* Telemetry update */
     portENTER_CRITICAL(&r->stats_mux);
     r->seq++;
     r->total_calls++;

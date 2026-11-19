@@ -23,8 +23,6 @@
 #include "lms_client.h"
 #include "i2s_audio.h"
 
-// === src/console_html.h ===
-
 static const char s_consoleHtml[] PROGMEM = R"rawhtml(<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -222,7 +220,6 @@ function appendLog(line) {
   }
 }
 
-// Fetch historical buffer first
 fetch('/api/logs').then(r => {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return r.text();
@@ -232,7 +229,6 @@ fetch('/api/logs').then(r => {
   appendLog('[WARN] Failed to load log history: ' + err.message);
 });
 
-// Setup WebSocket
 let ws;
 function connectWs() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -263,10 +259,6 @@ connectWs();
 </body>
 </html>
 )rawhtml";
-
-
-// === src/resampler_telemetry.h ===
-
 
 extern I2SAudio g_audio;
 
@@ -351,10 +343,6 @@ public:
         return d;
     }
 
-    /*
-     * Rate-limited periodic report (every 5000ms).
-     * Only emits logs when resampling is active so normal playback is not disturbed.
-     */
     static void periodicReport(const resampler_stats_t* btStats, const resampler_stats_t* flacStats) {
         if (!_s().loggingEnabled.load(std::memory_order_acquire)) return;
 
@@ -638,8 +626,6 @@ private:
         }
     }
 
-    // Temporarily raises Core 0 WebTask above CONFIG_ASYNC_TCP_PRIORITY so async_tcp cannot
-    // preempt mid-iteration over AsyncWebSocket::_clients or teardown _client mid-send.
     struct WsPriorityGuard {
         UBaseType_t prevPrio;
         WsPriorityGuard() : prevPrio(uxTaskPriorityGet(nullptr)) {
@@ -1186,7 +1172,6 @@ private:
             _stateBroadcastPending.store(true, std::memory_order_relaxed);
         }
         else if (strcmp(t, "wifi_save") == 0 || strcmp(t, "wifi_config") == 0) {
-            // Unauthenticated WS Wi-Fi provisioning is restricted exclusively to AP initial setup mode
             if ((WiFi.getMode() & WIFI_MODE_AP) && WiFi.status() != WL_CONNECTED) {
                 const char* ssid = doc["ssid"] | "";
                 const char* pass = doc["pass"] | "";

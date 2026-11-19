@@ -33,7 +33,6 @@ void WirelessConsole::begin(unsigned long baud)
 
 void WirelessConsole::loop()
 {
-    // Guard: Only initialize Telnet server once Wi-Fi or AP is actively running
     if (WiFi.status() == WL_CONNECTED || WiFi.getMode() == WIFI_AP || WiFi.getMode() == WIFI_AP_STA) {
         if (!_telnetServer) {
             _telnetServer = new WiFiServer(23);
@@ -118,12 +117,10 @@ size_t WirelessConsole::write(const uint8_t *buffer, size_t size)
     if (!buffer || size == 0) return 0;
     if (_mutex) xSemaphoreTakeRecursive(_mutex, portMAX_DELAY);
 
-    // 1. Output entire block atomically to USB-CDC / UART Serial
     if (_hwSerial) {
         _hwSerial->write(buffer, size);
     }
 
-    // 2. Buffer lines for Telnet and Web Console
     for (size_t i = 0; i < size; ++i) {
         uint8_t c = buffer[i];
         if (c == '\r') continue;

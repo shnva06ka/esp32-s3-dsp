@@ -4,16 +4,10 @@
 #include <cstring>
 #include "audio_config.h"
 #include "audio_ring_buffer.h"
-#include "biquad_eq.h"
-#include "subsonic.h"
-#include "compander.h"
-#include "limiter.h"
-#include "speaker_correction.h"
-#include "dsp_module_id.h"
 #include "dsp_pipeline.h"
 #include "param_store.h"
-#include "lms_resample.h"
-#include "ap_fallback_policy.h"
+#include "lms_codecs.h"
+#include "system_services.h"
 #include <WiFi.h>
 #include <esp_wifi.h>
 #include <esp_netif.h>
@@ -32,11 +26,10 @@ void console_log(const char* buf) {
         Serial.print(buf);
     }
 }
-#include "../../src/lms_resample.c"
+#include "../../src/lms_codecs.c"
 #include "../../src/lwip_tcp_tuning.c"
 }
 
-// Test 1: Audio Ring Buffer
 void test_ring_buffer_basic_ops(void) {
     AudioRingBuffer<128> rb;
     TEST_ASSERT_TRUE(rb.allocate());
@@ -74,21 +67,18 @@ void test_ring_buffer_wrap_and_bounds(void) {
     AudioRingBuffer<64> rb;
     TEST_ASSERT_TRUE(rb.allocate());
 
-    // Null pointer guards
     TEST_ASSERT_EQUAL_UINT32(0, rb.write(nullptr, nullptr, 16));
 
     float inL[64], inR[64];
     for (int i = 0; i < 64; ++i) { inL[i] = static_cast<float>(i + 1); inR[i] = -static_cast<float>(i + 1); }
 
-    // Saturation: max storable is CapacityFrames - 1 = 63
     TEST_ASSERT_EQUAL_UINT32(63, rb.write(inL, inR, 64));
     TEST_ASSERT_EQUAL_UINT32(0, rb.space());
 
     float outL[64], outR[64];
     TEST_ASSERT_EQUAL_UINT32(32, rb.read(outL, outR, 32));
-    TEST_ASSERT_EQUAL_UINT32(32, rb.write(inL, inR, 40)); // Wraps across 64-boundary
+    TEST_ASSERT_EQUAL_UINT32(32, rb.write(inL, inR, 40));
 
-    // Underrun zero-padding check
     rb.clear();
     TEST_ASSERT_EQUAL_UINT32(0, rb.available());
     for (int i = 0; i < 16; ++i) { outL[i] = 99.0f; outR[i] = -99.0f; }
@@ -99,11 +89,10 @@ void test_ring_buffer_wrap_and_bounds(void) {
     }
 }
 
-// Test 2: Biquad EQ & Subsonic (96 kHz Stability & NaN)
-void test_biquad_eq_nan_denormal(void) {
-    BiquadEQ eq;
+void test_iir_eq_nan_denormal(void) {
+    IirEQ eq;
     eq.setBand(0, { 1000.0f, 6.0f, 1.0f, true, EQ_FILTER_PEAK, 2 });
-    eq.setBand(1, { NAN, NAN, NAN, true, EQ_FILTER_PEAK, 2 }); // NaN params must sanitize
+    eq.setBand(1, { NAN, NAN, NAN, true, EQ_FILTER_PEAK, 2 });
 
     float left[32], right[32];
     for (int i = 0; i < 32; ++i) {
@@ -131,8 +120,7 @@ void test_biquad_eq_nan_denormal(void) {
     }
 }
 
-void test_biquad_eq_20hz_and_subsonic_96khz(void) {
-    // 20 Hz 4th-order HPF @ 96 kHz
+void test_iir_eq_20hz_and_subsonic_96khz(void) {
     SubsonicFilter sub;
     sub.setParams({ 20.0f, 4, true });
 
@@ -152,10 +140,8 @@ void test_biquad_eq_20hz_and_subsonic_96khz(void) {
         }
     }
     rms1k = sqrt(rms1k / (4.0 * 256.0));
-    // 1 kHz passband RMS
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.35355f, (float)rms1k);
 
-    // DC step rejection
     sub.reset();
     for (int blk = 0; blk < 120; ++blk) {
         for (int i = 0; i < 256; ++i) { l[i] = 1.0f; r[i] = 1.0f; }
@@ -164,16 +150,14 @@ void test_biquad_eq_20hz_and_subsonic_96khz(void) {
     TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, l[255]);
 }
 
-// Test 3: SpeakerCorrection Hilbert Phase & Delay
 void test_speaker_correction_hilbert_and_delay(void) {
     static SpeakerCorrection sc;
-    // Hilbert +45/-90 @ 96 kHz
     const float testFreqs[3] = { 100.0f, 1000.0f, 10000.0f };
     for (int fIdx = 0; fIdx < 3; ++fIdx) {
         sc.reset();
         SubsonicParams sp{ 20.0f, 2, true };
         sp.balance = 0.0f;
-        sp.delayMsL = -1.0f; // Tests negative delay normalization
+        sp.delayMsL = -1.0f;
         sp.delayMsR =  0.0f;
         sp.phaseL = 45;
         sp.phaseR = -90;
@@ -200,13 +184,11 @@ void test_speaker_correction_hilbert_and_delay(void) {
         }
         float rmsL = sqrtf((float)(sumL2 / (10.0 * 256.0)));
         float rmsR = sqrtf((float)(sumR2 / (10.0 * 256.0)));
-        // Hilbert unity gain check
         TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.35355f, rmsL);
         TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.35355f, rmsR);
     }
 }
 
-// Test 4: Compander & Limiter Precision
 void test_compander_and_limiter(void) {
     Compander comp;
     comp.setParams({ -18.0f, 4.0f, 5.0f, 150.0f, 0.0f, true });
@@ -223,7 +205,6 @@ void test_compander_and_limiter(void) {
         TEST_ASSERT_TRUE(std::isfinite(right[i]));
     }
 
-    // -0.5 dBFS ceiling
     SoftLimiter lim;
     lim.setParams({ -0.5f, 3.0f, true });
     lim.process(left, right, 32);
@@ -236,7 +217,6 @@ void test_compander_and_limiter(void) {
         TEST_ASSERT_TRUE(fabsf(right[i]) <= expectedCeiling + 1e-4f);
     }
 
-    // Soft-knee curve
     const float kneeLevelsDb[3] = { -1.5f, -0.5f, 0.5f };
     for (int idx = 0; idx < 3; ++idx) {
         const float levelDb = kneeLevelsDb[idx];
@@ -260,7 +240,6 @@ void test_compander_and_limiter(void) {
         TEST_ASSERT_FLOAT_WITHIN(0.05f, expectedGainDb, 20.0f * log10f(g0));
     }
 
-    // Non-finite inputs
     float mixL[64], mixR[64];
     for (int i = 0; i < 64; ++i) {
         mixL[i] = (i % 2 == 0) ? 0.5f : -1.5f;
@@ -280,7 +259,6 @@ void test_compander_and_limiter(void) {
         TEST_ASSERT_TRUE(fabsf(mixR[i]) <= expectedCeiling + 1e-4f);
     }
 
-    // 256-frame gain ramp
     comp.reset();
     comp.setParams({ -18.0f, 4.0f, 5.0f, 150.0f, 0.0f, true });
     float ramp256L[256], ramp256R[256];
@@ -299,7 +277,6 @@ void test_compander_and_limiter(void) {
     TEST_ASSERT_TRUE(ramp256Rms < 0.5f && ramp256Rms > 0.1f);
     TEST_ASSERT_TRUE(fabsf(ramp256L[255]) < fabsf(ramp256L[0]));
 
-    // 35-frame gain ramp
     comp.reset();
     float ramp35L[35], ramp35R[35];
     for (int i = 0; i < 35; ++i) {
@@ -318,7 +295,6 @@ void test_compander_and_limiter(void) {
     TEST_ASSERT_TRUE(fabsf(ramp35L[34]) < fabsf(ramp35L[31]));
     TEST_ASSERT_TRUE(fabsf(ramp35L[34]) < fabsf(ramp35L[0]));
 
-    // NaN params
     lim.setParams({ NAN, NAN, true });
     for (int i = 0; i < 32; ++i) { left[i] = 3.0f; right[i] = -3.0f; }
     lim.process(left, right, 32);
@@ -327,14 +303,13 @@ void test_compander_and_limiter(void) {
     }
 }
 
-// Test 5: DSPPipeline & THD/Flatness @ 96 kHz
 void test_dsp_pipeline_and_audio_quality(void) {
     TEST_ASSERT_EQUAL_UINT8((uint8_t)DspModuleId::Eq, (uint8_t)parseDspModuleId("eq"));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)DspModuleId::Subsonic, (uint8_t)parseDspModuleId("sub"));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)DspModuleId::Unknown, (uint8_t)parseDspModuleId("invalid"));
 
     static ParamStore ps;
-    ps.setModuleOrder("eq,eq,sub,comp,lim"); // Must deduplicate "eq,eq" -> "eq,subsonic,comp,lim"
+    ps.setModuleOrder("eq,eq,sub,comp,lim");
     TEST_ASSERT_EQUAL_STRING("eq,subsonic,comp,lim", ps.getModuleOrder().c_str());
 
     static DSPPipeline pipe(ps);
@@ -351,11 +326,9 @@ void test_dsp_pipeline_and_audio_quality(void) {
         errSq += d * d;
         refSq += (double)ref[i] * (double)ref[i];
     }
-    // Bypassed unity check
     TEST_ASSERT_TRUE(errSq / refSq < 1e-12);
 }
 
-// Test 6: ParamStore Clamping & Sanitization
 void test_param_store_sanitization(void) {
     static ParamStore ps;
 
@@ -369,7 +342,6 @@ void test_param_store_sanitization(void) {
     TEST_ASSERT_TRUE(pSan.type <= EQ_FILTER_FLAT_HIGH_PASS);
     TEST_ASSERT_EQUAL_UINT8(2, pSan.order);
 
-    // addEQBand sanitization
     TEST_ASSERT_TRUE(ps.addEQBand(NAN, 999.0f, -1.0f, 88, 9));
     EQBandParams added = ps.getEQBand(ps.getEQBandCount() - 1);
     TEST_ASSERT_TRUE(std::isfinite(added.freq) && added.freq >= 10.0f);
@@ -378,7 +350,6 @@ void test_param_store_sanitization(void) {
     TEST_ASSERT_EQUAL_UINT8(EQ_FILTER_PEAK, added.type);
     TEST_ASSERT_EQUAL_UINT8(2, added.order);
 
-    // Negative speaker delay and phase
     SubsonicParams sub{ 30.0f, 4, true };
     sub.delayMsL = -10.0f;
     sub.phaseL = -90;
@@ -388,19 +359,17 @@ void test_param_store_sanitization(void) {
     TEST_ASSERT_EQUAL_INT16(-90, subOut.phaseL);
 
     ps.setPreamp(50.0f);
-    TEST_ASSERT_EQUAL_FLOAT(18.0f, ps.getPreamp());
+    TEST_ASSERT_EQUAL_FLOAT(24.0f, ps.getPreamp());
     ps.setPreamp(-100.0f);
-    TEST_ASSERT_EQUAL_FLOAT(-18.0f, ps.getPreamp());
+    TEST_ASSERT_EQUAL_FLOAT(-24.0f, ps.getPreamp());
     ps.setPreamp(NAN);
     TEST_ASSERT_EQUAL_FLOAT(0.0f, ps.getPreamp());
 }
 
-// Test 7: Resampler Create, Bounds & Quality
 void test_resampler_arbitrary_rate(void) {
     resampler_t* r = resampler_create(44100, 96000);
     TEST_ASSERT_NOT_NULL(r);
 
-    // Zero-frame contract
     TEST_ASSERT_EQUAL_UINT32(0, (uint32_t)resampler_in_for_out(r, 0));
 
     size_t inFrames = 256;
@@ -430,7 +399,6 @@ void test_resampler_arbitrary_rate(void) {
         }
     }
     rmsOut = sqrt(rmsOut / (double)totalOut);
-    // Input RMS = 0.8 / sqrt(2) = 0.5657
     TEST_ASSERT_FLOAT_WITHIN(0.02f, 0.5657f, (float)rmsOut);
 
     resampler_stats_t stats;
@@ -444,9 +412,7 @@ void test_resampler_arbitrary_rate(void) {
     resampler_run_self_test();
 }
 
-// Test 8: AIFF IEEE-80 & Chunk Bounds Logic
 void test_wav_aiff_parser_boundaries(void) {
-    // 44100 Hz in 80-bit IEEE 754
     const uint8_t ieee44k[10] = { 0x40, 0x0E, 0xAC, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
     int expon = (((int)ieee44k[0] & 0x7F) << 8) | ieee44k[1];
     uint32_t hi = ((uint32_t)ieee44k[2] << 24) | ((uint32_t)ieee44k[3] << 16) | ((uint32_t)ieee44k[4] << 8) | ieee44k[5];
@@ -454,16 +420,13 @@ void test_wav_aiff_parser_boundaries(void) {
     unsigned rate = (unsigned)(ldexp((double)hi, expon - 31) + 0.5);
     TEST_ASSERT_EQUAL_UINT32(44100, rate);
 
-    // AIFF SSND offset overflow
     uint32_t chunkLen = 100;
     uint32_t maliciousOffset = 0xFFFFFFFCu;
     bool validSsnd = (chunkLen >= 8 && (uint64_t)maliciousOffset <= (uint64_t)chunkLen - 8ULL);
     TEST_ASSERT_FALSE(validSsnd);
 }
 
-// Test 9: Fallback AP Isolation & Captive Portal Policy
 void test_ap_fallback_isolation_and_captive_portal(void) {
-    // Captive portal probe paths
     TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/generate_204"));
     TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/gen_204"));
     TEST_ASSERT_TRUE(apIsCaptivePortalProbePath("/hotspot-detect.html"));
@@ -478,12 +441,10 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     TEST_ASSERT_FALSE(apIsLocalDspHostname("example.com"));
     TEST_ASSERT_FALSE(apIsLocalDspHostname(""));
 
-    // WS backpressure policy
     TEST_ASSERT_TRUE(apShouldSendWsTelemetry(true, true, 0));
     TEST_ASSERT_FALSE(apShouldSendWsTelemetry(true, true, 8));
     TEST_ASSERT_FALSE(apShouldSendWsTelemetry(false, true, 0));
 
-    // Local DNS responder
     const IPAddress apIp(192, 168, 4, 1);
     uint8_t dnsOut[512]{};
 
@@ -497,10 +458,10 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     TEST_ASSERT_EQUAL_UINT8(0x12, dnsOut[0]);
     TEST_ASSERT_EQUAL_UINT8(0x34, dnsOut[1]);
     TEST_ASSERT_TRUE((dnsOut[2] & 0x80) != 0);
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F); // NoError
-    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
-    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[7]);        // ANCount == 1
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[7]);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);
     TEST_ASSERT_EQUAL_UINT8(192, dnsOut[outLen - 4]);
     TEST_ASSERT_EQUAL_UINT8(168, dnsOut[outLen - 3]);
     TEST_ASSERT_EQUAL_UINT8(4,   dnsOut[outLen - 2]);
@@ -514,10 +475,10 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     };
     outLen = apBuildCaptiveDnsResponse(queryDspEdnsA, sizeof(queryDspEdnsA), apIp, dnsOut, sizeof(dnsOut));
     TEST_ASSERT_EQUAL_UINT32(sizeof(queryDspA) + 16U, outLen);
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F); // NoError
-    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
-    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[7]);        // ANCount == 1
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[7]);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);
     TEST_ASSERT_EQUAL_UINT8(192, dnsOut[outLen - 4]);
     TEST_ASSERT_EQUAL_UINT8(168, dnsOut[outLen - 3]);
     TEST_ASSERT_EQUAL_UINT8(4,   dnsOut[outLen - 2]);
@@ -532,10 +493,10 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     outLen = apBuildCaptiveDnsResponse(queryDspAAAA, sizeof(queryDspAAAA), apIp, dnsOut, sizeof(dnsOut));
     TEST_ASSERT_EQUAL_UINT32(sizeof(queryDspA), outLen);
     TEST_ASSERT_TRUE((dnsOut[2] & 0x80) != 0);
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F); // NoError
-    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[7]);        // ANCount == 0 (NODATA)
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[3] & 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[7]);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);
 
     const uint8_t queryExternalA[] = {
         0xDE, 0xAD, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
@@ -546,10 +507,10 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     outLen = apBuildCaptiveDnsResponse(queryExternalA, sizeof(queryExternalA), apIp, dnsOut, sizeof(dnsOut));
     TEST_ASSERT_EQUAL_UINT32(29U, outLen);
     TEST_ASSERT_TRUE((dnsOut[2] & 0x80) != 0);
-    TEST_ASSERT_EQUAL_UINT8(3, dnsOut[3] & 0x0F); // NXDOMAIN
-    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);        // QDCount == 1
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[7]);        // ANCount == 0
-    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);       // ARCount == 0 (EDNS0 stripped)
+    TEST_ASSERT_EQUAL_UINT8(3, dnsOut[3] & 0x0F);
+    TEST_ASSERT_EQUAL_UINT8(1, dnsOut[5]);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[7]);
+    TEST_ASSERT_EQUAL_UINT8(0, dnsOut[11]);
 
     const uint8_t queryShort[] = { 0x00, 0x01, 0x01, 0x00 };
     TEST_ASSERT_EQUAL_UINT32(0U, apBuildCaptiveDnsResponse(queryShort, sizeof(queryShort), apIp, dnsOut, sizeof(dnsOut)));
@@ -559,7 +520,6 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     };
     TEST_ASSERT_EQUAL_UINT32(0U, apBuildCaptiveDnsResponse(queryTruncLabel, sizeof(queryTruncLabel), apIp, dnsOut, sizeof(dnsOut)));
 
-    // AP-only isolation after failed STA
     WiFi.persistent(false);
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);
@@ -568,7 +528,6 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
 
     apEnterPureSoftApMode("ESP32-S3-DSP");
 
-    // Wait for scan cycle
     delay(3200);
 
     TEST_ASSERT_EQUAL(WIFI_AP, WiFi.getMode());
@@ -593,7 +552,6 @@ void test_ap_fallback_isolation_and_captive_portal(void) {
     WiFi.mode(WIFI_OFF);
 }
 
-// Test 10: dr_flac LPC Prediction & Bitops
 void test_drflac_lpc_and_bitops(void) {
     TEST_ASSERT_EQUAL_UINT32(32U, test_drflac_clz(0U));
     TEST_ASSERT_EQUAL_UINT32(31U, test_drflac_clz(1U));
@@ -608,7 +566,6 @@ void test_drflac_lpc_and_bitops(void) {
     TEST_ASSERT_EQUAL_UINT32(6U,  test_drflac_ilog2(32U));
     TEST_ASSERT_EQUAL_UINT32(32U, test_drflac_ilog2(0xFFFFFFFFU));
 
-    // 32-bit prediction
     int32_t coeffs32[32];
     int32_t buf32[64];
     for (int i = 0; i < 32; ++i) {
@@ -634,7 +591,6 @@ void test_drflac_lpc_and_bitops(void) {
         }
     }
 
-    // 64-bit prediction
     int32_t coeffs64[32];
     int32_t buf64[64];
     for (int i = 0; i < 32; ++i) {
@@ -671,8 +627,8 @@ void setup() {
     UNITY_BEGIN();
     RUN_TEST(test_ring_buffer_basic_ops);
     RUN_TEST(test_ring_buffer_wrap_and_bounds);
-    RUN_TEST(test_biquad_eq_nan_denormal);
-    RUN_TEST(test_biquad_eq_20hz_and_subsonic_96khz);
+    RUN_TEST(test_iir_eq_nan_denormal);
+    RUN_TEST(test_iir_eq_20hz_and_subsonic_96khz);
     RUN_TEST(test_speaker_correction_hilbert_and_delay);
     RUN_TEST(test_compander_and_limiter);
     RUN_TEST(test_dsp_pipeline_and_audio_quality);

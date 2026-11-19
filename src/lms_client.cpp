@@ -17,9 +17,9 @@ namespace {
 constexpr const char* kTag = "[LMS]";
 
 constexpr uint16_t kServerPort      = 3483;
-constexpr size_t   kStreamRingBytes = 2u * 1024u * 1024u;   // power of two, PSRAM
-constexpr size_t   kOutRingFrames   = 262144;               // 2 MiB planar float in PSRAM (~1.37 s at 192 kHz)
-constexpr size_t   kChunkFrames     = RS_MAX_IN;            // decoder chunk, also the resampler's max input
+constexpr size_t   kStreamRingBytes = 2u * 1024u * 1024u;
+constexpr size_t   kOutRingFrames   = 262144;
+constexpr size_t   kChunkFrames     = RS_MAX_IN;
 constexpr size_t   kResampleOutCap  = 4096;
 constexpr size_t   kHttpHeaderMax   = 4096;
 constexpr size_t   kHttpReqMax      = 2048;
@@ -29,7 +29,7 @@ constexpr uint32_t kHeartbeatMs     = 1000;
 constexpr uint32_t kAbortWaitMs     = 3000;
 
 struct TrackParams {
-    uint32_t ip{0};                 // 0 = control server
+    uint32_t ip{0};
     uint16_t port{9000};
     uint8_t  http[kHttpReqMax];
     size_t   httpLen{0};
@@ -44,14 +44,12 @@ struct TrackParams {
 };
 
 struct Core {
-    // lifecycle
     std::atomic<bool> running{false};
     std::atomic<bool> otaPause{false};
     std::atomic<bool> controlIdle{true};
     TaskHandle_t      controlTask{nullptr}, streamTask{nullptr}, decodeTask{nullptr};
     std::atomic<bool> controlExited{true}, streamExited{true}, decodeExited{true};
 
-    // buffers
     uint8_t*          streamStore{nullptr};
     lms::ByteRing     ring;
     AudioRingBuffer<kOutRingFrames> out;
@@ -65,26 +63,22 @@ struct Core {
     uint8_t*          ctlBuf{nullptr};
     uint8_t*          tmpBuf{nullptr};
 
-    // track session handshake: tasks only touch ring/params for the generation named in readyGen
     std::atomic<uint32_t> gen{0}, readyGen{0}, streamAck{0}, decodeAck{0};
     TrackParams       tp;
     IPAddress         controlServer;
 
-    // session flags (written by the stream/decode tasks, consumed by the control task)
     std::atomic<bool> streamEof{false}, streamError{false}, evConnected{false}, evHeaders{false};
     std::atomic<bool> decoderDone{false}, decoderError{false};
     std::atomic<uint32_t> bytesRx{0};
     std::atomic<uint32_t> srcRate{0}, srcBits{0};
 
-    // output side
     std::atomic<bool>     playing{false}, outPaused{false}, dacEnabled{true};
     std::atomic<uint32_t> audgL{0x10000u}, audgR{0x10000u};
     std::atomic<float>    volL{1.0f}, volR{1.0f};
     std::atomic<uint32_t> framesWritten{0}, framesRead{0}, trackFrames{0}, skipFrames{0}, boundaryAt{0};
     std::atomic<bool>     boundaryPending{false}, boundaryHit{false}, underrun{false};
-    float                 curL{1.0f}, curR{1.0f};     // audio-task private
+    float                 curL{1.0f}, curR{1.0f};
 
-    // telemetry
     ParamStore*           params{nullptr};
     std::atomic<uint32_t> activeOutRate{audio_rate::kDefaultRate};
     std::atomic<bool>     connected{false};
@@ -93,7 +87,6 @@ struct Core {
     SemaphoreHandle_t     rsMutex{nullptr};
     resampler_t*          rs{nullptr};
 
-    // skip/glitch diagnostics (atomics updated in hot paths, reported in telemetry)
     std::atomic<uint32_t> diagAudioCalls{0};
     std::atomic<uint32_t> diagAudioShort{0};
     std::atomic<uint32_t> diagAudioShortFrames{0};
@@ -118,8 +111,6 @@ void* allocPsramFirst(size_t bytes) {
     return p;
 }
 
-// ------------------------------------------------------------------ output side
-
 bool flushOutput() {
     if (!C.outMutex) return false;
     xSemaphoreTake(C.outMutex, portMAX_DELAY);
@@ -133,8 +124,6 @@ bool flushOutput() {
     xSemaphoreGive(C.outMutex);
     return true;
 }
-
-// ------------------------------------------------------------------ session handshake
 
 bool waitForAcks(uint32_t gen) {
     const uint32_t t0 = nowMs();
@@ -157,7 +146,6 @@ void resetSessionFlags() {
     C.srcBits.store(0);
 }
 
-// Stops the stream and decode tasks for the current track. Returns false if they failed to stop in time.
 bool abortSession() {
     const uint32_t g = C.gen.fetch_add(1, std::memory_order_acq_rel) + 1;
     if (!waitForAcks(g)) return false;
@@ -187,8 +175,6 @@ bool startSession(const lms::Strm& s, bool gapless) {
     C.readyGen.store(C.gen.load(), std::memory_order_release);
     return true;
 }
-
-// ------------------------------------------------------------------ stream task (HTTP -> byte ring)
 
 bool readHttpHeaders(WiFiClient& cl, uint32_t gen) {
     char    head[kHttpHeaderMax];
@@ -307,13 +293,10 @@ void streamTaskFn(void*) {
     vTaskDelete(nullptr);
 }
 
-// ------------------------------------------------------------------ decode task (byte ring -> float ring)
-
 struct ReadCtx {
     uint32_t gen;
 };
 
-// Blocking read from the byte ring. Returns 0 on end of stream, abort or stall.
 size_t ringRead(void* user, void* buf, size_t n) {
     const uint32_t gen = static_cast<ReadCtx*>(user)->gen;
     uint32_t waited = 0;
@@ -339,7 +322,6 @@ size_t ringRead(void* user, void* buf, size_t n) {
     }
 }
 
-// Blocks until `n` bytes are read, or the stream ends (returns the partial count).
 size_t ringReadFull(ReadCtx* ctx, uint8_t* buf, size_t n) {
     size_t total = 0;
     while (total < n) {
@@ -358,7 +340,6 @@ bool prepareResampler(uint32_t rate) {
 
     i2s_request_wifi_rate(targetRate);
     if (targetRate != i2s_active_rate()) {
-        // Drain barrier: let any old-rate frames in the output ring finish before switching clocks.
         const uint32_t genSnap = C.gen.load(std::memory_order_acquire);
         uint32_t waited = 0;
         while (C.playing.load(std::memory_order_acquire) &&
@@ -390,7 +371,6 @@ bool prepareResampler(uint32_t rate) {
     return C.rs != nullptr;
 }
 
-// Writes planar float frames to the output ring, waiting for room. Returns false when aborted.
 bool writeOutput(uint32_t gen, const float* L, const float* R, size_t n) {
     uint32_t waited = 0;
     while (n > 0) {
@@ -412,7 +392,6 @@ bool writeOutput(uint32_t gen, const float* L, const float* R, size_t n) {
     return true;
 }
 
-// Resamples a block of planar float input and pushes it to the output ring.
 bool emitBlock(uint32_t gen, float* L, float* R, size_t n, const lms::Gains& tg) {
     if (tg.left != 1.0f || tg.right != 1.0f) {
         for (size_t i = 0; i < n; ++i) {
@@ -581,13 +560,10 @@ void decodeTaskFn(void*) {
         if (C.gen.load(std::memory_order_acquire) == g && !C.decoderError.load()) {
             C.decoderDone.store(true, std::memory_order_release);
         }
-        // Idle until the control task starts another session; the ack at the loop top lets it proceed.
     }
     C.decodeExited.store(true);
     vTaskDelete(nullptr);
 }
-
-// ------------------------------------------------------------------ control task (SlimProto)
 
 bool discoverServer(IPAddress& out) {
     WiFiUDP udp;
@@ -739,7 +715,6 @@ void handleFrame(const lms::Frame& f, ControlState& st, WiFiClient& cl) {
             }
         }
     }
-    // every other command (display, visualiser, firmware, ...) is ignored by length
     syncOutputFlags(st);
     if (ev) sendEvents(cl, st, ev);
 }
@@ -896,9 +871,7 @@ void controlTaskFn(void*) {
     vTaskDelete(nullptr);
 }
 
-}  // namespace
-
-// ================================================================== public API
+}
 
 size_t lms_output_frames(float* left, float* right, size_t frames) {
     if (!C.outMutex || !C.playing.load(std::memory_order_acquire) || C.outPaused.load(std::memory_order_acquire)) {
@@ -916,12 +889,11 @@ size_t lms_output_frames(float* left, float* right, size_t frames) {
     C.lastAudioUs = nowUs;
     if (xSemaphoreTake(C.outMutex, 0) != pdTRUE) {
         C.diagMutexMiss.fetch_add(1, std::memory_order_relaxed);
-        return 0;     // a flush is in progress: output silence
+        return 0;
     }
 
     size_t n = C.out.read(left, right, frames);
 
-    // skip-ahead (strm 'a'): drop frames instead of playing them
     uint32_t skip = C.skipFrames.load();
     if (skip > 0 && n > 0) {
         const uint32_t drop = skip < (uint32_t)n ? skip : (uint32_t)n;
@@ -1022,8 +994,6 @@ void lms_pause_for_ota(void) {
     C.otaPause.store(true);
     for (int i = 0; i < 150 && !C.controlIdle.load(); ++i) vTaskDelay(pdMS_TO_TICKS(10));
 }
-
-// ================================================================== LmsClient
 
 LmsClient::LmsClient(ParamStore& params) : _params(params) {}
 

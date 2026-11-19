@@ -6135,7 +6135,7 @@ function db2y(db, H) {
   return H * (0.5 - db / (2 * DB_MAX));
 }
 
-function singleBiquadMag(type, freq, gain, q, f) {
+function singleIirMag(type, freq, gain, q, f) {
   const safeFreq = Math.max(20, Math.min(FS * 0.49, freq));
   const safeQ = Math.max(0.05, q);
   const w0 = 2 * Math.PI * safeFreq / FS;
@@ -6259,14 +6259,14 @@ function bandMagAt(b, f) {
       return Math.max(-60, Math.min(30, eval1stOrderLP(b.freq, f)));
     }
     if (order === 3) {
-      const m = eval1stOrderLP(b.freq, f) + singleBiquadMag(3, b.freq, 0, 1.0, f);
+      const m = eval1stOrderLP(b.freq, f) + singleIirMag(3, b.freq, 0, 1.0, f);
       return Math.max(-60, Math.min(30, m));
     }
     if (order === 4) {
-      const m = singleBiquadMag(3, b.freq, 0, 1.30656296, f) + singleBiquadMag(3, b.freq, 0, 0.5411961, f);
+      const m = singleIirMag(3, b.freq, 0, 1.30656296, f) + singleIirMag(3, b.freq, 0, 0.5411961, f);
       return Math.max(-60, Math.min(30, m));
     }
-    const m = singleBiquadMag(3, b.freq, 0, Math.SQRT1_2, f);
+    const m = singleIirMag(3, b.freq, 0, Math.SQRT1_2, f);
     return Math.max(-60, Math.min(30, m));
   }
 
@@ -6275,18 +6275,18 @@ function bandMagAt(b, f) {
       return Math.max(-60, Math.min(30, eval1stOrderHP(b.freq, f)));
     }
     if (order === 3) {
-      const m = eval1stOrderHP(b.freq, f) + singleBiquadMag(4, b.freq, 0, 1.0, f);
+      const m = eval1stOrderHP(b.freq, f) + singleIirMag(4, b.freq, 0, 1.0, f);
       return Math.max(-60, Math.min(30, m));
     }
     if (order === 4) {
-      const m = singleBiquadMag(4, b.freq, 0, 1.30656296, f) + singleBiquadMag(4, b.freq, 0, 0.5411961, f);
+      const m = singleIirMag(4, b.freq, 0, 1.30656296, f) + singleIirMag(4, b.freq, 0, 0.5411961, f);
       return Math.max(-60, Math.min(30, m));
     }
-    const m = singleBiquadMag(4, b.freq, 0, Math.SQRT1_2, f);
+    const m = singleIirMag(4, b.freq, 0, Math.SQRT1_2, f);
     return Math.max(-60, Math.min(30, m));
   }
 
-  const m = singleBiquadMag(type, b.freq, b.gain, b.q, f);
+  const m = singleIirMag(type, b.freq, b.gain, b.q, f);
   return Math.max(-60, Math.min(30, m));
 }
 
@@ -6296,9 +6296,9 @@ function evalSubsonicMagAt(f) {
   if (order < 1 || order > 4) return 0;
   const freq = subsonicParams.freq || 80;
   if (order === 1) return Math.max(-60, Math.min(30, eval1stOrderHP(freq, f)));
-  if (order === 3) return Math.max(-60, Math.min(30, eval1stOrderHP(freq, f) + singleBiquadMag(4, freq, 0, 1.0, f)));
-  if (order === 4) return Math.max(-60, Math.min(30, singleBiquadMag(4, freq, 0, 1.30656296, f) + singleBiquadMag(4, freq, 0, 0.5411961, f)));
-  return Math.max(-60, Math.min(30, singleBiquadMag(4, freq, 0, Math.SQRT1_2, f)));
+  if (order === 3) return Math.max(-60, Math.min(30, eval1stOrderHP(freq, f) + singleIirMag(4, freq, 0, 1.0, f)));
+  if (order === 4) return Math.max(-60, Math.min(30, singleIirMag(4, freq, 0, 1.30656296, f) + singleIirMag(4, freq, 0, 0.5411961, f)));
+  return Math.max(-60, Math.min(30, singleIirMag(4, freq, 0, Math.SQRT1_2, f)));
 }
 
 function totalMagAt(f) {
@@ -9135,7 +9135,7 @@ const MODULE_HELP_DOCS = {
   },
   eq: {
     title: 'Parametric Equalizer (1 to 10 Bands)',
-    summary: '64-bit biquad parametric equalizer with interactive frequency response graph.',
+    summary: '64-bit IIR parametric equalizer with interactive frequency response graph.',
     items: [
       ['Graph', 'Drag node for Frequency/Gain; middle-drag adjusts Q/Slope; right-click opens band actions. Double-click any value box to reset.'],
       ['Auto Preamp', 'Automatically sets Preamp gain to the negative of peak combined EQ boost to prevent clipping.'],

@@ -1,5 +1,3 @@
-// ESP32-S3-DSP entry point. Core 1 runs audio + DSP, core 0 runs WebUI, Wi-Fi and SlimProto.
-
 #include <Arduino.h>
 #include "audio_config.h"
 #include "i2s_audio.h"
@@ -25,7 +23,6 @@ void setup()
 {
     Serial.begin(115200);
 
-    // Give USB CDC time to enumerate if host is connected
     delay(1200);
 
     Console.println("\n========================================================");
@@ -82,7 +79,7 @@ void loop()
     vTaskDelay(portMAX_DELAY);
 }
 
-static void audioTask(void* /*pvParameters*/)
+static void audioTask(void*)
 {
     Console.println("[AUDIO] Initialising Dual-I2S Audio Driver...");
     if (!g_audio.begin()) {
@@ -115,7 +112,7 @@ static void audioTask(void* /*pvParameters*/)
     }
 }
 
-static void webTask(void* /*pvParameters*/)
+static void webTask(void*)
 {
     Console.println("[WEB] Initialising Web UI on Core 0...");
     static WebUI ui(g_params);

@@ -9,7 +9,6 @@
 
 static constexpr uint32_t kSampleRate    = SAMPLE_RATE;
 static constexpr size_t   kBufferFrames  = BUFFER_FRAMES;
-/* Bluetooth I2S feed from the WROOM bridge stays at 44.1 kHz and is resampled to kSampleRate on the S3 */
 static constexpr uint32_t kBtSampleRate  = 44100;
 static constexpr uint8_t  kChannels      = 2;
 
@@ -159,4 +158,4 @@ inline size_t blockFramesForRate(uint32_t rate) {
     return (rate >= 176400u) ? 512u : 256u;
 }
 
-}  // namespace audio_rate
+}

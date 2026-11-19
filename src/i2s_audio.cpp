@@ -79,7 +79,6 @@ void I2SAudio::_switchMasterRate(uint32_t newRate, const RateChangeCallback& onR
     if (newRate == 0 || newRate == _activeRate) return;
     const int64_t t0 = esp_timer_get_time();
 
-    // Fade out last block smoothly to avoid click on clock switch
     for (size_t i = 0; i < _blockFrames; ++i) {
         const float g = 1.0f - (static_cast<float>(i + 1) / static_cast<float>(_blockFrames));
         _leftMix[i]  *= g;
@@ -111,7 +110,6 @@ void I2SAudio::_switchMasterRate(uint32_t newRate, const RateChangeCallback& onR
     _activeRateAtomic.store(newRate, std::memory_order_release);
     ++_rateSwitches;
 
-    // Reset measurement window so measured Hz reflects the new rate cleanly
     _statsLastUs      = esp_timer_get_time();
     _statsFrames      = 0;
     _statsDspUsSum    = 0;
@@ -404,7 +402,6 @@ void I2SAudio::process(const AudioCallback& cb, const RateChangeCallback& onRate
         if (dspUs > _statsDspUsMax) _statsDspUsMax = dspUs;
         ++_statsBlocks;
 
-        // Post-DSP left-channel zero-crossing pitch check (active signal only)
         float sumSq = 0.0f;
         for (size_t i = 0; i < nFrames; ++i) sumSq += _leftMix[i] * _leftMix[i];
         if (sumSq > 1e-4f * static_cast<float>(nFrames)) {
@@ -523,7 +520,6 @@ void I2SAudio::_writeBtFrames(size_t frames)
     float bufL[kMaxBlockFrames];
     float bufR[kMaxBlockFrames];
     dsp_unpack_i32_stereo_to_f32(_rxBufBt, bufL, bufR, frames, kScale, kScale);
-    // BT stays at 44.1 kHz natively; copy directly into the BT ring buffer.
     size_t written = _btRingBuffer.write(bufL, bufR, frames);
     if (_btResampler) {
         uint32_t overrun = (frames > written) ? static_cast<uint32_t>(frames - written) : 0;

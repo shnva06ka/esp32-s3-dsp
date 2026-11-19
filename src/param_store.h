@@ -186,7 +186,6 @@ public:
             }
         }
 
-        // Load sample rate preferences from separate keys (preserves NvsBlobV2 compatibility).
         Preferences ratePrefs;
         if (ratePrefs.begin("dsp_cfg", true)) {
             const uint32_t savedAdc = ratePrefs.getUInt("adc_rate", audio_rate::kDefaultRate);
@@ -777,7 +776,6 @@ private:
     static void _sanitizeSubsonic(SubsonicParams& s) {
         if (!std::isfinite(s.freq) || s.freq < 20.0f) s.freq = 20.0f;
         if (s.freq > 100.0f) s.freq = 100.0f;
-            // order == 0 means the Subsonic high-pass filter is bypassed independently of Channel Correction
         if (s.order > 4) s.order = 2;
         if (!std::isfinite(s.balance)) s.balance = 0.0f;
         if (s.balance < -100.0f) s.balance = -100.0f;
