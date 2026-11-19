@@ -208,22 +208,20 @@ select::-ms-expand {
   border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
   text-align: left;
   font-family: var(--mono);
-  outline: none;
 }
 .input-card:hover {
-  background: var(--nord5);
+  background: var(--surface-hover);
   border-color: var(--nord9);
 }
 .input-card:active {
-  transform: scale(0.99);
+  transform: scale(0.97);
 }
 .input-card.active {
   background: var(--accent-soft);
   border-color: var(--nord10);
-  border-width: 1.5px;
 }
 .input-card-main {
   display: flex;
@@ -809,13 +807,14 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   display: inline-flex;
 }
 .preset-dropdown-btn {
+  position: relative;
   text-transform: uppercase;
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 800;
   height: 30px;
   min-width: 148px;
-  padding: 0 12px;
+  padding: 0 26px 0 12px;
   background: var(--card-bg);
   color: var(--nord0);
   border: 1px solid var(--border-strong);
@@ -966,8 +965,8 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
   text-transform: uppercase;
   font-family: var(--mono);
   font-size: 11px;
-  font-weight: 700;
-  height: 30px;
+  font-weight: 800;
+  height: 32px;
   padding: 0 10px;
   background: var(--card-bg);
   color: var(--nord0);
@@ -990,48 +989,7 @@ body:has(.sorting) { user-select: none; cursor: grabbing; }
 }
 .btn-preset-action.primary:hover {
   background: var(--accent-hover);
-}
-
-.eq-bands-box {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  background: var(--nord5);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px 12px;
-  flex-shrink: 0;
-}
-.band-count-badge {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--nord0);
-  background: var(--card-bg);
-  border: 1px solid var(--border-strong);
-  padding: 3px 8px;
-  border-radius: 2px;
-}
-.btn-primary {
-  text-transform: uppercase;
-  background: var(--accent);
-  color: var(--on-accent);
-  border: 1px solid var(--nord0);
-  font-size: 11px;
-  font-weight: 800;
-  padding: 5px 12px;
-  border-radius: 2px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.btn-primary:hover {
-  background: var(--accent-hover);
-}
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  border-color: var(--accent-hover);
 }
 
 .eq-body-layout {
@@ -1477,14 +1435,13 @@ body.reorder-bands .band-card:not(.eq-row-desktop) .band-reorder-overlay,
   padding: 4px 0;
   font-family: var(--mono);
 }
-.band-card:not(.eq-row-desktop) .band-type-menu-wrap:hover .band-type-dropdown,
 .band-type-menu-wrap.open .band-type-dropdown {
   display: block;
 }
 
 :root:not([data-theme="dark"]) .band-type-dropdown {
   background: #FFFFFF;
-  border-color: #D8DEE9;
+  border-color: var(--border-strong);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
 }
 :root:not([data-theme="dark"]) .band-menu-opt {
@@ -1539,20 +1496,20 @@ body.is-scrubbing-val * {
   user-select: none;
 }
 .eq-preamp-desk .eq-preamp-gain-field {
-  width: 136px;
-  min-width: 136px;
-  max-width: 136px;
-  flex: 0 0 136px;
+  width: 170px;
+  min-width: 170px;
+  max-width: 170px;
+  flex: 0 0 170px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
 }
 .eq-preamp-desk .eq-preamp-auto-field {
-  width: 170px;
-  min-width: 170px;
-  max-width: 170px;
-  flex: 0 0 170px;
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  flex: 0 0 100px;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -1790,7 +1747,7 @@ body.is-scrubbing-val * {
   background: var(--card-bg) !important;
   color: var(--nord0) !important;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2448,7 +2405,7 @@ body.is-scrubbing-val * {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 .boot-radio-label:hover {
-  background: var(--nord5);
+  background: var(--surface-hover);
   border-color: var(--nord9);
 }
 .boot-radio-label input[type="radio"] {
@@ -2458,7 +2415,7 @@ body.is-scrubbing-val * {
 }
 .boot-radio-label:has(input[type="radio"]:checked) {
   background: var(--accent-soft);
-  border: 1.5px solid var(--nord10);
+  border-color: var(--nord10);
   color: var(--nord0);
 }
 .boot-radio-label:has(input[type="radio"]:checked):hover {
@@ -2490,10 +2447,10 @@ body.is-scrubbing-val * {
   color: var(--nord0);
   cursor: pointer;
   user-select: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
 }
 .boot-toggle-item:hover {
-  background: var(--nord5);
+  background: var(--surface-hover);
   border-color: var(--nord9);
 }
 .boot-toggle-item:has(input[type="checkbox"]:checked) {
@@ -2533,11 +2490,12 @@ body.is-scrubbing-val * {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 .cfg-btn:hover {
-  background: var(--nord5);
+  background: var(--surface-hover);
   border-color: var(--nord9);
 }
 .cfg-btn:active,
 .boot-radio-label:active,
+.boot-toggle-item:active,
 .cfg-btn-subtle:active {
   transform: scale(0.97);
 }
@@ -2559,7 +2517,7 @@ body.is-scrubbing-val * {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 .cfg-btn-subtle:hover {
-  background: var(--nord5);
+  background: var(--surface-hover);
   border-color: var(--nord9);
 }
 .boot-saved-indicator {
@@ -2704,7 +2662,15 @@ body.is-scrubbing-val * {
   flex-direction: column;
   gap: 18px;
 }
-#about-modal .wifi-cfg-body { display: block; }
+#about-modal .wifi-cfg-body {
+  padding: 18px 20px 20px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--nord0);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .wifi-cfg-card {
   display: contents;
 }
@@ -2757,7 +2723,7 @@ body.is-scrubbing-val * {
 .wifi-text-input:focus-visible {
   border-color: var(--accent);
   outline: 2px solid var(--nord8);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 .wifi-pass-toggle {
   position: absolute;
@@ -2772,7 +2738,7 @@ body.is-scrubbing-val * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease, transform 0.1s ease;
 }
 .wifi-pass-toggle:hover {
   opacity: 1;
@@ -2808,14 +2774,14 @@ body.is-scrubbing-val * {
   border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.05s;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
-.btn-wifi-connect:hover {
-  background: var(--nord5);
+.btn-wifi-connect:hover:not(:disabled) {
+  background: var(--surface-hover);
   border-color: var(--nord9);
 }
-.btn-wifi-connect:active {
-  transform: scale(0.98);
+.btn-wifi-connect:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .btn-wifi-connect:disabled {
   background: var(--card-bg);
@@ -2870,17 +2836,20 @@ body.is-scrubbing-val * {
   color: var(--err-text);
 }
 
-body, .module-box, .module-header, .band-card.eq-row-desktop, .btn-preset, .wifi-cfg-panel, .input-card {
-  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+body, .module-box, .module-header, .band-card.eq-row-desktop, .wifi-cfg-panel, .input-card {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, opacity 0.15s ease;
 }
 
 @keyframes body-in {
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: none; }
 }
-button:not(:disabled), .input-card, .btn-preset, .mobile-tab { -webkit-tap-highlight-color: transparent; }
+button:not(:disabled), a.cfg-btn, .input-card, .mobile-tab, .boot-radio-label, .boot-toggle-item { -webkit-tap-highlight-color: transparent; }
 button:not(:disabled):active { transform: scale(0.97); }
-button:focus-visible, .switch input:focus-visible + .slider, .module-dragger:focus-visible,
+button:focus-visible, a.cfg-btn:focus-visible, .module-header:focus-visible, .ota-drop-zone:focus-visible,
+.boot-radio-label:has(input:focus-visible), .boot-toggle-item:has(input:focus-visible),
+.card-val-badge:has(input:focus-visible), .eq-scrub-box:has(input:focus-visible),
+.switch input:focus-visible + .slider, .module-dragger:focus-visible,
 select:focus-visible, input:focus-visible, .knob:focus-visible {
   outline: 2px solid var(--nord8);
   outline-offset: 2px;
@@ -2889,39 +2858,16 @@ select:focus-visible, input:focus-visible, .knob:focus-visible {
   border-radius: 50%;
 }
 .slider, .slider:before { transition: background-color 0.133s ease, transform 0.133s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.133s ease; }
-.input-card, .btn-preset, .btn-primary, .btn-card-action,
+.input-card, .btn-card-action,
 .preset-dropdown-btn, .btn-preset-action, .eq-preamp-auto-btn,
 .eq-scrub-box, .eq-add-row-btn, .band-type-menu-btn, .band-bypass-btn, .band-delete-btn,
-.eq-undo-btn, .eq-undo-dismiss, .preset-del-x, .module-header,
+.eq-undo-btn, .eq-undo-dismiss, .preset-del-x, .module-header, .wifi-modal-close,
 .band-card.eq-row-desktop .band-type-menu-btn,
 .band-card.eq-row-desktop .band-bypass-btn,
 .band-card.eq-row-desktop .band-delete-btn,
 .band-card.eq-row-desktop .eq-row-select-cb,
 .band-card.eq-row-desktop .band-dragger-titlebar.eq-row-dragger {
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
-}
-.input-card:hover, .btn-preset:hover, .btn-primary:hover, .btn-card-action:hover,
-.btn-card-action.btn-danger:hover, .preset-dropdown-btn:hover, .btn-preset-action:hover,
-.btn-preset-action.primary:hover, .eq-preamp-auto-btn:hover, .eq-scrub-box:hover,
-.eq-add-row-btn:hover:not(:disabled),
-.eq-delete-row-btn:hover:not(:disabled), .band-type-menu-btn:hover,
-.band-card.eq-row-desktop:hover,
-.band-card.eq-row-desktop .band-type-menu-btn:hover,
-.band-card.eq-row-desktop .band-bypass-btn:hover,
-.band-card.eq-row-desktop .band-delete-btn:hover:not(:disabled),
-.band-card.eq-row-desktop .eq-row-select-cb:hover,
-.band-card.eq-row-desktop .band-dragger-titlebar.eq-row-dragger:hover,
-.band-dragger-titlebar:hover .drag-grip,
-.band-bypass-btn:hover, .band-delete-btn:hover,
-.cfg-btn:hover, .cfg-btn-subtle:hover, .boot-radio-label:hover,
-.boot-radio-label:has(input[type="radio"]:checked):hover, .boot-toggle-item:hover,
-.module-info-btn:hover, .module-header:hover, .module-dragger:hover, .collapse-icon:hover,
-.wifi-modal-close:hover, .wifi-pass-toggle:hover, .btn-wifi-connect:hover,
-.eq-undo-btn:hover, .eq-undo-dismiss:hover, .preset-del-x:hover, .preset-modal-list .gm-opt:hover,
-#graph-band-menu .gm-opt:hover, .band-menu-opt:hover,
-.control-pod:hover, .ota-drop-zone:hover,
-:root:not([data-theme="dark"]) .band-card:not(.eq-row-desktop) .band-type-menu-btn:hover {
-  transition-duration: 0s !important;
 }
 .module-box { transition: border-color 0.25s ease, background-color 0.25s ease; }
 .module-box.bypassed .module-body { transition: none; }
@@ -2944,12 +2890,12 @@ select:focus-visible, input:focus-visible, .knob:focus-visible {
 .card-val-badge input.badge-val-input { text-align: center; -moz-appearance: textfield; appearance: textfield; }
 .sys-actions-grid { margin-top: 0; }
 #dsp-modal .wifi-cfg-panel { overflow: visible; }
-#dsp-modal .wifi-cfg-header { border-radius: 6px 6px 0 0; }
-#dsp-modal .wifi-cfg-body { padding-bottom: 36px; }
+#dsp-modal .wifi-cfg-header { border-radius: 5px 5px 0 0; }
 #dsp-modal .wifi-info-val { font-size: 13px; padding: 2px 0; }
 .rate-dd { display: block; }
-.rate-dd .rate-dd-btn { position: relative; display: flex; align-items: center; justify-content: flex-start; width: 100%; text-align: left; cursor: pointer; }
-.rate-dd .band-type-dropdown { left: 0; transform: none; width: 100%; margin-top: 4px; max-height: 220px; overflow-y: auto; }
+.rate-dd .rate-dd-btn { position: relative; display: flex; align-items: center; justify-content: flex-start; width: 100%; padding-right: 28px; text-align: left; cursor: pointer; transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease; }
+.rate-dd .rate-dd-btn:hover { background: var(--surface-hover); border-color: var(--nord9); }
+.rate-dd .band-type-dropdown { left: 0; transform: none; width: 100%; margin-top: 4px; max-height: 220px; overflow-y: auto; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
 .rate-dd .band-menu-opt { text-align: left; }
 .rate-dd.open .band-type-dropdown { display: block; }
 @media (min-width: 681px) {
@@ -2961,6 +2907,10 @@ select:focus-visible, input:focus-visible, .knob:focus-visible {
     padding: 7px 12px;
     background: var(--nord5);
     border-radius: 4px;
+  }
+  .sys-actions-grid .input-card:hover:not(.active) {
+    background: var(--surface-hover);
+    border-color: var(--nord9);
   }
   .sys-actions-grid .input-card.active {
     background: var(--accent-soft);
@@ -3196,12 +3146,13 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     justify-content: center;
   }
   .reorder-bar .btn-card-action {
-  text-transform: uppercase;
+    text-transform: uppercase;
     flex: 0 0 auto;
     width: auto;
     flex-direction: row;
     padding: 9px 16px;
     border: 1px solid var(--border);
+    border-radius: 4px;
   }
   .reorder-bar .btn-card-action:hover {
     border-style: solid;
@@ -3226,9 +3177,6 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
   }
   .module-box[data-module] .module-header {
     transition: min-height 0.22s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-  }
-  .module-box[data-module] .module-header:hover {
-    transition-duration: 0.22s, 0s, 0s, 0s !important;
   }
   .module-dragger {
     pointer-events: none;
@@ -3493,7 +3441,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
               <svg class="theme-icon-moon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
               <svg class="theme-icon-sun" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
             </div>
-            <div class="input-card-title" id="theme-toggle-label">Dark theme</div>
+            <div class="input-card-title" id="theme-toggle-label">Dark Theme</div>
           </div>
         </button>
 
@@ -3529,7 +3477,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
                 <polyline points="2 12 6 12 9 4 13 20 16 12 22 12"/>
               </svg>
             </div>
-            <div class="input-card-title">Sample rate</div>
+            <div class="input-card-title">Sample Rate</div>
           </div>
         </button>
       </div>
@@ -4092,7 +4040,7 @@ body { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
                 <span>Limiter</span>
               </label>
             </div>
-            <button type="button" class="cfg-btn-subtle" onclick="saveCurrentAsBootDefaults()">Use current active</button>
+            <button type="button" class="cfg-btn-subtle" onclick="saveCurrentAsBootDefaults()">Use Current Active</button>
           </div>
           <div class="module-help-row mobile-only-help">
             <button type="button" class="module-info-btn" onclick="openModuleHelp('boot-cfg', event)" title="Configuration Help" aria-label="Configuration Help">?</button>
@@ -4292,7 +4240,7 @@ function bandCardBorder(hsl, hex) {
   const tBtn = document.getElementById('theme-toggle-btn');
   const tLbl = document.getElementById('theme-toggle-label');
   if (tBtn) tBtn.setAttribute('aria-pressed', name === 'dark' ? 'true' : 'false');
-  if (tLbl) tLbl.textContent = name === 'dark' ? 'Light theme' : 'Dark theme';
+  if (tLbl) tLbl.textContent = name === 'dark' ? 'Light Theme' : 'Dark Theme';
   if (persist) { try { localStorage.setItem('esp32_dsp_theme', name); } catch (_) {} }
   if (typeof bands !== 'undefined' && document.getElementById('band-card-0')) {
     bands.forEach((_, idx) => syncBandCardUI(idx));
@@ -5730,7 +5678,7 @@ function selectRate(id, v) {
   closeRateMenus();
   setSampleRates();
 }
-document.addEventListener('click', (e) => { if (!e.target.closest('.rate-dd')) closeRateMenus(); });
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.rate-dd')) closeRateMenus(); });
 
 function setSampleRates() {
   const adcSel = document.getElementById('adc-rate-sel');
@@ -6841,16 +6789,20 @@ function getBandTypeLabel(type) {
   }
 }
 
+function closeBandMenus() {
+  document.querySelectorAll('.band-type-menu-wrap:not(.rate-dd)').forEach(w => {
+    w.classList.remove('open');
+    const b = w.querySelector('.band-type-menu-btn');
+    if (b) b.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function toggleBandMenu(i, event) {
   if (event) event.stopPropagation();
   const wrap = document.getElementById(`band-type-wrap-${i}`);
   if (!wrap) return;
   const wasOpen = wrap.classList.contains('open');
-  document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
-    w.classList.remove('open');
-    const b = w.querySelector('.band-type-menu-btn');
-    if (b) b.setAttribute('aria-expanded', 'false');
-  });
+  closeBandMenus();
   if (!wasOpen) {
     wrap.classList.add('open');
     const btn = wrap.querySelector('.band-type-menu-btn');
@@ -6858,13 +6810,9 @@ function toggleBandMenu(i, event) {
   }
 }
 
-document.addEventListener('click', (e) => {
+document.addEventListener('pointerdown', (e) => {
   if (!e.target.closest('.band-type-menu-wrap')) {
-    document.querySelectorAll('.band-type-menu-wrap').forEach(w => {
-      w.classList.remove('open');
-      const b = w.querySelector('.band-type-menu-btn');
-      if (b) b.setAttribute('aria-expanded', 'false');
-    });
+    closeBandMenus();
   }
 });
 
@@ -8019,7 +7967,7 @@ function syncBandCardUI(i) {
     card.style.borderWidth = isDeskRow ? '2px' : '3px';
     if (bypassBtn) {
       bypassBtn.setAttribute('aria-pressed', 'false');
-      if (!isDeskRow) bypassBtn.style.color = bandCardBorder(hsl, bandColor);
+      if (!isDeskRow) bypassBtn.style.color = '';
     }
     card.classList.remove('band-bypassed');
   } else {
@@ -8028,7 +7976,7 @@ function syncBandCardUI(i) {
     card.style.borderWidth = isDeskRow ? '2px' : '3px';
     if (bypassBtn) {
       bypassBtn.setAttribute('aria-pressed', 'true');
-      if (!isDeskRow) bypassBtn.style.color = 'var(--muted)';
+      if (!isDeskRow) bypassBtn.style.color = '';
     }
     card.classList.add('band-bypassed');
   }
@@ -9076,8 +9024,12 @@ document.addEventListener('keydown', (e) => {
     closeWiFiModal();
     closePresetModal();
     closeOtaModal();
+    closeDspModal();
     closeAboutModal();
     closeHelpModal();
+    closeRateMenus();
+    closeBandMenus();
+    closeGraphMenu();
   }
 });
 
@@ -9164,72 +9116,72 @@ function closeAboutModal(e) {
 const MODULE_HELP_DOCS = {
   rates: {
     title: 'Sample Rate',
-    summary: 'Enter the maximum sample rates of your ADC and DAC.',
+    summary: 'Configure the maximum sample rates of your ADC and DAC.',
     items: [
-      ['ADC sample rate', 'Analog input sample rate, fixed while active.'],
-      ['DAC sample rate', 'Highest sample rate used by DSP and DAC.'],
-      ['Active Clock', 'Current DSP/DAC rate.'],
+      ['ADC Sample Rate', 'Analog input sample rate, fixed while active.'],
+      ['DAC Sample Rate', 'Highest sample rate used by DSP and DAC.'],
+      ['Active Clock', 'Current DSP/DAC operating sample rate.'],
       ['Bluetooth', 'Always 44.1 kHz.']
     ]
   },
   input: {
-    title: 'Input Gain & Metering',
-    summary: 'Digital input trim and stereo peak/RMS/system telemetry.',
+    title: 'Inputs & System',
+    summary: 'Audio input source selection, system controls, and real-time hardware telemetry.',
     items: [
-      ['Input Gain', 'Pre-DSP level offset in dB.'],
-      ['Pre / Post', 'Input and processed output meters in dBFS, plus compressor gain reduction (GR).'],
-      ['CPU / Memory', 'Core 0/1 CPU load and PSRAM/Flash usage.']
+      ['Inputs', 'Switch active audio input between Line In (ADC), Bluetooth (A2DP), and Squeezebox (SlimProto Wi-Fi stream).'],
+      ['System', 'Master DSP Processing bypass, Light/Dark theme switch, Network setup, OTA Firmware Update, and Sample Rate configuration.'],
+      ['CPU / Memory', 'Real-time Core 0 (Sys/Net) and Core 1 (Audio DSP) load, plus SRAM, PSRAM, and Flash usage.']
     ]
   },
   eq: {
-    title: 'Parametric EQ (1 to 16 Bands)',
-    summary: '64-bit biquad equalizer.',
+    title: 'Parametric Equalizer (1 to 10 Bands)',
+    summary: '64-bit biquad parametric equalizer with interactive frequency response graph.',
     items: [
-      ['Graph', 'Drag node for Frequency/Gain. Scroll wheel changes Q; double-click resets or adds band.'],
-      ['Auto Gain', 'Compensates Preamp gain for positive EQ boosts.'],
-      ['Presets', 'Built-in and browser-saved EQ curves. Undo restores deleted bands.']
+      ['Graph', 'Drag node for Frequency/Gain; middle-drag adjusts Q/Slope; right-click opens band actions. Double-click any value box to reset.'],
+      ['Auto Preamp', 'Automatically sets Preamp gain to the negative of peak combined EQ boost to prevent clipping.'],
+      ['Presets', 'Built-in and browser-saved custom EQ curves with JSON file import/export.']
     ]
   },
   comp: {
     title: 'Compressor',
     summary: 'Dynamic range compressor.',
     items: [
-      ['Threshold / Ratio', 'Level where compression starts and reduction slope.'],
-      ['Attack / Release', 'Gain reduction engage and recovery times.'],
-      ['Knee / Make-Up', 'Threshold transition width and post-compression gain.']
+      ['Threshold / Ratio', 'Level in dBFS where compression begins and gain reduction ratio.'],
+      ['Attack / Release', 'Gain reduction engagement and recovery times in ms.'],
+      ['Makeup', 'Post-compression output gain compensation in dB.']
     ]
   },
   lim: {
-    title: 'Peak Limiter',
-    summary: 'Output brickwall peak limiter.',
+    title: 'Limiter',
+    summary: 'Output peak limiter.',
     items: [
-      ['Ceiling', 'Maximum output peak level in dBFS.'],
-      ['Release', 'Gain recovery time after limiting.']
+      ['Ceiling', 'Maximum output peak level in dBFS (-6.0 to 0.0 dBFS).'],
+      ['Knee', 'Soft-knee transition width in dB (0.0 to 6.0 dB).']
     ]
   },
   subsonic: {
     title: 'Speakers Correction & Subsonic Filter',
-    summary: 'Subsonic high-pass filter with channel alignment.',
+    summary: 'Subsonic high-pass filter with stereo channel alignment.',
     items: [
-      ['Subsonic Switch', 'Bypasses or enables the high-pass filter (20 to 100 Hz, 6 to 24 dB/oct).'],
-      ['Balance / Delay', 'Left/Right trim (-100% to +100%) and delay (-20 to +20 ms).'],
-      ['Phase', 'All-pass phase offset in 45° steps (-180° to +180°).']
+      ['Subsonic Filter', 'Bypasses or enables the high-pass filter (20 to 100 Hz, 6 to 24 dB/oct).'],
+      ['Balance / Time L-R', 'Left/Right channel balance (-100% to +100%) and time alignment delay (-20 to +20 ms).'],
+      ['Phase L-R', 'All-pass phase offset in 45° steps (-180° to +180°).']
     ]
   },
   wifi: {
     title: 'Wi-Fi Network',
     summary: 'Connect the device to your Wi-Fi network for Web UI access and Squeezebox streaming.',
     items: [
-      ['Network / Password', 'Your Wi-Fi name (SSID) and password.'],
+      ['Network / Password', 'Your Wi-Fi network name (SSID) and password.'],
       ['Hotspot Fallback', 'If Wi-Fi cannot connect, the device creates an ESP32-DSP hotspot at 192.168.4.1.']
     ]
   },
   'boot-cfg': {
-    title: 'Power-On State',
-    summary: 'DSP configuration loaded at boot.',
+    title: 'Configuration & Backup',
+    summary: 'Power-on DSP state, full JSON configuration backup, and system tools.',
     items: [
-      ['Restore Last', 'Loads the last active settings from flash.'],
-      ['Custom', 'Loads the fixed module states selected below.']
+      ['Restore Last / Custom', 'Load the last active settings from flash at boot, or enforce custom per-module startup states.'],
+      ['Presets & Backup', 'Export or import the full device DSP configuration as a JSON file.']
     ]
   }
 };
@@ -9275,6 +9227,7 @@ function openDspModal() {
 }
 function closeDspModal(e) {
   if (e && e.target && e.currentTarget && e.target !== e.currentTarget) return;
+  closeRateMenus();
   const m = document.getElementById('dsp-modal');
   if (m) m.classList.remove('open');
 }
