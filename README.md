@@ -5,13 +5,12 @@ Real-time stereo audio processor built on the ESP32-S3, controlled from a web in
 ## Features
 
 - Three inputs: Line In, Bluetooth, Squeezebox
-- Fixed 96 kHz sample rate for DSP and I2S, with on-device resampling for lower rates
-- Parametric EQ with up to 10 bands (Peaking, Shelf, Low Pass, High Pass, up to 4th order)
+- Supports sample rates of up to 192kHz
+- Parametric EQ with up to 10 bands (Peaking, Shelf, Low Pass, High Pass)
 - Speaker correction: subsonic filter, balance, per-channel delay, phase
-- Compressor and soft-knee limiter
+- Compressor and limiter
 - Adjustable processing order
-- Web UI with live EQ graph, presets, and Wi-Fi setup
-- OTA firmware updates at `/update`
+- Controlled via web UI
 
 ## Hardware Requirements
 
@@ -19,7 +18,7 @@ Real-time stereo audio processor built on the ESP32-S3, controlled from a web in
 - **Audio Converters**: PCM1808 (ADC) and PCM5102A (DAC), or any standard I2S DAC/ADC supporting 256fs MCLK (24.576 MHz generated via ESP32-S3 APLL).
 - **Bluetooth Bridge (Optional)**: ESP32-WROOM (or any classic ESP32 module) running the included bridge firmware.
 
-**Note:** The ESP32-S3-N16R8 is strictly required; modules without PSRAM or with Quad PSRAM (N8R2, N16R2) will panic on boot.
+**Note:** The ESP32-S3-N16R8 (16MB flash, 8MB PSRAM) is strictly required
 
 
 ## Getting Started
@@ -49,13 +48,6 @@ pio test -e yd_esp32s3_n16r8 --without-uploading --without-testing # Run test su
 pio device monitor -e yd_esp32s3_n16r8  # Serial monitor
 ```
 
-## Security & OTA
-
-- LAN-only appliance; no external cloud endpoints or telemetry.
-- `/update`, `/api/ota/auth`, `/api/reboot`, `/console`, and `/api/logs` use HTTP Digest auth (default `admin` / `admin`, stored in NVS `dsp_auth`, updatable via `POST /api/auth`).
-- Dual 6.25 MB OTA partitions (`app0`, `app1`) with 0xE9 header check and 5 s boot rollback confirmation. ArduinoOTA requires an NVS password and is disabled in AP mode.
-- USB recovery: `pio run -e yd_esp32s3_n16r8 -t upload` (or `-t erase` to factory-reset NVS).
-
 ## Architecture
 
 ```
@@ -65,9 +57,9 @@ Squeezebox ---------/
 ```
 
 - **ESP32-S3**: audio engine, DSP, web UI, and Squeezebox client
-- **ESP32-WROOM** (optional): Bluetooth A2DP receiver, since the S3 has no Bluetooth Classic. Any I2S source can replace it.
-- **Squeezebox**: works with Logitech Media Server and compatible players such as Roon.  
-    Supports FLAC, WAV, AIFF, and PCM up to 96 kHz; lower rates (44.1, 48, 88.2 kHz) are resampled to 96 kHz.
+- **ESP32-WROOM** (optional): Bluetooth A2DP receiver. Any I2S source can replace it
+- **Squeezebox**: full support for Logitech Media Server and compatible players such as Roon
+    Supports FLAC, WAV, AIFF, and PCM up to 192 kHz with auto resampler
 Tested with PCM1808 (ADC) and PCM5102A (DAC).
 
 ## Wiring
